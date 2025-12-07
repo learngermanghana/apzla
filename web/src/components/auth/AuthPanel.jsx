@@ -39,7 +39,12 @@ export function AuthPanel({
   onPasswordChange,
   onSubmit,
   loading,
+  errorMessage,
+  disableSubmit,
+  validationMessage,
 }) {
+  const inlineError = errorMessage || validationMessage;
+
   return (
     <div
       style={{
@@ -334,19 +339,35 @@ export function AuthPanel({
                 outline: "none",
               }}
             />
+            {inlineError && (
+              <p
+                role="alert"
+                style={{
+                  margin: 0,
+                  color: "#b91c1c",
+                  fontSize: "13px",
+                  background: "#fef2f2",
+                  border: "1px solid #fecdd3",
+                  borderRadius: "10px",
+                  padding: "10px 12px",
+                }}
+              >
+                {inlineError}
+              </p>
+            )}
             <button
               onClick={onSubmit}
-              disabled={loading}
+              disabled={disableSubmit}
               style={{
                 marginTop: "8px",
                 padding: "12px 16px",
                 borderRadius: "12px",
                 border: "none",
-                background: loading
+                background: disableSubmit
                   ? "#cbd5e1"
                   : "linear-gradient(135deg, #4338ca, #2563eb)",
-                color: loading ? "#475569" : "white",
-                cursor: loading ? "not-allowed" : "pointer",
+                color: disableSubmit ? "#475569" : "white",
+                cursor: disableSubmit ? "not-allowed" : "pointer",
                 fontSize: "15px",
                 fontWeight: 700,
                 boxShadow: "0 10px 30px rgba(37,99,235,0.35)",
@@ -385,6 +406,15 @@ AuthPanel.propTypes = {
   onPasswordChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool.isRequired,
+  errorMessage: PropTypes.string,
+  disableSubmit: PropTypes.bool,
+  validationMessage: PropTypes.string,
+};
+
+AuthPanel.defaultProps = {
+  errorMessage: "",
+  disableSubmit: false,
+  validationMessage: "",
 };
 
 export default AuthPanel;
