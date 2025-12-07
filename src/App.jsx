@@ -7,7 +7,6 @@ import {
   getDocs,
   doc,
   setDoc,
-  getDoc,
   query,
   where,
 } from "firebase/firestore";
@@ -15,18 +14,19 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
 } from "firebase/auth";
 
+import AuthPanel from "./components/auth/AuthPanel";
+import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
+import { useAuthProfile } from "./hooks/useAuthProfile";
+
 function App() {
-  const [user, setUser] = useState(null); // Firebase auth user
-  const [userProfile, setUserProfile] = useState(null); // Firestore profile
-  const [profileLoading, setProfileLoading] = useState(false);
+  const { user, userProfile, setUserProfile, profileLoading } = useAuthProfile();
 
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
+  const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
@@ -91,44 +91,19 @@ function App() {
   // Follow-up
   const [followupPastorName, setFollowupPastorName] = useState("");
 
-  // ---------- Listen to Firebase Auth state ----------
+  // ---------- Reset data when auth user changes ----------
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      setMessages([]);
-      setMembers([]);
-      setAttendance([]);
-      setGiving([]);
-      setSermons([]);
-
-      if (firebaseUser) {
-        setProfileLoading(true);
-        try {
-          const profileRef = doc(db, "users", firebaseUser.uid);
-          const snap = await getDoc(profileRef);
-          if (snap.exists()) {
-            setUserProfile({ id: snap.id, ...snap.data() });
-          } else {
-            setUserProfile(null);
-          }
-        } catch (err) {
-          console.error("Profile load error:", err);
-        } finally {
-          setProfileLoading(false);
-        }
-      } else {
-        setUserProfile(null);
-        setProfileLoading(false);
-      }
-    });
-
-    return () => unsub();
-  }, []);
+    setMessages([]);
+    setMembers([]);
+    setAttendance([]);
+    setGiving([]);
+    setSermons([]);
+  }, [user?.uid]);
 
   // ---------- Auth handlers ----------
   const handleRegister = async () => {
     try {
-      setLoading(true);
+      setAuthLoading(true);
       await createUserWithEmailAndPassword(auth, email, password);
       setEmail("");
       setPassword("");
@@ -136,13 +111,13 @@ function App() {
       console.error("Register error:", err);
       alert(err.message);
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
   const handleLogin = async () => {
     try {
-      setLoading(true);
+      setAuthLoading(true);
       await signInWithEmailAndPassword(auth, email, password);
       setEmail("");
       setPassword("");
@@ -150,7 +125,7 @@ function App() {
       console.error("Login error:", err);
       alert(err.message);
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
@@ -535,150 +510,16 @@ function App() {
   // ---------- UI: Auth screen ----------
   if (!user) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#f3f4f6",
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            background: "white",
-            borderRadius: "16px",
-            padding: "24px",
-            width: "100%",
-            maxWidth: "420px",
-            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
-          }}
-        >
-          <h1
-            style={{
-              fontSize: "26px",
-              fontWeight: 700,
-              marginBottom: "4px",
-            }}
-          >
-            ⛪ Apzla
-          </h1>
-          <p
-            style={{
-              marginBottom: "16px",
-              color: "#4b5563",
-              fontSize: "14px",
-              fontWeight: 500,
-            }}
-          >
-            Where Ministry Meets Order.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              marginBottom: "16px",
-              fontSize: "14px",
-            }}
-          >
-            <button
-              onClick={() => setAuthMode("login")}
-              style={{
-                flex: 1,
-                padding: "8px 0",
-                borderRadius: "999px",
-                border: "none",
-                background:
-                  authMode === "login" ? "#111827" : "#e5e7eb",
-                color: authMode === "login" ? "white" : "#111827",
-                cursor: "pointer",
-              }}
-            >
-              Login
-            </button>
-            <button
-              onClick={() => setAuthMode("register")}
-              style={{
-                flex: 1,
-                padding: "8px 0",
-                borderRadius: "999px",
-                border: "none",
-                background:
-                  authMode === "register" ? "#111827" : "#e5e7eb",
-                color:
-                  authMode === "register" ? "white" : "#111827",
-                cursor: "pointer",
-              }}
-            >
-              Register
-            </button>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-              }}
-            />
-            <input
-              type="password"
-              placeholder="Password (min 6 characters)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-              }}
-            />
-            <button
-              onClick={
-                authMode === "login" ? handleLogin : handleRegister
-              }
-              disabled={loading}
-              style={{
-                marginTop: "8px",
-                padding: "10px 16px",
-                borderRadius: "8px",
-                border: "none",
-                background: loading ? "#6b7280" : "#111827",
-                color: "white",
-                cursor: loading ? "default" : "pointer",
-                fontSize: "14px",
-                fontWeight: 500,
-              }}
-            >
-              {loading
-                ? "Working..."
-                : authMode === "login"
-                ? "Login"
-                : "Create account"}
-            </button>
-          </div>
-
-          <p
-            style={{
-              marginTop: "16px",
-              fontSize: "12px",
-              color: "#9ca3af",
-            }}
-          >
-            This is a basic auth screen. Later we’ll turn this into a
-            proper onboarding flow with roles and invitations.
-          </p>
-        </div>
-      </div>
+      <AuthPanel
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        email={email}
+        password={password}
+        onEmailChange={(e) => setEmail(e.target.value)}
+        onPasswordChange={(e) => setPassword(e.target.value)}
+        onSubmit={authMode === "login" ? handleLogin : handleRegister}
+        loading={authLoading}
+      />
     );
   }
 
@@ -718,158 +559,18 @@ function App() {
   // ---------- UI: user logged in but no church yet ----------
   if (user && !userProfile) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#f3f4f6",
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            background: "white",
-            borderRadius: "16px",
-            padding: "24px",
-            maxWidth: "520px",
-            width: "100%",
-            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "16px",
-              alignItems: "center",
-              marginBottom: "12px",
-            }}
-          >
-            <div>
-              <h1
-                style={{
-                  fontSize: "24px",
-                  fontWeight: 700,
-                  marginBottom: "4px",
-                }}
-              >
-                ⛪ Welcome to Apzla
-              </h1>
-              <p
-                style={{
-                  margin: 0,
-                  color: "#4b5563",
-                  fontSize: "13px",
-                }}
-              >
-                Where Ministry Meets Order.
-              </p>
-              <p
-                style={{
-                  margin: 0,
-                  color: "#6b7280",
-                  fontSize: "12px",
-                }}
-              >
-                Logged in as <strong>{user.email}</strong>
-              </p>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "999px",
-                border: "none",
-                background: "#ef4444",
-                color: "white",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: 500,
-              }}
-            >
-              Logout
-            </button>
-          </div>
-
-          <p
-            style={{
-              marginBottom: "16px",
-              color: "#6b7280",
-              fontSize: "14px",
-            }}
-          >
-            Let’s set up your church. This creates your first church in
-            Apzla and links it to your account as the church admin.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              maxWidth: "400px",
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Church name (e.g. Grace Chapel International)"
-              value={churchName}
-              onChange={(e) => setChurchName(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Country"
-              value={churchCountry}
-              onChange={(e) => setChurchCountry(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-              }}
-            />
-            <input
-              type="text"
-              placeholder="City"
-              value={churchCity}
-              onChange={(e) => setChurchCity(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-              }}
-            />
-            <button
-              onClick={handleCreateChurch}
-              disabled={loading}
-              style={{
-                marginTop: "8px",
-                padding: "10px 16px",
-                borderRadius: "8px",
-                border: "none",
-                background: loading ? "#6b7280" : "#111827",
-                color: "white",
-                cursor: loading ? "default" : "pointer",
-                fontSize: "14px",
-                fontWeight: 500,
-              }}
-            >
-              {loading ? "Saving..." : "Create Church"}
-            </button>
-          </div>
-        </div>
-      </div>
+      <ChurchSetupPanel
+        userEmail={user.email}
+        churchName={churchName}
+        churchCountry={churchCountry}
+        churchCity={churchCity}
+        onChangeChurchName={(e) => setChurchName(e.target.value)}
+        onChangeChurchCountry={(e) => setChurchCountry(e.target.value)}
+        onChangeChurchCity={(e) => setChurchCity(e.target.value)}
+        onCreateChurch={handleCreateChurch}
+        onLogout={handleLogout}
+        loading={loading}
+      />
     );
   }
 
