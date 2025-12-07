@@ -26,6 +26,7 @@ function App() {
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -101,29 +102,59 @@ function App() {
   }, [user?.uid]);
 
   // ---------- Auth handlers ----------
+  const validateAuthInputs = () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) return "Email is required.";
+
+    // Basic email pattern check to avoid immediate Firebase rejection
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(trimmedEmail)) return "Enter a valid email address.";
+
+    if (!password) return "Password is required.";
+    if (password.length < 6)
+      return "Password must be at least 6 characters long.";
+
+    return "";
+  };
+
   const handleRegister = async () => {
+    const validationMessage = validateAuthInputs();
+    if (validationMessage) {
+      setAuthError(validationMessage);
+      return;
+    }
+
     try {
       setAuthLoading(true);
-      await createUserWithEmailAndPassword(auth, email, password);
+      setAuthError("");
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
       setEmail("");
       setPassword("");
     } catch (err) {
       console.error("Register error:", err);
-      alert(err.message);
+      setAuthError(err.message);
     } finally {
       setAuthLoading(false);
     }
   };
 
   const handleLogin = async () => {
+    const validationMessage = validateAuthInputs();
+    if (validationMessage) {
+      setAuthError(validationMessage);
+      return;
+    }
+
     try {
       setAuthLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
+      setAuthError("");
+      await signInWithEmailAndPassword(auth, email.trim(), password);
       setEmail("");
       setPassword("");
     } catch (err) {
       console.error("Login error:", err);
-      alert(err.message);
+      setAuthError(err.message);
     } finally {
       setAuthLoading(false);
     }
@@ -507,18 +538,32 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
 
+  const authValidationMessage = validateAuthInputs();
+
   // ---------- UI: Auth screen ----------
   if (!user) {
     return (
       <AuthPanel
         authMode={authMode}
-        setAuthMode={setAuthMode}
+        setAuthMode={(mode) => {
+          setAuthMode(mode);
+          setAuthError("");
+        }}
         email={email}
         password={password}
-        onEmailChange={(e) => setEmail(e.target.value)}
-        onPasswordChange={(e) => setPassword(e.target.value)}
+        onEmailChange={(e) => {
+          setEmail(e.target.value);
+          setAuthError("");
+        }}
+        onPasswordChange={(e) => {
+          setPassword(e.target.value);
+          setAuthError("");
+        }}
         onSubmit={authMode === "login" ? handleLogin : handleRegister}
         loading={authLoading}
+        errorMessage={authError}
+        disableSubmit={!!authValidationMessage || authLoading}
+        validationMessage={authValidationMessage}
       />
     );
   }
