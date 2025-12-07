@@ -1,0 +1,2447 @@
+// src/App.jsx
+import { useEffect, useState } from "react";
+import { db, auth } from "./firebase";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  setDoc,
+  getDoc,
+  query,
+  where,
+} from "firebase/firestore";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+
+function App() {
+  const [user, setUser] = useState(null); // Firebase auth user
+  const [userProfile, setUserProfile] = useState(null); // Firestore profile
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+  // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Overview tab state
+  const [messages, setMessages] = useState([]);
+
+  // Church creation form
+  const [churchName, setChurchName] = useState("");
+  const [churchCountry, setChurchCountry] = useState("Ghana");
+  const [churchCity, setChurchCity] = useState("");
+
+  // Members (CRM)
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberForm, setMemberForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    status: "VISITOR",
+  });
+
+  // Attendance
+  const [attendance, setAttendance] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [attendanceForm, setAttendanceForm] = useState({
+    date: todayStr,
+    serviceType: "Sunday Service",
+    adults: "",
+    children: "",
+    visitors: "",
+    notes: "",
+  });
+
+  // Giving (collections & tithes)
+  const [giving, setGiving] = useState([]);
+  const [givingLoading, setGivingLoading] = useState(false);
+  const [givingForm, setGivingForm] = useState({
+    date: todayStr,
+    serviceType: "Sunday Service",
+    type: "Offering", // Offering | Tithe | Special
+    amount: "",
+    notes: "",
+  });
+
+  // Sermons
+  const [sermons, setSermons] = useState([]);
+  const [sermonsLoading, setSermonsLoading] = useState(false);
+  const [sermonForm, setSermonForm] = useState({
+    date: todayStr,
+    title: "",
+    preacher: "",
+    series: "",
+    scripture: "",
+    notes: "",
+    link: "",
+  });
+
+  // Follow-up
+  const [followupPastorName, setFollowupPastorName] = useState("");
+
+  // ---------- Listen to Firebase Auth state ----------
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      setMessages([]);
+      setMembers([]);
+      setAttendance([]);
+      setGiving([]);
+      setSermons([]);
+
+      if (firebaseUser) {
+        setProfileLoading(true);
+        try {
+          const profileRef = doc(db, "users", firebaseUser.uid);
+          const snap = await getDoc(profileRef);
+          if (snap.exists()) {
+            setUserProfile({ id: snap.id, ...snap.data() });
+          } else {
+            setUserProfile(null);
+          }
+        } catch (err) {
+          console.error("Profile load error:", err);
+        } finally {
+          setProfileLoading(false);
+        }
+      } else {
+        setUserProfile(null);
+        setProfileLoading(false);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  // ---------- Auth handlers ----------
+  const handleRegister = async () => {
+    try {
+      setLoading(true);
+      await createUserWithEmailAndPassword(auth, email, password);
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      console.error("Register error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      await signInWithEmailAndPassword(auth, email, password);
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      console.error("Login error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
+
+  // ---------- Create church + user profile ----------
+  const handleCreateChurch = async () => {
+    if (!user) return;
+
+    if (!churchName.trim()) {
+      alert("Please enter a church name.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const churchRef = await addDoc(collection(db, "churches"), {
+        name: churchName.trim(),
+        country: churchCountry.trim(),
+        city: churchCity.trim(),
+        ownerUserId: user.uid,
+        createdAt: new Date().toISOString(),
+      });
+
+      const churchId = churchRef.id;
+
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        churchId,
+        role: "CHURCH_ADMIN",
+        churchName: churchName.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setUserProfile({
+        id: user.uid,
+        email: user.email,
+        churchId,
+        role: "CHURCH_ADMIN",
+        churchName: churchName.trim(),
+      });
+    } catch (err) {
+      console.error("Create church error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------- Firestore test (overview, scoped by church) ----------
+  const handleAddTestDoc = async () => {
+    if (!userProfile?.churchId) {
+      alert("No church linked yet.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const colRef = collection(db, "testMessages");
+
+      await addDoc(colRef, {
+        text: `Hello from Apzla 👋 (church: ${
+          userProfile.churchName || userProfile.churchId
+        }, user: ${user?.email || "unknown"})`,
+        createdAt: new Date().toISOString(),
+        churchId: userProfile.churchId,
+      });
+
+      const q = query(colRef, where("churchId", "==", userProfile.churchId));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setMessages(data);
+    } catch (err) {
+      console.error("Firestore error:", err);
+      alert("Error talking to Firestore. Check the console.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------- Members (CRM) ----------
+  const loadMembers = async () => {
+    if (!userProfile?.churchId) return;
+    try {
+      setMembersLoading(true);
+      const colRef = collection(db, "members");
+      const qMembers = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId)
+      );
+      const snapshot = await getDocs(qMembers);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMembers(data);
+    } catch (err) {
+      console.error("Load members error:", err);
+      alert("Error loading members.");
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const handleCreateMember = async () => {
+    if (!userProfile?.churchId) return;
+
+    if (!memberForm.firstName.trim()) {
+      alert("First name is required.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addDoc(collection(db, "members"), {
+        churchId: userProfile.churchId,
+        firstName: memberForm.firstName.trim(),
+        lastName: memberForm.lastName.trim(),
+        phone: memberForm.phone.trim(),
+        email: memberForm.email.trim(),
+        status: memberForm.status,
+        createdAt: new Date().toISOString(),
+      });
+
+      setMemberForm({
+        firstName: "",
+        lastName: "",
+        phone: "",
+        email: "",
+        status: "VISITOR",
+      });
+
+      await loadMembers();
+    } catch (err) {
+      console.error("Create member error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      (activeTab === "members" ||
+        activeTab === "overview" ||
+        activeTab === "followup") &&
+      userProfile?.churchId
+    ) {
+      loadMembers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  // ---------- Attendance ----------
+  const loadAttendance = async () => {
+    if (!userProfile?.churchId) return;
+    try {
+      setAttendanceLoading(true);
+      const colRef = collection(db, "attendance");
+      const qAtt = query(colRef, where("churchId", "==", userProfile.churchId));
+      const snapshot = await getDocs(qAtt);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAttendance(data);
+    } catch (err) {
+      console.error("Load attendance error:", err);
+      alert("Error loading attendance.");
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  const handleCreateAttendance = async () => {
+    if (!userProfile?.churchId) return;
+
+    if (!attendanceForm.date) {
+      alert("Please select a date.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addDoc(collection(db, "attendance"), {
+        churchId: userProfile.churchId,
+        date: attendanceForm.date,
+        serviceType: attendanceForm.serviceType.trim() || "Service",
+        adults: attendanceForm.adults ? Number(attendanceForm.adults) : 0,
+        children: attendanceForm.children
+          ? Number(attendanceForm.children)
+          : 0,
+        visitors: attendanceForm.visitors
+          ? Number(attendanceForm.visitors)
+          : 0,
+        notes: attendanceForm.notes.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setAttendanceForm({
+        date: todayStr,
+        serviceType: "Sunday Service",
+        adults: "",
+        children: "",
+        visitors: "",
+        notes: "",
+      });
+
+      await loadAttendance();
+    } catch (err) {
+      console.error("Create attendance error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      (activeTab === "attendance" || activeTab === "overview") &&
+      userProfile?.churchId
+    ) {
+      loadAttendance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  // ---------- Giving ----------
+  const loadGiving = async () => {
+    if (!userProfile?.churchId) return;
+    try {
+      setGivingLoading(true);
+      const colRef = collection(db, "giving");
+      const qGiving = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId)
+      );
+      const snapshot = await getDocs(qGiving);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setGiving(data);
+    } catch (err) {
+      console.error("Load giving error:", err);
+      alert("Error loading giving records.");
+    } finally {
+      setGivingLoading(false);
+    }
+  };
+
+  const handleCreateGiving = async () => {
+    if (!userProfile?.churchId) return;
+
+    if (!givingForm.date) {
+      alert("Please select a date.");
+      return;
+    }
+    if (!givingForm.amount) {
+      alert("Please enter an amount.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addDoc(collection(db, "giving"), {
+        churchId: userProfile.churchId,
+        date: givingForm.date,
+        serviceType: givingForm.serviceType.trim() || "Service",
+        type: givingForm.type,
+        amount: Number(givingForm.amount),
+        notes: givingForm.notes.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setGivingForm({
+        date: todayStr,
+        serviceType: "Sunday Service",
+        type: "Offering",
+        amount: "",
+        notes: "",
+      });
+
+      await loadGiving();
+    } catch (err) {
+      console.error("Create giving error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      (activeTab === "giving" || activeTab === "overview") &&
+      userProfile?.churchId
+    ) {
+      loadGiving();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  // ---------- Sermons ----------
+  const loadSermons = async () => {
+    if (!userProfile?.churchId) return;
+    try {
+      setSermonsLoading(true);
+      const colRef = collection(db, "sermons");
+      const qSermons = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId)
+      );
+      const snapshot = await getDocs(qSermons);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setSermons(data);
+    } catch (err) {
+      console.error("Load sermons error:", err);
+      alert("Error loading sermon records.");
+    } finally {
+      setSermonsLoading(false);
+    }
+  };
+
+  const handleCreateSermon = async () => {
+    if (!userProfile?.churchId) return;
+
+    if (!sermonForm.date || !sermonForm.title.trim()) {
+      alert("Please enter at least the date and sermon title.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addDoc(collection(db, "sermons"), {
+        churchId: userProfile.churchId,
+        date: sermonForm.date,
+        title: sermonForm.title.trim(),
+        preacher: sermonForm.preacher.trim(),
+        series: sermonForm.series.trim(),
+        scripture: sermonForm.scripture.trim(),
+        notes: sermonForm.notes.trim(),
+        link: sermonForm.link.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setSermonForm({
+        date: todayStr,
+        title: "",
+        preacher: "",
+        series: "",
+        scripture: "",
+        notes: "",
+        link: "",
+      });
+
+      await loadSermons();
+    } catch (err) {
+      console.error("Create sermon error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "sermons" && userProfile?.churchId) {
+      loadSermons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  // ---------- UI: Auth screen ----------
+  if (!user) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px",
+            width: "100%",
+            maxWidth: "420px",
+            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "26px",
+              fontWeight: 700,
+              marginBottom: "4px",
+            }}
+          >
+            ⛪ Apzla
+          </h1>
+          <p
+            style={{
+              marginBottom: "16px",
+              color: "#4b5563",
+              fontSize: "14px",
+              fontWeight: 500,
+            }}
+          >
+            Where Ministry Meets Order.
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginBottom: "16px",
+              fontSize: "14px",
+            }}
+          >
+            <button
+              onClick={() => setAuthMode("login")}
+              style={{
+                flex: 1,
+                padding: "8px 0",
+                borderRadius: "999px",
+                border: "none",
+                background:
+                  authMode === "login" ? "#111827" : "#e5e7eb",
+                color: authMode === "login" ? "white" : "#111827",
+                cursor: "pointer",
+              }}
+            >
+              Login
+            </button>
+            <button
+              onClick={() => setAuthMode("register")}
+              style={{
+                flex: 1,
+                padding: "8px 0",
+                borderRadius: "999px",
+                border: "none",
+                background:
+                  authMode === "register" ? "#111827" : "#e5e7eb",
+                color:
+                  authMode === "register" ? "white" : "#111827",
+                cursor: "pointer",
+              }}
+            >
+              Register
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+              }}
+            />
+            <input
+              type="password"
+              placeholder="Password (min 6 characters)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+              }}
+            />
+            <button
+              onClick={
+                authMode === "login" ? handleLogin : handleRegister
+              }
+              disabled={loading}
+              style={{
+                marginTop: "8px",
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
+            >
+              {loading
+                ? "Working..."
+                : authMode === "login"
+                ? "Login"
+                : "Create account"}
+            </button>
+          </div>
+
+          <p
+            style={{
+              marginTop: "16px",
+              fontSize: "12px",
+              color: "#9ca3af",
+            }}
+          >
+            This is a basic auth screen. Later we’ll turn this into a
+            proper onboarding flow with roles and invitations.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- UI: loading profile ----------
+  if (profileLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px",
+            maxWidth: "420px",
+            width: "100%",
+            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: "14px", color: "#4b5563" }}>
+            Loading your profile…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- UI: user logged in but no church yet ----------
+  if (user && !userProfile) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px",
+            maxWidth: "520px",
+            width: "100%",
+            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "16px",
+              alignItems: "center",
+              marginBottom: "12px",
+            }}
+          >
+            <div>
+              <h1
+                style={{
+                  fontSize: "24px",
+                  fontWeight: 700,
+                  marginBottom: "4px",
+                }}
+              >
+                ⛪ Welcome to Apzla
+              </h1>
+              <p
+                style={{
+                  margin: 0,
+                  color: "#4b5563",
+                  fontSize: "13px",
+                }}
+              >
+                Where Ministry Meets Order.
+              </p>
+              <p
+                style={{
+                  margin: 0,
+                  color: "#6b7280",
+                  fontSize: "12px",
+                }}
+              >
+                Logged in as <strong>{user.email}</strong>
+              </p>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "999px",
+                border: "none",
+                background: "#ef4444",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 500,
+              }}
+            >
+              Logout
+            </button>
+          </div>
+
+          <p
+            style={{
+              marginBottom: "16px",
+              color: "#6b7280",
+              fontSize: "14px",
+            }}
+          >
+            Let’s set up your church. This creates your first church in
+            Apzla and links it to your account as the church admin.
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              maxWidth: "400px",
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Church name (e.g. Grace Chapel International)"
+              value={churchName}
+              onChange={(e) => setChurchName(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Country"
+              value={churchCountry}
+              onChange={(e) => setChurchCountry(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+              }}
+            />
+            <input
+              type="text"
+              placeholder="City"
+              value={churchCity}
+              onChange={(e) => setChurchCity(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+              }}
+            />
+            <button
+              onClick={handleCreateChurch}
+              disabled={loading}
+              style={{
+                marginTop: "8px",
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
+            >
+              {loading ? "Saving..." : "Create Church"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- UI: dashboard (user + church) ----------
+
+  // Overview summary metrics
+  const totalMembers = members.length;
+
+  let lastAttendanceTotal = 0;
+  let lastAttendanceDate = "";
+  if (attendance.length > 0) {
+    const sortedAttendance = [...attendance].sort((a, b) => {
+      if (!a.date) return -1;
+      if (!b.date) return 1;
+      return a.date.localeCompare(b.date);
+    });
+    const last = sortedAttendance[sortedAttendance.length - 1];
+    const adults = Number(last.adults || 0);
+    const children = Number(last.children || 0);
+    const visitors = Number(last.visitors || 0);
+    lastAttendanceTotal = adults + children + visitors;
+    lastAttendanceDate = last.date || "";
+  }
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  let givingThisMonth = 0;
+  giving.forEach((g) => {
+    if (!g.date) return;
+    const d = new Date(g.date);
+    if (Number.isNaN(d.getTime())) return;
+    if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+      givingThisMonth += Number(g.amount || 0);
+    }
+  });
+
+  // Follow-up templates (visitors)
+  const visitorTemplate = `Hi, thank you for worshipping with us at ${
+    userProfile.churchName || "our church"
+  } today. We’re glad you came. God bless you!${
+    followupPastorName ? ` – ${followupPastorName}` : ""
+  }`;
+
+  const visitorMembers = members.filter(
+    (m) => (m.status || "").toUpperCase() === "VISITOR"
+  );
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f3f4f6",
+        fontFamily:
+          "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          borderRadius: "16px",
+          padding: "24px",
+          maxWidth: "980px",
+          width: "100%",
+          boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "16px",
+            alignItems: "center",
+            marginBottom: "12px",
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                marginBottom: "4px",
+              }}
+            >
+              ⛪ Apzla Dashboard
+            </h1>
+            <p
+              style={{
+                margin: 0,
+                color: "#4b5563",
+                fontSize: "13px",
+              }}
+            >
+              Where Ministry Meets Order.
+            </p>
+            <p
+              style={{
+                margin: 0,
+                color: "#6b7280",
+                fontSize: "12px",
+              }}
+            >
+              Church:{" "}
+              <strong>{userProfile.churchName || userProfile.churchId}</strong>
+            </p>
+            <p
+              style={{
+                margin: 0,
+                color: "#6b7280",
+                fontSize: "12px",
+              }}
+            >
+              Logged in as <strong>{user.email}</strong> ({userProfile.role})
+            </p>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "999px",
+              border: "none",
+              background: "#ef4444",
+              color: "white",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: 500,
+            }}
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            marginBottom: "20px",
+            fontSize: "14px",
+          }}
+        >
+          <button
+            onClick={() => setActiveTab("overview")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "overview" ? "#111827" : "#e5e7eb",
+              color: activeTab === "overview" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab("members")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "members" ? "#111827" : "#e5e7eb",
+              color: activeTab === "members" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Members (CRM)
+          </button>
+          <button
+            onClick={() => setActiveTab("attendance")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "attendance" ? "#111827" : "#e5e7eb",
+              color: activeTab === "attendance" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Attendance
+          </button>
+          <button
+            onClick={() => setActiveTab("giving")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "giving" ? "#111827" : "#e5e7eb",
+              color: activeTab === "giving" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Giving (Tithes & Offerings)
+          </button>
+          <button
+            onClick={() => setActiveTab("followup")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "followup" ? "#111827" : "#e5e7eb",
+              color: activeTab === "followup" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Follow-up
+          </button>
+          <button
+            onClick={() => setActiveTab("sermons")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "sermons" ? "#111827" : "#e5e7eb",
+              color: activeTab === "sermons" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Sermons
+          </button>
+        </div>
+
+        {/* Tab content */}
+        {activeTab === "overview" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              This is your starting dashboard for{" "}
+              <strong>{userProfile.churchName}</strong>. You can test
+              that Firestore works and that data is scoped to this
+              church only:
+            </p>
+
+            {/* Summary cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: "12px",
+                marginBottom: "20px",
+                maxWidth: "720px",
+              }}
+            >
+              {/* Total members */}
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  background: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#6b7280",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Total members
+                </div>
+                <div
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 600,
+                    color: "#111827",
+                  }}
+                >
+                  {totalMembers}
+                </div>
+              </div>
+
+              {/* Last attendance */}
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  background: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#6b7280",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Last service attendance
+                </div>
+                <div
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 600,
+                    color: "#111827",
+                  }}
+                >
+                  {lastAttendanceTotal}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    marginTop: "2px",
+                  }}
+                >
+                  {lastAttendanceDate
+                    ? lastAttendanceDate
+                    : "No attendance yet"}
+                </div>
+              </div>
+
+              {/* Giving this month */}
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  background: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#6b7280",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Giving this month
+                </div>
+                <div
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 600,
+                    color: "#111827",
+                  }}
+                >
+                  {givingThisMonth.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    marginTop: "2px",
+                  }}
+                >
+                  {givingThisMonth > 0
+                    ? "Current month total"
+                    : "No giving records this month"}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleAddTestDoc}
+              disabled={loading}
+              style={{
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
+            >
+              {loading ? "Working..." : "Add & Fetch Test Data"}
+            </button>
+
+            <div style={{ marginTop: "24px" }}>
+              <h2
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 500,
+                  marginBottom: "8px",
+                }}
+              >
+                Messages from Firestore
+              </h2>
+
+              {messages.length === 0 ? (
+                <p style={{ color: "#9ca3af", fontSize: "14px" }}>
+                  No data yet. Click the button above to create the
+                  first record.
+                </p>
+              ) : (
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    fontSize: "14px",
+                    color: "#111827",
+                  }}
+                >
+                  {messages.map((m) => (
+                    <li
+                      key={m.id}
+                      style={{
+                        padding: "8px 0",
+                        borderBottom: "1px solid #e5e7eb",
+                      }}
+                    >
+                      <div>{m.text}</div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#6b7280",
+                        }}
+                      >
+                        {m.createdAt}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "members" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Manage your church members, visitors, and follow-ups. This
+              is the start of Apzla&apos;s customer management (CRM)
+              features.
+            </p>
+
+            {/* Member form */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: "8px",
+                marginBottom: "12px",
+                maxWidth: "520px",
+              }}
+            >
+              <input
+                type="text"
+                placeholder="First name"
+                value={memberForm.firstName}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    firstName: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Last name"
+                value={memberForm.lastName}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    lastName: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Phone"
+                value={memberForm.phone}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    phone: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={memberForm.email}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    email: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <select
+                value={memberForm.status}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    status: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="VISITOR">Visitor</option>
+                <option value="NEW_CONVERT">New Convert</option>
+                <option value="REGULAR">Regular</option>
+                <option value="WORKER">Worker</option>
+                <option value="PASTOR">Pastor</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleCreateMember}
+              disabled={loading}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px",
+              }}
+            >
+              {loading ? "Saving..." : "Save member"}
+            </button>
+
+            <div>
+              <h2
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  marginBottom: "8px",
+                }}
+              >
+                Members
+              </h2>
+
+              {membersLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading members…
+                </p>
+              ) : members.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No members yet. Add your first member above.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Name</th>
+                        <th style={{ padding: "6px 4px" }}>Phone</th>
+                        <th style={{ padding: "6px 4px" }}>Email</th>
+                        <th style={{ padding: "6px 4px" }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((m) => (
+                        <tr
+                          key={m.id}
+                          style={{
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.firstName} {m.lastName}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.phone || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.email || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.status}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "attendance" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Record attendance for each service. This helps you track
+              growth over time for{" "}
+              <strong>{userProfile.churchName}</strong>.
+            </p>
+
+            {/* Attendance form */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: "8px",
+                marginBottom: "12px",
+                maxWidth: "620px",
+              }}
+            >
+              <input
+                type="date"
+                value={attendanceForm.date}
+                onChange={(e) =>
+                  setAttendanceForm((f) => ({
+                    ...f,
+                    date: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Service type (e.g. Sunday Service)"
+                value={attendanceForm.serviceType}
+                onChange={(e) =>
+                  setAttendanceForm((f) => ({
+                    ...f,
+                    serviceType: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+
+              <input
+                type="number"
+                min="0"
+                placeholder="Adults"
+                value={attendanceForm.adults}
+                onChange={(e) =>
+                  setAttendanceForm((f) => ({
+                    ...f,
+                    adults: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="number"
+                min="0"
+                placeholder="Children"
+                value={attendanceForm.children}
+                onChange={(e) =>
+                  setAttendanceForm((f) => ({
+                    ...f,
+                    children: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="number"
+                min="0"
+                placeholder="Visitors"
+                value={attendanceForm.visitors}
+                onChange={(e) =>
+                  setAttendanceForm((f) => ({
+                    ...f,
+                    visitors: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+
+              <textarea
+                placeholder="Notes (optional)"
+                value={attendanceForm.notes}
+                onChange={(e) =>
+                  setAttendanceForm((f) => ({
+                    ...f,
+                    notes: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <button
+              onClick={handleCreateAttendance}
+              disabled={loading}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px",
+              }}
+            >
+              {loading ? "Saving..." : "Save attendance"}
+            </button>
+
+            <div>
+              <h2
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  marginBottom: "8px",
+                }}
+              >
+                Attendance records
+              </h2>
+
+              {attendanceLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading attendance…
+                </p>
+              ) : attendance.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No attendance records yet. Save your first one above.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Date</th>
+                        <th style={{ padding: "6px 4px" }}>Service</th>
+                        <th style={{ padding: "6px 4px" }}>Adults</th>
+                        <th style={{ padding: "6px 4px" }}>
+                          Children
+                        </th>
+                        <th style={{ padding: "6px 4px" }}>
+                          Visitors
+                        </th>
+                        <th style={{ padding: "6px 4px" }}>Total</th>
+                        <th style={{ padding: "6px 4px" }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendance.map((a) => {
+                        const total =
+                          (a.adults || 0) +
+                          (a.children || 0) +
+                          (a.visitors || 0);
+                        return (
+                          <tr
+                            key={a.id}
+                            style={{
+                              borderBottom: "1px solid #f3f4f6",
+                            }}
+                          >
+                            <td style={{ padding: "6px 4px" }}>
+                              {a.date}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {a.serviceType}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {a.adults ?? 0}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {a.children ?? 0}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {a.visitors ?? 0}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {total}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {a.notes || "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "giving" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Track collections, tithes, and special offerings for{" "}
+              <strong>{userProfile.churchName}</strong>.
+            </p>
+
+            {/* Giving form */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: "8px",
+                marginBottom: "12px",
+                maxWidth: "620px",
+              }}
+            >
+              <input
+                type="date"
+                value={givingForm.date}
+                onChange={(e) =>
+                  setGivingForm((f) => ({ ...f, date: e.target.value }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Service type (e.g. Sunday Service)"
+                value={givingForm.serviceType}
+                onChange={(e) =>
+                  setGivingForm((f) => ({
+                    ...f,
+                    serviceType: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+
+              <select
+                value={givingForm.type}
+                onChange={(e) =>
+                  setGivingForm((f) => ({ ...f, type: e.target.value }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="Offering">Offering</option>
+                <option value="Tithe">Tithe</option>
+                <option value="Special">Special</option>
+              </select>
+
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Amount"
+                value={givingForm.amount}
+                onChange={(e) =>
+                  setGivingForm((f) => ({
+                    ...f,
+                    amount: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+
+              <textarea
+                placeholder="Notes (e.g. project giving, special guest, currency)"
+                value={givingForm.notes}
+                onChange={(e) =>
+                  setGivingForm((f) => ({
+                    ...f,
+                    notes: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <button
+              onClick={handleCreateGiving}
+              disabled={loading}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px",
+              }}
+            >
+              {loading ? "Saving..." : "Save giving record"}
+            </button>
+
+            <div>
+              <h2
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  marginBottom: "8px",
+                }}
+              >
+                Giving records
+              </h2>
+
+              {givingLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading giving records…
+                </p>
+              ) : giving.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No giving records yet. Save your first one above.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Date</th>
+                        <th style={{ padding: "6px 4px" }}>Service</th>
+                        <th style={{ padding: "6px 4px" }}>Type</th>
+                        <th style={{ padding: "6px 4px" }}>Amount</th>
+                        <th style={{ padding: "6px 4px" }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {giving.map((g) => (
+                        <tr
+                          key={g.id}
+                          style={{
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>
+                            {g.date}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {g.serviceType}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {g.type}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {g.amount?.toLocaleString?.() ?? g.amount}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {g.notes || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "followup" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Apzla shows you who to follow up and gives you a ready
+              message. Copy it and send with your own phone via SMS or
+              WhatsApp. No SMS cost is handled inside Apzla yet.
+            </p>
+
+            {/* Pastor name for signature */}
+            <div
+              style={{
+                marginBottom: "16px",
+                maxWidth: "320px",
+              }}
+            >
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  marginBottom: "4px",
+                }}
+              >
+                Pastor / sender name (optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Pastor James"
+                value={followupPastorName}
+                onChange={(e) => setFollowupPastorName(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+            </div>
+
+            {/* Visitors list */}
+            <div style={{ marginBottom: "20px" }}>
+              <h2
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  marginBottom: "6px",
+                }}
+              >
+                Visitors in your members list
+              </h2>
+              <p
+                style={{
+                  marginBottom: "8px",
+                  color: "#6b7280",
+                  fontSize: "13px",
+                }}
+              >
+                These are members with status <strong>VISITOR</strong>.
+                Later, you can add per-service attendance so this shows{" "}
+                <em>&ldquo;visitors this Sunday&rdquo;</em>.
+              </p>
+
+              {membersLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading members…
+                </p>
+              ) : visitorMembers.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No visitors found yet. Add members with status
+                  &ldquo;Visitor&rdquo; in the Members tab.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Name</th>
+                        <th style={{ padding: "6px 4px" }}>Phone</th>
+                        <th style={{ padding: "6px 4px" }}>Email</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitorMembers.map((m) => (
+                        <tr
+                          key={m.id}
+                          style={{
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.firstName} {m.lastName}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.phone || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {m.email || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Template area */}
+            <div
+              style={{
+                borderRadius: "12px",
+                border: "1px solid #e5e7eb",
+                padding: "12px 14px",
+                maxWidth: "520px",
+                background: "#f9fafb",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "8px",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "#111827",
+                  }}
+                >
+                  Visitor thank-you message
+                </div>
+                <button
+                  onClick={() => {
+                    if (!navigator.clipboard) {
+                      alert(
+                        "Clipboard not available. You can select and copy the text manually."
+                      );
+                      return;
+                    }
+                    navigator.clipboard
+                      .writeText(visitorTemplate)
+                      .then(() =>
+                        alert(
+                          "Message copied. Paste it into WhatsApp or your SMS app."
+                        )
+                      )
+                      .catch(() =>
+                        alert(
+                          "Could not copy automatically. Please select and copy the text."
+                        )
+                      );
+                  }}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "999px",
+                    border: "none",
+                    background: "#111827",
+                    color: "white",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Copy message
+                </button>
+              </div>
+
+              <textarea
+                readOnly
+                value={visitorTemplate}
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  resize: "vertical",
+                  background: "white",
+                }}
+              />
+              <p
+                style={{
+                  marginTop: "6px",
+                  fontSize: "12px",
+                  color: "#6b7280",
+                }}
+              >
+                Tip: You can also export phone numbers from the Members
+                tab and use this text in any bulk SMS or WhatsApp
+                broadcast tool.
+              </p>
+            </div>
+          </>
+        )}
+
+        {activeTab === "sermons" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Log sermons and series so your team can quickly see what
+              was preached and when.
+            </p>
+
+            {/* Sermon form */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: "8px",
+                marginBottom: "12px",
+                maxWidth: "720px",
+              }}
+            >
+              <input
+                type="date"
+                value={sermonForm.date}
+                onChange={(e) =>
+                  setSermonForm((f) => ({ ...f, date: e.target.value }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Sermon title"
+                value={sermonForm.title}
+                onChange={(e) =>
+                  setSermonForm((f) => ({ ...f, title: e.target.value }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Preacher"
+                value={sermonForm.preacher}
+                onChange={(e) =>
+                  setSermonForm((f) => ({
+                    ...f,
+                    preacher: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Series (optional)"
+                value={sermonForm.series}
+                onChange={(e) =>
+                  setSermonForm((f) => ({
+                    ...f,
+                    series: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Main scripture (e.g. John 3:16)"
+                value={sermonForm.scripture}
+                onChange={(e) =>
+                  setSermonForm((f) => ({
+                    ...f,
+                    scripture: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Recording link (YouTube, audio – optional)"
+                value={sermonForm.link}
+                onChange={(e) =>
+                  setSermonForm((f) => ({ ...f, link: e.target.value }))
+                }
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <textarea
+                placeholder="Notes / summary"
+                value={sermonForm.notes}
+                onChange={(e) =>
+                  setSermonForm((f) => ({
+                    ...f,
+                    notes: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <button
+              onClick={handleCreateSermon}
+              disabled={loading}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "#6b7280" : "#111827",
+                color: "white",
+                cursor: loading ? "default" : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px",
+              }}
+            >
+              {loading ? "Saving..." : "Save sermon"}
+            </button>
+
+            {/* Sermons list */}
+            <div>
+              <h2
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  marginBottom: "8px",
+                }}
+              >
+                Sermon history
+              </h2>
+
+              {sermonsLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading sermons…
+                </p>
+              ) : sermons.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No sermons logged yet. Save your first one above.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Date</th>
+                        <th style={{ padding: "6px 4px" }}>Title</th>
+                        <th style={{ padding: "6px 4px" }}>Preacher</th>
+                        <th style={{ padding: "6px 4px" }}>Series</th>
+                        <th style={{ padding: "6px 4px" }}>Scripture</th>
+                        <th style={{ padding: "6px 4px" }}>Link</th>
+                        <th style={{ padding: "6px 4px" }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sermons.map((s) => (
+                        <tr
+                          key={s.id}
+                          style={{
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>{s.date}</td>
+                          <td style={{ padding: "6px 4px" }}>{s.title}</td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {s.preacher || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {s.series || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {s.scripture || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {s.link ? (
+                              <a
+                                href={s.link}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Open
+                              </a>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {s.notes || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
