@@ -1,16 +1,16 @@
-# React + Vite
+# Monorepo Layout
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository is organized for Vercel deployment with separate frontend and backend areas:
 
-Currently, two official plugins are available:
+- `web/` contains the React + Vite frontend.
+- `functions/` holds backend serverless functions that Vercel exposes under `/api`.
+- `vercel.json` configures the build pipeline and routing for both parts.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Development
 
-## React Compiler
+- Frontend: run `npm install` then `npm run dev` inside `web/`.
+- Backend: place additional serverless handlers under `functions/api/`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Deployment
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The included `vercel.json` uses Vercel's static build for the frontend and Node functions for the backend, so the project can be imported directly into Vercel.
