@@ -14,3 +14,10 @@ This repository is organized for Vercel deployment with separate frontend and ba
 ## Deployment
 
 The included `vercel.json` uses Vercel's static build for the frontend and Node functions for the backend, so the project can be imported directly into Vercel.
+
+## Operations
+
+- **Health check**: `GET /api/health` returns `{ "status": "ok", "firestore": { ... } }` when the service is healthy.
+  - By default the Firestore check is skipped and the payload notes that status.
+  - If `FIRESTORE_PROJECT_ID` and `FIRESTORE_BEARER_TOKEN` are provided, the function performs a lightweight read against `/health/health` (or `FIRESTORE_HEALTH_COLLECTION`/`FIRESTORE_HEALTH_DOCUMENT` overrides) and includes document metadata in the response.
+  - Firestore connection or dependency issues cause the endpoint to return HTTP 500 so external monitors surface outages quickly.
