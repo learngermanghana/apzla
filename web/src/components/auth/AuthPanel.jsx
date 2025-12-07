@@ -1,34 +1,8 @@
 import PropTypes from "prop-types";
-
-function ToggleButton({ label, isActive, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flex: 1,
-        padding: "10px 0",
-        borderRadius: "999px",
-        border: "1px solid #cbd5e1",
-        background: isActive
-          ? "linear-gradient(135deg, #4338ca, #2563eb)"
-          : "#f1f5f9",
-        color: isActive ? "white" : "#0f172a",
-        cursor: "pointer",
-        fontWeight: 700,
-        fontSize: "14px",
-        boxShadow: isActive ? "0 10px 30px rgba(37,99,235,0.25)" : "none",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-ToggleButton.propTypes = {
-  label: PropTypes.string.isRequired,
-  isActive: PropTypes.bool.isRequired,
-  onClick: PropTypes.func.isRequired,
-};
+import Button from "../ui/Button";
+import Card from "../ui/Card";
+import Input from "../ui/Input";
+import Pill from "../ui/Pill";
 
 export function AuthPanel({
   authMode,
@@ -46,72 +20,17 @@ export function AuthPanel({
   const inlineError = errorMessage || validationMessage;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "48px 16px 64px",
-        background:
-          "radial-gradient(circle at 10% 20%, rgba(59,130,246,0.12) 0, transparent 30%), radial-gradient(circle at 85% 15%, rgba(16,185,129,0.14) 0, transparent 30%), radial-gradient(circle at 20% 80%, rgba(99,102,241,0.12) 0, transparent 32%), linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
-        fontFamily: "Inter, 'Segoe UI', system-ui, -apple-system, sans-serif",
-        color: "#0f172a",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.8) 0, rgba(255,255,255,0) 35%), radial-gradient(circle at 70% 10%, rgba(236,72,153,0.08) 0, rgba(255,255,255,0) 25%)",
-          zIndex: 0,
-        }}
-      />
+    <div className="app-shell auth-gradient" style={{ color: "#0f172a" }}>
+      <div aria-hidden className="auth-overlay" />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.1fr 0.9fr",
-          gap: "28px",
-          alignItems: "stretch",
-          maxWidth: "1080px",
-          width: "100%",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <div
-          style={{
-            background: "rgba(255,255,255,0.85)",
-            borderRadius: "20px",
-            padding: "28px",
-            boxShadow: "0 25px 60px rgba(15,23,42,0.1)",
-            backdropFilter: "blur(6px)",
-            border: "1px solid rgba(148,163,184,0.25)",
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 12px",
-              background: "#eef2ff",
-              color: "#4338ca",
-              borderRadius: "999px",
-              fontSize: "12px",
-              fontWeight: 700,
-              letterSpacing: 0.4,
-              textTransform: "uppercase",
-            }}
-          >
-            <span style={{ fontSize: "18px" }}>⛪</span>
+      <div className="auth-grid">
+        <Card variant="frosted" style={{ borderRadius: "20px", padding: "28px" }}>
+          <Pill variant="purple">
+            <span style={{ fontSize: "18px" }} aria-hidden>
+              ⛪
+            </span>
             Apzla for Churches
-          </div>
+          </Pill>
 
           <h1
             style={{
@@ -144,14 +63,7 @@ export function AuthPanel({
               marginBottom: "18px",
             }}
           >
-            <div
-              style={{
-                background: "linear-gradient(145deg, #eef2ff, #e0f2fe)",
-                padding: "14px",
-                borderRadius: "14px",
-                border: "1px solid rgba(148,163,184,0.35)",
-              }}
-            >
+            <Card variant="gradient" className="ui-card-compact">
               <p style={{ margin: 0, color: "#4338ca", fontSize: "12px" }}>
                 Mission
               </p>
@@ -166,16 +78,8 @@ export function AuthPanel({
                 Equip every church to love people well with clear, actionable
                 data.
               </p>
-            </div>
-            <div
-              style={{
-                background: "white",
-                padding: "14px",
-                borderRadius: "14px",
-                border: "1px solid rgba(148,163,184,0.35)",
-                boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
-              }}
-            >
+            </Card>
+            <Card variant="compact">
               <p style={{ margin: 0, color: "#0f766e", fontSize: "12px" }}>
                 About Us
               </p>
@@ -190,16 +94,8 @@ export function AuthPanel({
                 A pastoral co-pilot that captures every guest, follow-up, and
                 service moment.
               </p>
-            </div>
-            <div
-              style={{
-                background: "#0f172a",
-                padding: "14px",
-                borderRadius: "14px",
-                color: "white",
-                boxShadow: "0 16px 40px rgba(15,23,42,0.4)",
-              }}
-            >
+            </Card>
+            <Card variant="dark" className="ui-card-compact">
               <p style={{ margin: 0, opacity: 0.8, fontSize: "12px" }}>
                 Our Promise
               </p>
@@ -212,7 +108,7 @@ export function AuthPanel({
               >
                 Simple to adopt. Secure by default. Built for shepherding teams.
               </p>
-            </div>
+            </Card>
           </div>
 
           <div
@@ -224,17 +120,10 @@ export function AuthPanel({
           >
             {["Member care CRM", "Attendance & giving", "Visitor follow-up", "Sermon + media links"].map(
               (item) => (
-                <div
+                <Card
                   key={item}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    background: "rgba(255,255,255,0.9)",
-                    border: "1px solid rgba(148,163,184,0.3)",
-                  }}
+                  variant="compact"
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
                 >
                   <span
                     aria-hidden
@@ -261,19 +150,17 @@ export function AuthPanel({
                       Purpose-built for ministry momentum.
                     </p>
                   </div>
-                </div>
+                </Card>
               )
             )}
           </div>
-        </div>
+        </Card>
 
-        <div
+        <Card
           style={{
-            background: "white",
             borderRadius: "20px",
             padding: "28px",
             boxShadow: "0 25px 60px rgba(15,23,42,0.14)",
-            border: "1px solid rgba(148,163,184,0.25)",
             display: "flex",
             flexDirection: "column",
             gap: "16px",
@@ -298,46 +185,38 @@ export function AuthPanel({
               fontSize: "14px",
             }}
           >
-            <ToggleButton
-              label="Login"
-              isActive={authMode === "login"}
+            <Button
+              variant="toggle"
+              active={authMode === "login"}
               onClick={() => setAuthMode("login")}
-            />
-            <ToggleButton
-              label="Register"
-              isActive={authMode === "register"}
+              fullWidth
+            >
+              Login
+            </Button>
+            <Button
+              variant="toggle"
+              active={authMode === "register"}
               onClick={() => setAuthMode("register")}
-            />
+              fullWidth
+            >
+              Register
+            </Button>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <input
+            <Input
               type="email"
               placeholder="Email"
               value={email}
               onChange={onEmailChange}
-              style={{
-                padding: "12px 14px",
-                borderRadius: "12px",
-                border: "1px solid #cbd5e1",
-                fontSize: "14px",
-                background: "#f8fafc",
-                outline: "none",
-              }}
+              style={{ background: "#f8fafc" }}
             />
-            <input
+            <Input
               type="password"
               placeholder="Password (min 6 characters)"
               value={password}
               onChange={onPasswordChange}
-              style={{
-                padding: "12px 14px",
-                borderRadius: "12px",
-                border: "1px solid #cbd5e1",
-                fontSize: "14px",
-                background: "#f8fafc",
-                outline: "none",
-              }}
+              style={{ background: "#f8fafc" }}
             />
             {inlineError && (
               <p
@@ -355,30 +234,18 @@ export function AuthPanel({
                 {inlineError}
               </p>
             )}
-            <button
+            <Button
               onClick={onSubmit}
               disabled={disableSubmit}
-              style={{
-                marginTop: "8px",
-                padding: "12px 16px",
-                borderRadius: "12px",
-                border: "none",
-                background: disableSubmit
-                  ? "#cbd5e1"
-                  : "linear-gradient(135deg, #4338ca, #2563eb)",
-                color: disableSubmit ? "#475569" : "white",
-                cursor: disableSubmit ? "not-allowed" : "pointer",
-                fontSize: "15px",
-                fontWeight: 700,
-                boxShadow: "0 10px 30px rgba(37,99,235,0.35)",
-              }}
+              fullWidth
+              style={{ marginTop: "8px" }}
             >
               {loading
                 ? "Working..."
                 : authMode === "login"
                 ? "Login"
                 : "Create account"}
-            </button>
+            </Button>
           </div>
 
           <p

@@ -1,27 +1,8 @@
 import PropTypes from "prop-types";
-
-function Field({ placeholder, value, onChange }) {
-  return (
-    <input
-      type="text"
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      style={{
-        padding: "8px 10px",
-        borderRadius: "8px",
-        border: "1px solid #d1d5db",
-        fontSize: "14px",
-      }}
-    />
-  );
-}
-
-Field.propTypes = {
-  placeholder: PropTypes.string.isRequired,
-  value: PropTypes.string.isRequired,
-  onChange: PropTypes.func.isRequired,
-};
+import Button from "../ui/Button";
+import Card from "../ui/Card";
+import Input from "../ui/Input";
+import Pill from "../ui/Pill";
 
 export function ChurchSetupPanel({
   userEmail,
@@ -36,26 +17,8 @@ export function ChurchSetupPanel({
   loading,
 }) {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f3f4f6",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          borderRadius: "16px",
-          padding: "24px",
-          maxWidth: "520px",
-          width: "100%",
-          boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
-        }}
-      >
+    <div className="app-shell soft-background">
+      <Card className="centered-panel" style={{ boxShadow: "0 15px 30px rgba(15,23,42,0.1)" }}>
         <div
           style={{
             display: "flex",
@@ -66,14 +29,18 @@ export function ChurchSetupPanel({
           }}
         >
           <div>
+            <Pill variant="white" style={{ color: "#4338ca", marginBottom: "8px" }}>
+              <span aria-hidden>⛪</span>
+              Church onboarding
+            </Pill>
             <h1
               style={{
                 fontSize: "24px",
                 fontWeight: 700,
-                marginBottom: "4px",
+                margin: "6px 0 4px",
               }}
             >
-              ⛪ Welcome to Apzla
+              Welcome to Apzla
             </h1>
             <p
               style={{
@@ -95,21 +62,9 @@ export function ChurchSetupPanel({
             </p>
           </div>
 
-          <button
-            onClick={onLogout}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "999px",
-              border: "none",
-              background: "#ef4444",
-              color: "white",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: 500,
-            }}
-          >
+          <Button variant="danger" onClick={onLogout} style={{ borderRadius: "10px" }}>
             Logout
-          </button>
+          </Button>
         </div>
 
         <p
@@ -131,40 +86,35 @@ export function ChurchSetupPanel({
             maxWidth: "400px",
           }}
         >
-          <Field
+          <Input
+            type="text"
             placeholder="Church name (e.g. Grace Chapel International)"
             value={churchName}
             onChange={onChangeChurchName}
           />
-          <Field
+          <Input
+            type="text"
             placeholder="Country"
             value={churchCountry}
             onChange={onChangeChurchCountry}
           />
-          <Field
+          <Input
+            type="text"
             placeholder="City"
             value={churchCity}
             onChange={onChangeChurchCity}
           />
-          <button
+          <Button
             onClick={onCreateChurch}
             disabled={loading}
-            style={{
-              marginTop: "8px",
-              padding: "10px 16px",
-              borderRadius: "8px",
-              border: "none",
-              background: loading ? "#6b7280" : "#111827",
-              color: "white",
-              cursor: loading ? "default" : "pointer",
-              fontSize: "14px",
-              fontWeight: 500,
-            }}
+            fullWidth
+            style={{ marginTop: "8px" }}
+            variant={loading ? "secondary" : "primary"}
           >
             {loading ? "Saving..." : "Create Church"}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
