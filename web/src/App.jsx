@@ -18,6 +18,7 @@ import {
 
 import AuthPanel from "./components/auth/AuthPanel";
 import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
+import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 
 function App() {
