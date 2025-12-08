@@ -42,6 +42,37 @@
   margin-bottom: 18px;
 }
 
+.checkin-summary {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: #f9fafb;
+}
+
+.checkin-summary-header {
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+.checkin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 16px;
+}
+
+.checkin-subvalue {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.checkin-summary-note {
+  margin: 10px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
 .checkin-form {
   display: flex;
   flex-direction: column;

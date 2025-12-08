@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   collection,
@@ -28,65 +28,95 @@ function StatusBanner({ tone = "info", message }) {
 
 export default function CheckinPage() {
   const [token, setToken] = useState("");
-  const [status, setStatus] = useState("idle");
-  const [message, setMessage] = useState("Enter your check-in link or token.");
-  const [result, setResult] = useState(null);
+  const [feedback, setFeedback] = useState({
+    status: "idle",
+    message: "Paste your token to continue.",
+  });
+  const [summary, setSummary] = useState(null);
+
+  const statusTone = useMemo(() => {
+    if (feedback.status === "success") return "success";
+    if (feedback.status === "error") return "error";
+    return "info";
+  }, [feedback.status]);
+
+  const setErrorFeedback = (message) => {
+    setFeedback({ status: "error", message });
+    setSummary(null);
+  };
+
+  const handleVerify = useCallback(
+    async (incomingToken, { auto = false } = {}) => {
+      const value = (incomingToken ?? token).trim();
+      if (!value) {
+        setErrorFeedback("Paste a token to continue.");
+        return;
+      }
+
+      setFeedback({
+        status: "loading",
+        message: auto
+          ? "Verifying the token from your link…"
+          : "Verifying your check-in link…",
+      });
+
+      try {
+        const res = await fetch("/api/verify-checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: value }),
+        });
+
+        const body = await res.json().catch(() => ({ status: "error" }));
+        const failureMessage =
+          body.message ||
+          (body.reason === "expired"
+            ? "That check-in link has expired. Ask your church admin for a new one."
+            : "Unable to verify this token. Please confirm the full link was pasted.");
+
+        if (!res.ok || body.status !== "success") {
+          setErrorFeedback(failureMessage);
+          return;
+        }
+
+        const payload = body.data;
+        const { memberId, churchId, serviceDate, serviceType } = payload;
+
+        await recordAttendance({ memberId, churchId, serviceDate, serviceType });
+
+        const confirmation = {
+          memberId,
+          memberName: payload.memberName || "Member",
+          churchId,
+          churchName: payload.churchName || "Church",
+          serviceDate,
+          serviceType: serviceType || "Service",
+          status: "Verified",
+          verifiedAt: new Date().toISOString(),
+        };
+
+        setSummary(confirmation);
+        setFeedback({
+          status: "success",
+          message: "Check-in verified! We'll record your attendance.",
+        });
+      } catch (err) {
+        setErrorFeedback(
+          err.message || "Unexpected verification error. Please try again."
+        );
+      }
+    },
+    [token]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tokenFromUrl = params.get("token") || "";
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
-      handleVerify(tokenFromUrl);
+      handleVerify(tokenFromUrl, { auto: true });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const statusTone = useMemo(() => {
-    if (status === "success") return "success";
-    if (status === "error") return "error";
-    return "info";
-  }, [status]);
-
-  const handleVerify = async (incomingToken) => {
-    const value = incomingToken || token;
-    if (!value) {
-      setMessage("Paste a token to continue.");
-      setStatus("error");
-      return;
-    }
-
-    setStatus("loading");
-    setMessage("Verifying your check-in link…");
-
-    try {
-      const res = await fetch("/api/verify-checkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: value }),
-      });
-
-      const body = await res.json().catch(() => ({ status: "error" }));
-
-      if (!res.ok || body.status !== "success") {
-        setStatus("error");
-        setMessage(body.message || "Unable to verify token.");
-        return;
-      }
-
-      const payload = body.data;
-      const { memberId, churchId, serviceDate, serviceType } = payload;
-
-      await recordAttendance({ memberId, churchId, serviceDate, serviceType });
-
-      setStatus("success");
-      setResult({ memberId, churchId, serviceDate, serviceType });
-      setMessage("You are checked in. Enjoy the service!");
-    } catch (err) {
-      setStatus("error");
-      setMessage(err.message || "Unexpected verification error.");
-    }
-  };
+  }, [handleVerify]);
 
   const recordAttendance = async ({
     memberId,
@@ -127,22 +157,40 @@ export default function CheckinPage() {
           Verify your link to mark attendance instantly.
         </p>
 
-        <StatusBanner tone={statusTone} message={message} />
+        <StatusBanner tone={statusTone} message={feedback.message} />
 
-        {result && (
-          <div className="checkin-details">
-            <div>
-              <div className="checkin-label">Member</div>
-              <div className="checkin-value">{result.memberId}</div>
+        {summary && (
+          <div className="checkin-summary">
+            <div className="checkin-summary-header">Attendance summary</div>
+            <div className="checkin-summary-grid">
+              <div>
+                <div className="checkin-label">Member</div>
+                <div className="checkin-value">{summary.memberName}</div>
+                <div className="checkin-subvalue">ID: {summary.memberId}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Church</div>
+                <div className="checkin-value">{summary.churchName}</div>
+                <div className="checkin-subvalue">ID: {summary.churchId}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Service date</div>
+                <div className="checkin-value">{summary.serviceDate}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Service</div>
+                <div className="checkin-value">{summary.serviceType}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Status</div>
+                <div className="checkin-value">{summary.status}</div>
+                <div className="checkin-subvalue">Verified at {summary.verifiedAt}</div>
+              </div>
             </div>
-            <div>
-              <div className="checkin-label">Service date</div>
-              <div className="checkin-value">{result.serviceDate}</div>
-            </div>
-            <div>
-              <div className="checkin-label">Service</div>
-              <div className="checkin-value">{result.serviceType}</div>
-            </div>
+            <p className="checkin-summary-note">
+              We have validated your token. These details are ready to be stored in
+              attendance records for this service.
+            </p>
           </div>
         )}
 
@@ -160,9 +208,9 @@ export default function CheckinPage() {
           <button
             className="checkin-button"
             onClick={() => handleVerify()}
-            disabled={status === "loading"}
+            disabled={feedback.status === "loading"}
           >
-            {status === "loading" ? "Checking…" : "Verify & check in"}
+            {feedback.status === "loading" ? "Checking…" : "Verify & check in"}
           </button>
         </div>
       </div>
