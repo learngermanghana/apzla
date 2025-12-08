@@ -90,6 +90,10 @@ function App() {
   const [attendance, setAttendance] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const defaultBaseUrl = useMemo(
+    () => (typeof window !== "undefined" ? window.location.origin : ""),
+    []
+  );
   const [attendanceForm, setAttendanceForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -107,6 +111,20 @@ function App() {
     serviceType: "Sunday Service",
     search: "",
   });
+  const [checkinTokenForm, setCheckinTokenForm] = useState({
+    memberId: "",
+    churchId: "",
+    serviceDate: todayStr,
+    serviceType: "",
+    email: "",
+    baseUrl: defaultBaseUrl,
+  });
+  const [checkinTokenLink, setCheckinTokenLink] = useState("");
+  const [checkinTokenLoading, setCheckinTokenLoading] = useState(false);
+  const [checkinTokenError, setCheckinTokenError] = useState("");
+  const [showCheckinIssuer, setShowCheckinIssuer] = useState(false);
+  const canShareCheckinLink =
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
@@ -221,6 +239,30 @@ function App() {
     }, 4200);
   };
 
+  // ---------- Persist check-in token form ----------
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem("checkinTokenForm");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setCheckinTokenForm((prev) => ({
+          ...prev,
+          ...parsed,
+          baseUrl: parsed.baseUrl || prev.baseUrl || defaultBaseUrl,
+          serviceDate: parsed.serviceDate || prev.serviceDate || todayStr,
+        }));
+      }
+    } catch (err) {
+      console.error("Restore check-in token form failed:", err);
+    }
+  }, [defaultBaseUrl, todayStr]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("checkinTokenForm", JSON.stringify(checkinTokenForm));
+  }, [checkinTokenForm]);
+
   // ---------- Reset data when auth user changes ----------
   useEffect(() => {
     setMembers([]);
@@ -229,6 +271,14 @@ function App() {
     setSermons([]);
     setMemberAttendanceHistory([]);
   }, [user?.uid]);
+
+  useEffect(() => {
+    setCheckinTokenForm((prev) => ({
+      ...prev,
+      churchId: prev.churchId || userProfile?.churchId || "",
+      baseUrl: prev.baseUrl || defaultBaseUrl,
+    }));
+  }, [userProfile?.churchId, defaultBaseUrl]);
 
   useEffect(() => {
     const fetchChurchPlan = async () => {
@@ -959,6 +1009,95 @@ function App() {
       showToast(err.message || "Unable to mark member present.", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const issueCheckinToken = async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      ...checkinTokenForm,
+      memberId: checkinTokenForm.memberId.trim(),
+      churchId: checkinTokenForm.churchId.trim(),
+      serviceDate: checkinTokenForm.serviceDate,
+      serviceType: checkinTokenForm.serviceType.trim(),
+      email: checkinTokenForm.email.trim(),
+      baseUrl: checkinTokenForm.baseUrl.trim(),
+    };
+
+    if (!payload.memberId || !payload.churchId || !payload.serviceDate) {
+      setCheckinTokenError("Member ID, church ID, and service date are required.");
+      return;
+    }
+
+    if (!payload.email) {
+      setCheckinTokenError("An email address is required to send the link.");
+      return;
+    }
+
+    setCheckinTokenError("");
+    setCheckinTokenLink("");
+
+    try {
+      setCheckinTokenLoading(true);
+      const res = await fetch("/api/checkin-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message = data?.error || data?.message || "Unable to issue link.";
+        throw new Error(message);
+      }
+
+      const token = data?.token || data?.id;
+      const linkBase = payload.baseUrl?.replace(/\/$/, "") || "";
+      const generatedLink =
+        data?.link ||
+        (token ? `${linkBase}/checkin?token=${encodeURIComponent(token)}` : "");
+
+      if (!generatedLink) {
+        throw new Error("The server did not return a check-in link.");
+      }
+
+      setCheckinTokenLink(generatedLink);
+      showToast("Check-in link issued.", "success");
+    } catch (err) {
+      console.error("Issue check-in token error:", err);
+      setCheckinTokenError(err.message || "Unable to issue link.");
+    } finally {
+      setCheckinTokenLoading(false);
+    }
+  };
+
+  const copyCheckinLink = async () => {
+    if (!checkinTokenLink) return;
+    try {
+      await navigator.clipboard.writeText(checkinTokenLink);
+      showToast("Link copied to clipboard.", "success");
+    } catch (err) {
+      console.error("Copy check-in link error:", err);
+      showToast("Unable to copy link.", "error");
+    }
+  };
+
+  const shareCheckinLink = async () => {
+    if (!checkinTokenLink) return;
+    if (!navigator?.share) {
+      showToast("Sharing is not supported on this device.", "error");
+      return;
+    }
+
+    try {
+      await navigator.share({ title: "Service check-in", url: checkinTokenLink });
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        console.error("Share check-in link error:", err);
+        showToast("Unable to share link.", "error");
+      }
     }
   };
 
@@ -3225,31 +3364,32 @@ function App() {
                   Loading check-ins…
                 </p>
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  {filteredMembers.map((m) => {
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    {filteredMembers.map((m) => {
                       const isPresent = memberAttendance.some(
                         (a) => a.memberId === m.id
                       );
-                    return (
-                      <div
-                        key={m.id}
-                        className="checkin-card"
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "10px 12px",
-                          borderRadius: "12px",
-                          border: "1px solid #e5e7eb",
-                          background: "#f9fafb",
-                        }}
-                      >
+                      return (
+                        <div
+                          key={m.id}
+                          className="checkin-card"
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 12px",
+                            borderRadius: "12px",
+                            border: "1px solid #e5e7eb",
+                            background: "#f9fafb",
+                          }}
+                        >
                           <div>
                             <div
                               style={{
@@ -3300,27 +3440,191 @@ function App() {
                           )}
                         </div>
                       );
-                  })}
+                    })}
 
-                  {members.length === 0 && (
-                    <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                      No members yet. Add members in the CRM tab to start
-                      check-ins.
-                    </p>
-                  )}
-
-                  {members.length > 0 &&
-                    filteredMembers.length === 0 && (
+                    {members.length === 0 && (
                       <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                        No members match that search.
+                        No members yet. Add members in the CRM tab to start
+                        check-ins.
                       </p>
                     )}
-                </div>
+
+                    {members.length > 0 &&
+                      filteredMembers.length === 0 && (
+                        <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                          No members match that search.
+                        </p>
+                      )}
+                  </div>
+
+                  <div className="checkin-admin-card">
+                    <div className="checkin-admin-header">
+                      <div>
+                        <div className="checkin-admin-title">
+                          Issue self check-in link
+                        </div>
+                        <p className="checkin-admin-subtitle">
+                          Create a one-time link for a member to confirm attendance
+                          remotely. Details are saved locally for quick re-issuing.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCheckinIssuer((open) => !open)}
+                        className="checkin-admin-toggle"
+                      >
+                        {showCheckinIssuer ? "Hide" : "Open"}
+                      </button>
+                    </div>
+
+                    {showCheckinIssuer && (
+                      <form
+                        onSubmit={issueCheckinToken}
+                        className="checkin-admin-form"
+                        autoComplete="off"
+                      >
+                        <div className="checkin-admin-grid">
+                          <label className="checkin-admin-field">
+                            <span>Member ID*</span>
+                            <input
+                              type="text"
+                              value={checkinTokenForm.memberId}
+                              onChange={(e) =>
+                                setCheckinTokenForm((prev) => ({
+                                  ...prev,
+                                  memberId: e.target.value,
+                                }))
+                              }
+                              placeholder="e.g. member document ID"
+                            />
+                          </label>
+
+                          <label className="checkin-admin-field">
+                            <span>Church ID*</span>
+                            <input
+                              type="text"
+                              value={checkinTokenForm.churchId}
+                              onChange={(e) =>
+                                setCheckinTokenForm((prev) => ({
+                                  ...prev,
+                                  churchId: e.target.value,
+                                }))
+                              }
+                              placeholder="e.g. church document ID"
+                            />
+                          </label>
+
+                          <label className="checkin-admin-field">
+                            <span>Service date*</span>
+                            <input
+                              type="date"
+                              value={checkinTokenForm.serviceDate}
+                              onChange={(e) =>
+                                setCheckinTokenForm((prev) => ({
+                                  ...prev,
+                                  serviceDate: e.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+
+                          <label className="checkin-admin-field">
+                            <span>Service type (optional)</span>
+                            <input
+                              type="text"
+                              value={checkinTokenForm.serviceType}
+                              onChange={(e) =>
+                                setCheckinTokenForm((prev) => ({
+                                  ...prev,
+                                  serviceType: e.target.value,
+                                }))
+                              }
+                              placeholder="Sunday Service, Midweek, etc."
+                            />
+                          </label>
+
+                          <label className="checkin-admin-field">
+                            <span>Recipient email*</span>
+                            <input
+                              type="email"
+                              value={checkinTokenForm.email}
+                              onChange={(e) =>
+                                setCheckinTokenForm((prev) => ({
+                                  ...prev,
+                                  email: e.target.value,
+                                }))
+                              }
+                              placeholder="member@email.com"
+                            />
+                          </label>
+
+                          <label className="checkin-admin-field">
+                            <span>Base URL*</span>
+                            <input
+                              type="text"
+                              value={checkinTokenForm.baseUrl}
+                              onChange={(e) =>
+                                setCheckinTokenForm((prev) => ({
+                                  ...prev,
+                                  baseUrl: e.target.value,
+                                }))
+                              }
+                              placeholder="https://app.example.com"
+                            />
+                          </label>
+                        </div>
+
+                        {checkinTokenError && (
+                          <div className="checkin-admin-error">{checkinTokenError}</div>
+                        )}
+
+                        <div className="checkin-admin-actions">
+                          <div className="checkin-admin-note">
+                            Fields are stored locally so you can quickly issue multiple
+                            links.
+                          </div>
+                          <button
+                            type="submit"
+                            className="checkin-admin-submit"
+                            disabled={checkinTokenLoading}
+                          >
+                            {checkinTokenLoading ? "Issuing…" : "Send check-in link"}
+                          </button>
+                        </div>
+
+                        {checkinTokenLink && (
+                          <div className="checkin-link-box">
+                            <div>
+                              <div className="checkin-link-label">Issued link</div>
+                              <div className="checkin-link-value">{checkinTokenLink}</div>
+                            </div>
+                            <div className="checkin-link-actions">
+                              <button type="button" onClick={copyCheckinLink}>
+                                Copy
+                              </button>
+                              <button
+                                type="button"
+                                onClick={shareCheckinLink}
+                                disabled={!canShareCheckinLink}
+                                title={
+                                  canShareCheckinLink
+                                    ? "Share link"
+                                    : "Device does not support the Web Share API"
+                                }
+                              >
+                                Share
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </form>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </>
         )}
-
         {activeTab === "giving" && (
           <>
             <p
