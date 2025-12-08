@@ -21,3 +21,10 @@ The included `vercel.json` uses Vercel's static build for the frontend and Node 
   - By default the Firestore check is skipped and the payload notes that status.
   - If `FIRESTORE_PROJECT_ID` and `FIRESTORE_BEARER_TOKEN` are provided, the function performs a lightweight read against `/health/health` (or `FIRESTORE_HEALTH_COLLECTION`/`FIRESTORE_HEALTH_DOCUMENT` overrides) and includes document metadata in the response.
   - Firestore connection or dependency issues cause the endpoint to return HTTP 500 so external monitors surface outages quickly.
+
+## Check-in links
+
+- **Issue a token + link**: `POST /api/checkin-token` with `memberId`, `churchId`, `serviceDate`, optional `serviceType`, `email`, and `baseUrl`.
+  - Requires `CHECKIN_JWT_SECRET`, `FIRESTORE_PROJECT_ID`, and `FIRESTORE_BEARER_TOKEN` environment variables (optional overrides: `FIRESTORE_CHECKIN_COLLECTION`, `FIRESTORE_NOTIFICATION_COLLECTION`, `CHECKIN_TOKEN_TTL_MINUTES`, `APP_BASE_URL`).
+  - Stores a nonce document in Firestore and, when `email` and `baseUrl`/`APP_BASE_URL` are provided, queues a notification document containing the link `https://<app>/checkin?token=...`.
+- **Verify and consume**: `POST /api/verify-checkin` with `token` to validate and mark a nonce as used; responses indicate success/failure and include the decoded payload for the client to record attendance.
