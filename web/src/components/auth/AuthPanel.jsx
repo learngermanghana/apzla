@@ -3,6 +3,7 @@ import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 import Pill from "../ui/Pill";
+import churchPhoto from "../../assets/pexels-jibarofoto-2019331.jpg";
 
 export function AuthPanel({
   authMode,
@@ -25,6 +26,19 @@ export function AuthPanel({
 
       <div className="auth-grid">
         <Card variant="frosted" style={{ borderRadius: "20px", padding: "28px" }}>
+          <div className="auth-hero-photo" role="img" aria-label="Church community worshipping">
+            <div className="auth-hero-photo-overlay" />
+            <img src={churchPhoto} alt="Congregation worshipping" loading="lazy" />
+            <div className="auth-hero-photo-caption">
+              <span aria-hidden>🌅</span>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700 }}>Moments of worship</p>
+                <p style={{ margin: 0, fontSize: "12px" }}>
+                  Capture every service highlight with Apzla.
+                </p>
+              </div>
+            </div>
+          </div>
           <Pill variant="purple">
             <span style={{ fontSize: "18px" }} aria-hidden>
               ⛪
