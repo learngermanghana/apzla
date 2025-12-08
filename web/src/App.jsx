@@ -30,6 +30,7 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toasts, setToasts] = useState([]);
 
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
   const [activeTab, setActiveTab] = useState("overview");
@@ -101,6 +102,14 @@ function App() {
 
   // Follow-up
   const [followupPastorName, setFollowupPastorName] = useState("");
+
+  const showToast = (message, variant = "info") => {
+    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
+    setToasts((prev) => [...prev, { id, message, variant }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 4200);
+  };
 
   // ---------- Reset data when auth user changes ----------
   useEffect(() => {
@@ -179,7 +188,7 @@ function App() {
     if (!user) return;
 
     if (!churchName.trim()) {
-      alert("Please enter a church name.");
+      showToast("Please enter a church name.", "error");
       return;
     }
 
@@ -211,9 +220,11 @@ function App() {
         role: "CHURCH_ADMIN",
         churchName: churchName.trim(),
       });
+
+      showToast("Church created and linked to your account.", "success");
     } catch (err) {
       console.error("Create church error:", err);
-      alert(err.message);
+      showToast(err.message || "Unable to create church.", "error");
     } finally {
       setLoading(false);
     }
@@ -222,7 +233,7 @@ function App() {
   // ---------- Firestore test (overview, scoped by church) ----------
   const handleAddTestDoc = async () => {
     if (!userProfile?.churchId) {
-      alert("No church linked yet.");
+      showToast("No church linked yet.", "error");
       return;
     }
 
@@ -246,9 +257,10 @@ function App() {
       }));
 
       setMessages(data);
+      showToast("Test message saved to Firestore.", "success");
     } catch (err) {
       console.error("Firestore error:", err);
-      alert("Error talking to Firestore. Check the console.");
+      showToast("Error talking to Firestore. Check the console.", "error");
     } finally {
       setLoading(false);
     }
@@ -272,7 +284,7 @@ function App() {
       setMembers(data);
     } catch (err) {
       console.error("Load members error:", err);
-      alert("Error loading members.");
+      showToast("Error loading members.", "error");
     } finally {
       setMembersLoading(false);
     }
@@ -282,7 +294,7 @@ function App() {
     if (!userProfile?.churchId) return;
 
     if (!memberForm.firstName.trim()) {
-      alert("First name is required.");
+      showToast("First name is required.", "error");
       return;
     }
 
@@ -307,9 +319,10 @@ function App() {
       });
 
       await loadMembers();
+      showToast("Member saved.", "success");
     } catch (err) {
       console.error("Create member error:", err);
-      alert(err.message);
+      showToast(err.message || "Unable to save member.", "error");
     } finally {
       setLoading(false);
     }
@@ -343,7 +356,7 @@ function App() {
       setAttendance(data);
     } catch (err) {
       console.error("Load attendance error:", err);
-      alert("Error loading attendance.");
+      showToast("Error loading attendance.", "error");
     } finally {
       setAttendanceLoading(false);
     }
@@ -353,7 +366,7 @@ function App() {
     if (!userProfile?.churchId) return;
 
     if (!attendanceForm.date) {
-      alert("Please select a date.");
+      showToast("Please select a date.", "error");
       return;
     }
 
@@ -384,9 +397,10 @@ function App() {
       });
 
       await loadAttendance();
+      showToast("Attendance saved.", "success");
     } catch (err) {
       console.error("Create attendance error:", err);
-      alert(err.message);
+      showToast(err.message || "Unable to save attendance.", "error");
     } finally {
       setLoading(false);
     }
@@ -423,7 +437,7 @@ function App() {
       setMemberAttendance(data);
     } catch (err) {
       console.error("Load member attendance error:", err);
-      alert("Error loading member attendance.");
+      showToast("Error loading member attendance.", "error");
     } finally {
       setMemberAttendanceLoading(false);
     }
@@ -450,9 +464,10 @@ function App() {
       });
 
       await loadMemberAttendance();
+      showToast("Member marked present.", "success");
     } catch (err) {
       console.error("Create member attendance error:", err);
-      alert(err.message);
+      showToast(err.message || "Unable to mark member present.", "error");
     } finally {
       setLoading(false);
     }
@@ -483,7 +498,7 @@ function App() {
       setGiving(data);
     } catch (err) {
       console.error("Load giving error:", err);
-      alert("Error loading giving records.");
+      showToast("Error loading giving records.", "error");
     } finally {
       setGivingLoading(false);
     }
@@ -493,11 +508,11 @@ function App() {
     if (!userProfile?.churchId) return;
 
     if (!givingForm.date) {
-      alert("Please select a date.");
+      showToast("Please select a date.", "error");
       return;
     }
     if (!givingForm.amount) {
-      alert("Please enter an amount.");
+      showToast("Please enter an amount.", "error");
       return;
     }
 
@@ -522,9 +537,10 @@ function App() {
       });
 
       await loadGiving();
+      showToast("Giving record saved.", "success");
     } catch (err) {
       console.error("Create giving error:", err);
-      alert(err.message);
+      showToast(err.message || "Unable to save giving record.", "error");
     } finally {
       setLoading(false);
     }
@@ -558,7 +574,7 @@ function App() {
       setSermons(data);
     } catch (err) {
       console.error("Load sermons error:", err);
-      alert("Error loading sermon records.");
+      showToast("Error loading sermon records.", "error");
     } finally {
       setSermonsLoading(false);
     }
@@ -568,7 +584,7 @@ function App() {
     if (!userProfile?.churchId) return;
 
     if (!sermonForm.date || !sermonForm.title.trim()) {
-      alert("Please enter at least the date and sermon title.");
+      showToast("Please enter at least the date and sermon title.", "error");
       return;
     }
 
@@ -597,9 +613,10 @@ function App() {
       });
 
       await loadSermons();
+      showToast("Sermon saved.", "success");
     } catch (err) {
       console.error("Create sermon error:", err);
-      alert(err.message);
+      showToast(err.message || "Unable to save sermon.", "error");
     } finally {
       setLoading(false);
     }
@@ -798,6 +815,25 @@ function App() {
           "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`toast toast-${toast.variant}`}
+          >
+            <span className="toast-message">{toast.message}</span>
+            <button
+              onClick={() =>
+                setToasts((prev) => prev.filter((t) => t.id !== toast.id))
+              }
+              aria-label="Dismiss toast"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div
         style={{
           background: "white",
@@ -877,6 +913,7 @@ function App() {
 
         {/* Tabs */}
         <div
+          className="dashboard-tabs"
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -1360,9 +1397,10 @@ function App() {
 
             {/* Member form */}
             <div
+              className="member-form-grid"
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                 gap: "8px",
                 marginBottom: "12px",
                 maxWidth: "520px",
@@ -1499,7 +1537,7 @@ function App() {
                   No members yet. Add your first member above.
                 </p>
               ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div className="members-table-wrapper" style={{ overflowX: "auto" }}>
                   <table
                     style={{
                       width: "100%",
@@ -1811,9 +1849,10 @@ function App() {
 
             {/* Service info */}
             <div
+              className="service-grid"
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
                 gap: "8px",
                 marginBottom: "12px",
                 maxWidth: "620px",
@@ -1898,19 +1937,20 @@ function App() {
                       const isPresent = memberAttendance.some(
                         (a) => a.memberId === m.id
                       );
-                      return (
-                        <div
-                          key={m.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "10px 12px",
-                            borderRadius: "12px",
-                            border: "1px solid #e5e7eb",
-                            background: "#f9fafb",
-                          }}
-                        >
+                    return (
+                      <div
+                        key={m.id}
+                        className="checkin-card"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "10px 12px",
+                          borderRadius: "12px",
+                          border: "1px solid #e5e7eb",
+                          background: "#f9fafb",
+                        }}
+                      >
                           <div>
                             <div
                               style={{
@@ -2344,21 +2384,24 @@ function App() {
                 <button
                   onClick={() => {
                     if (!navigator.clipboard) {
-                      alert(
-                        "Clipboard not available. You can select and copy the text manually."
+                      showToast(
+                        "Clipboard not available. You can select and copy the text manually.",
+                        "error"
                       );
                       return;
                     }
                     navigator.clipboard
                       .writeText(visitorTemplate)
                       .then(() =>
-                        alert(
-                          "Message copied. Paste it into WhatsApp or your SMS app."
+                        showToast(
+                          "Message copied. Paste it into WhatsApp or your SMS app.",
+                          "success"
                         )
                       )
                       .catch(() =>
-                        alert(
-                          "Could not copy automatically. Please select and copy the text."
+                        showToast(
+                          "Could not copy automatically. Please select and copy the text.",
+                          "error"
                         )
                       );
                   }}
