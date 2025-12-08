@@ -745,6 +745,36 @@ function App() {
     }
   });
 
+  const totalAttendanceRecords = attendance.length;
+  let totalAttendanceCount = 0;
+  let attendanceThisMonthTotal = 0;
+
+  attendance.forEach((record) => {
+    const adults = Number(record.adults || 0);
+    const children = Number(record.children || 0);
+    const visitors = Number(record.visitors || 0);
+    const total = adults + children + visitors;
+
+    totalAttendanceCount += total;
+
+    if (record.date) {
+      const recordDate = new Date(record.date);
+
+      if (
+        !Number.isNaN(recordDate) &&
+        recordDate.getFullYear() === currentYear &&
+        recordDate.getMonth() === currentMonth
+      ) {
+        attendanceThisMonthTotal += total;
+      }
+    }
+  });
+
+  const averageAttendance =
+    totalAttendanceRecords > 0
+      ? Math.round((totalAttendanceCount / totalAttendanceRecords) * 10) / 10
+      : 0;
+
   // Follow-up templates (visitors)
   const visitorTemplate = `Hi, thank you for worshipping with us at ${
     userProfile.churchName || "our church"
@@ -1096,6 +1126,152 @@ function App() {
                   {givingThisMonth > 0
                     ? "Current month total"
                     : "No giving records this month"}
+                </div>
+              </div>
+            </div>
+
+            {/* Attendance summary */}
+            <div style={{ marginBottom: "20px" }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                  color: "#111827",
+                }}
+              >
+                Attendance summary
+              </h3>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: "12px",
+                  maxWidth: "900px",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "#6b7280",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Services tracked
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "22px",
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    {totalAttendanceRecords}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {totalAttendanceRecords > 0
+                      ? "Lifetime services logged"
+                      : "No attendance yet"}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "#6b7280",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Average per service
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "22px",
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    {averageAttendance}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {totalAttendanceRecords > 0
+                      ? "Across all attendance logs"
+                      : "Add attendance to see averages"}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "#6b7280",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    This month attendance
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "22px",
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    {attendanceThisMonthTotal}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {attendanceThisMonthTotal > 0
+                      ? "Adults, children, and visitors combined"
+                      : "No attendance logged this month"}
+                  </div>
                 </div>
               </div>
             </div>
