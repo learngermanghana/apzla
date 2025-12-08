@@ -26,6 +26,5 @@ The included `vercel.json` uses Vercel's static build for the frontend and Node 
 
 - **Issue a token + link**: `POST /api/checkin-token` with `memberId`, `churchId`, `serviceDate`, optional `serviceType`, `email`, and `baseUrl`.
   - Requires `CHECKIN_JWT_SECRET`, `FIRESTORE_PROJECT_ID`, and `FIRESTORE_BEARER_TOKEN` environment variables (optional overrides: `FIRESTORE_CHECKIN_COLLECTION`, `FIRESTORE_NOTIFICATION_COLLECTION`, `CHECKIN_TOKEN_TTL_MINUTES`, `APP_BASE_URL`).
-  - Stores a nonce document in Firestore and, when `email` and `baseUrl`/`APP_BASE_URL` are provided, queues a notification document containing the link `https://<app>/checkin?token=...` plus a ready-to-use QR image URL for scanning.
-  - Supports bulk issuance: send `{ members: [{ memberId, churchId, serviceDate, serviceType?, email?, baseUrl? }, ...] }` to receive per-member links and QR URLs in a single call (HTTP 207 response with per-member results).
+  - Stores a nonce document in Firestore and, when `email` and `baseUrl`/`APP_BASE_URL` are provided, queues a notification document containing the link `https://<app>/checkin?token=...`.
 - **Verify and consume**: `POST /api/verify-checkin` with `token` to validate and mark a nonce as used; responses indicate success/failure and include the decoded payload for the client to record attendance.

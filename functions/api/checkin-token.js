@@ -38,12 +38,6 @@ function signJwt(payload) {
   return `${data}.${signature}`
 }
 
-function buildQrImageUrl(link) {
-  if (!link) return null
-  const encoded = encodeURIComponent(link)
-  return `https://quickchart.io/qr?text=${encoded}&margin=2&size=300`
-}
-
 function buildFirestoreFields(fields) {
   const mapped = {}
 
@@ -99,14 +93,7 @@ async function writeNonceRecord(nonce, payload) {
   }
 }
 
-async function queueNotification({
-  email,
-  link,
-  memberId,
-  churchId,
-  serviceDate,
-  qrImageUrl,
-}) {
+async function queueNotification({ email, link, memberId, churchId, serviceDate }) {
   if (!email) return null
 
   const endpoint = `${firestoreBase}/${notificationCollection}`
@@ -115,7 +102,6 @@ async function queueNotification({
       channel: 'email',
       email,
       link,
-      qrImageUrl,
       memberId,
       churchId,
       serviceDate,
@@ -123,7 +109,7 @@ async function queueNotification({
       type: 'checkin-link',
       createdAt: new Date(),
       subject: 'Your check-in link',
-      message: `Tap or scan to check in for service: ${link}`,
+      message: `Tap to check in for service: ${link}`,
     }),
   }
 
@@ -155,7 +141,7 @@ async function handler(request, response) {
   const { memberId, churchId, serviceDate, serviceType, email, baseUrl } =
     request.body || {}
 
-  if (!Array.isArray(request.body?.members) && (!memberId || !churchId || !serviceDate)) {
+  if (!memberId || !churchId || !serviceDate) {
     return response.status(400).json({
       status: 'error',
       message: 'memberId, churchId, and serviceDate are required.',
@@ -177,110 +163,52 @@ async function handler(request, response) {
     })
   }
 
-  async function issueTokenForMember(memberPayload) {
-    const issuedAt = Math.floor(Date.now() / 1000)
-    const expiresAt = issuedAt + tokenTtlMinutes * 60
-    const nonce = crypto.randomUUID()
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const expiresAt = issuedAt + tokenTtlMinutes * 60
+  const nonce = crypto.randomUUID()
 
-    const payload = {
-      memberId: memberPayload.memberId,
-      churchId: memberPayload.churchId,
-      serviceDate: memberPayload.serviceDate,
-      serviceType: memberPayload.serviceType || 'Service',
-      nonce,
-      iat: issuedAt,
-      exp: expiresAt,
-    }
+  const payload = {
+    memberId,
+    churchId,
+    serviceDate,
+    serviceType: serviceType || 'Service',
+    nonce,
+    iat: issuedAt,
+    exp: expiresAt,
+  }
 
-    const token = signJwt(payload)
+  const token = signJwt(payload)
 
+  try {
     await writeNonceRecord(nonce, {
-      memberId: payload.memberId,
-      churchId: payload.churchId,
-      serviceDate: payload.serviceDate,
+      memberId,
+      churchId,
+      serviceDate,
       serviceType: payload.serviceType,
       expiresAt: new Date(expiresAt * 1000).toISOString(),
     })
 
-    const normalizedBase = (memberPayload.baseUrl || baseUrl || appBaseUrl || '').replace(
-      /\/$/,
-      ''
-    )
+    const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
     const checkinLink = normalizedBase
       ? `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
       : null
-    const qrImageUrl = buildQrImageUrl(checkinLink)
 
-    if (memberPayload.email && checkinLink) {
+    if (email && checkinLink) {
       await queueNotification({
-        email: memberPayload.email,
+        email,
         link: checkinLink,
-        memberId: payload.memberId,
-        churchId: payload.churchId,
-        serviceDate: payload.serviceDate,
-        qrImageUrl,
+        memberId,
+        churchId,
+        serviceDate,
       })
     }
 
-    return {
+    return response.status(200).json({
       status: 'success',
       token,
       nonce,
       link: checkinLink,
-      qrImageUrl,
       expiresAt,
-      memberId: payload.memberId,
-    }
-  }
-
-  try {
-    if (Array.isArray(request.body?.members)) {
-      const memberRequests = request.body.members
-      const results = []
-
-      for (const member of memberRequests) {
-        if (!member.memberId || !member.churchId || !member.serviceDate) {
-          results.push({
-            status: 'error',
-            memberId: member.memberId,
-            message: 'memberId, churchId, and serviceDate are required per member.',
-          })
-          continue
-        }
-
-        try {
-          const result = await issueTokenForMember({
-            ...member,
-            baseUrl: member.baseUrl || baseUrl,
-          })
-          results.push(result)
-        } catch (memberError) {
-          results.push({
-            status: 'error',
-            memberId: member.memberId,
-            message: memberError.message || 'Unable to issue token for member.',
-          })
-        }
-      }
-
-      return response.status(207).json({
-        status: 'partial',
-        message: 'Bulk token issuance completed.',
-        results,
-      })
-    }
-
-    const result = await issueTokenForMember({
-      memberId,
-      churchId,
-      serviceDate,
-      serviceType,
-      email,
-      baseUrl,
-    })
-
-    return response.status(200).json({
-      ...result,
       message: 'Check-in token issued successfully.',
     })
   } catch (error) {
