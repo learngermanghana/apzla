@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db, auth } from "./firebase";
 import {
   collection,
@@ -970,6 +970,13 @@ function App() {
   }, [activeTab, userProfile?.churchId, memberAttendanceForm.date, memberAttendanceForm.serviceType]);
 
   useEffect(() => {
+    if (activeTab === "attendance" && userProfile?.churchId) {
+      loadMemberAttendanceHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  useEffect(() => {
     if (activeTab === "overview" && userProfile?.churchId) {
       loadMemberAttendanceHistory();
     }
@@ -1395,6 +1402,25 @@ function App() {
       monthlyMemberAttendance.add(entry.memberId);
     }
   });
+
+  const memberLookup = useMemo(() => {
+    const map = new Map();
+    members.forEach((member) => {
+      const fullName = `${member.firstName || ""} ${member.lastName || ""}`.trim();
+      const fallback = member.email || member.phone || member.id;
+      map.set(member.id, fullName || fallback);
+    });
+    return map;
+  }, [members]);
+
+  const recentMemberCheckins = useMemo(
+    () =>
+      memberAttendanceHistory.slice(0, 10).map((entry) => ({
+        ...entry,
+        memberName: memberLookup.get(entry.memberId) || entry.memberId,
+      })),
+    [memberAttendanceHistory, memberLookup]
+  );
 
   // Follow-up templates (visitors)
   const visitorTemplate = `Hi, thank you for worshipping with us at ${
@@ -3033,11 +3059,72 @@ function App() {
                               {total}
                             </td>
                             <td style={{ padding: "6px 4px" }}>
-                              {a.notes || "-"}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                          {a.notes || "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+            </div>
+
+            <div style={{ marginTop: "18px" }}>
+              <h3
+                style={{
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                }}
+              >
+                Recent member check-ins
+              </h3>
+              {recentMemberCheckins.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No member check-ins yet. Self-check-ins and usher check-ins
+                  will appear here.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Date</th>
+                        <th style={{ padding: "6px 4px" }}>Member</th>
+                        <th style={{ padding: "6px 4px" }}>Service</th>
+                        <th style={{ padding: "6px 4px" }}>Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentMemberCheckins.map((entry) => (
+                        <tr
+                          key={`${entry.memberId}-${entry.date}-${entry.serviceType}`}
+                          style={{ borderBottom: "1px solid #f3f4f6" }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>{entry.date}</td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {entry.memberName}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {entry.serviceType || "Service"}
+                          </td>
+                          <td style={{ padding: "6px 4px", textTransform: "capitalize" }}>
+                            {entry.source?.toLowerCase() || "-"}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
