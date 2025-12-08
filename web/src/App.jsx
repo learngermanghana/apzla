@@ -370,15 +370,6 @@ function App() {
 
     setPaystackLoading(true);
 
-    const handlePaystackSuccess = async (response) => {
-      await handleRecordSubscription(response);
-      setPaystackLoading(false);
-    };
-
-    const handlePaystackClose = () => {
-      setPaystackLoading(false);
-    };
-
     try {
       await loadPaystackScript();
 
@@ -389,7 +380,7 @@ function App() {
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: user.email,
-        amount: 120 * 100, // amount in pesewas (GHS)
+        amount: 120 * 100, // GHS 120 in pesewas
         currency: "GHS",
         ref: `APZLA-${Date.now()}`,
         metadata: {
@@ -397,8 +388,27 @@ function App() {
           churchName: churchSettings.name || userProfile.churchName,
           plan: "Monthly",
         },
-        callback: handlePaystackSuccess,
-        onClose: handlePaystackClose,
+
+        // ✅ Plain function – Paystack will accept this
+        callback: function (response) {
+          // we don't mark loading false until we try to save
+          handleRecordSubscription(response)
+            .catch((err) => {
+              console.error("Record subscription error (callback):", err);
+              showToast(
+                "Payment completed but we couldn't save your subscription yet. Please contact support.",
+                "error"
+              );
+            })
+            .finally(() => {
+              setPaystackLoading(false);
+            });
+        },
+
+        // ✅ Plain function for onClose
+        onClose: function () {
+          setPaystackLoading(false);
+        },
       });
 
       if (!handler || typeof handler.openIframe !== "function") {
