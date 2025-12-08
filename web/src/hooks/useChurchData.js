@@ -4,18 +4,25 @@ import {
   collection,
   getDocs,
   query,
+  limit,
+  orderBy,
+  startAfter,
   where,
 } from "firebase/firestore";
 
 import { db } from "../firebase";
 
 const overviewTabs = ["overview", "members", "attendance", "giving", "sermons", "followup"];
+const MEMBERS_PAGE_SIZE = 25;
+const GIVING_PAGE_SIZE = 25;
 
 export function useChurchData(userProfile, activeTab, todayStr) {
   const [messages, setMessages] = useState([]);
 
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [memberPageCursor, setMemberPageCursor] = useState(null);
+  const [membersHasMore, setMembersHasMore] = useState(true);
   const [memberForm, setMemberForm] = useState({
     firstName: "",
     lastName: "",
@@ -37,6 +44,8 @@ export function useChurchData(userProfile, activeTab, todayStr) {
 
   const [giving, setGiving] = useState([]);
   const [givingLoading, setGivingLoading] = useState(false);
+  const [givingPageCursor, setGivingPageCursor] = useState(null);
+  const [givingHasMore, setGivingHasMore] = useState(true);
   const [givingForm, setGivingForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -63,8 +72,12 @@ export function useChurchData(userProfile, activeTab, todayStr) {
   useEffect(() => {
     setMessages([]);
     setMembers([]);
+    setMemberPageCursor(null);
+    setMembersHasMore(true);
     setAttendance([]);
     setGiving([]);
+    setGivingPageCursor(null);
+    setGivingHasMore(true);
     setSermons([]);
     setMemberForm((prev) => ({ ...prev, status: "VISITOR" }));
     setAttendanceForm((prev) => ({ ...prev, date: todayStr }));
@@ -106,18 +119,33 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     }
   };
 
-  const loadMembers = async () => {
+  const loadMembers = async ({ append = false } = {}) => {
     if (!userProfile?.churchId) return;
     try {
       setMembersLoading(true);
       const colRef = collection(db, "members");
-      const qMembers = query(colRef, where("churchId", "==", userProfile.churchId));
+      const constraints = [
+        where("churchId", "==", userProfile.churchId),
+        orderBy("createdAt", "desc"),
+      ];
+
+      if (append && memberPageCursor) {
+        constraints.push(startAfter(memberPageCursor));
+      }
+
+      constraints.push(limit(MEMBERS_PAGE_SIZE));
+
+      const qMembers = query(colRef, ...constraints);
       const snapshot = await getDocs(qMembers);
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setMembers(data);
+      setMembers((prev) => (append ? [...prev, ...data] : data));
+
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+      setMemberPageCursor(lastDoc);
+      setMembersHasMore(snapshot.docs.length === MEMBERS_PAGE_SIZE);
     } catch (err) {
       console.error("Load members error:", err);
       alert("Error loading members.");
@@ -164,11 +192,18 @@ export function useChurchData(userProfile, activeTab, todayStr) {
   };
 
   useEffect(() => {
+    setMemberPageCursor(null);
+    setMembersHasMore(true);
     if (overviewTabs.includes(activeTab) && userProfile?.churchId) {
       loadMembers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
+
+  const loadMoreMembers = () => {
+    if (!membersHasMore || membersLoading) return;
+    return loadMembers({ append: true });
+  };
 
   const loadAttendance = async () => {
     if (!userProfile?.churchId) return;
@@ -236,18 +271,33 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
 
-  const loadGiving = async () => {
+  const loadGiving = async ({ append = false } = {}) => {
     if (!userProfile?.churchId) return;
     try {
       setGivingLoading(true);
       const colRef = collection(db, "giving");
-      const qGiving = query(colRef, where("churchId", "==", userProfile.churchId));
+      const constraints = [
+        where("churchId", "==", userProfile.churchId),
+        orderBy("createdAt", "desc"),
+      ];
+
+      if (append && givingPageCursor) {
+        constraints.push(startAfter(givingPageCursor));
+      }
+
+      constraints.push(limit(GIVING_PAGE_SIZE));
+
+      const qGiving = query(colRef, ...constraints);
       const snapshot = await getDocs(qGiving);
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setGiving(data);
+      setGiving((prev) => (append ? [...prev, ...data] : data));
+
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+      setGivingPageCursor(lastDoc);
+      setGivingHasMore(snapshot.docs.length === GIVING_PAGE_SIZE);
     } catch (err) {
       console.error("Load giving error:", err);
       alert("Error loading giving records.");
@@ -298,11 +348,18 @@ export function useChurchData(userProfile, activeTab, todayStr) {
   };
 
   useEffect(() => {
+    setGivingPageCursor(null);
+    setGivingHasMore(true);
     if ((activeTab === "giving" || activeTab === "overview") && userProfile?.churchId) {
       loadGiving();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
+
+  const loadMoreGiving = () => {
+    if (!givingHasMore || givingLoading) return;
+    return loadGiving({ append: true });
+  };
 
   const loadSermons = async () => {
     if (!userProfile?.churchId) return;
@@ -394,6 +451,7 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     attendanceLoading,
     followupPastorName,
     giving,
+    givingHasMore,
     givingForm,
     givingLoading,
     handleAddTestDoc,
@@ -402,11 +460,14 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     handleCreateMember,
     handleCreateSermon,
     loadAttendance,
+    loadMoreGiving,
+    loadMoreMembers,
     loadGiving,
     loadMembers,
     loadSermons,
     memberForm,
     members,
+    membersHasMore,
     membersLoading,
     messages,
     sermonForm,
