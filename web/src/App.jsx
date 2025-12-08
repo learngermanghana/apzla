@@ -66,6 +66,15 @@ function App() {
     notes: "",
   });
 
+  // Member attendance (per person check-ins)
+  const [memberAttendance, setMemberAttendance] = useState([]);
+  const [memberAttendanceLoading, setMemberAttendanceLoading] = useState(false);
+  const [memberAttendanceForm, setMemberAttendanceForm] = useState({
+    date: todayStr,
+    serviceType: "Sunday Service",
+    search: "",
+  });
+
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
   const [givingLoading, setGivingLoading] = useState(false);
@@ -310,7 +319,8 @@ function App() {
     if (
       (activeTab === "members" ||
         activeTab === "overview" ||
-        activeTab === "followup") &&
+        activeTab === "followup" ||
+        activeTab === "checkin") &&
       userProfile?.churchId
     ) {
       loadMembers();
@@ -391,6 +401,69 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
+
+  // ---------- Member attendance (per-person check-ins) ----------
+  const loadMemberAttendance = async () => {
+    if (!userProfile?.churchId) return;
+    try {
+      setMemberAttendanceLoading(true);
+      const normalizedServiceType =
+        memberAttendanceForm.serviceType.trim() || "Service";
+
+      const colRef = collection(db, "memberAttendance");
+      const qMemberAttendance = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId),
+        where("date", "==", memberAttendanceForm.date),
+        where("serviceType", "==", normalizedServiceType)
+      );
+
+      const snapshot = await getDocs(qMemberAttendance);
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setMemberAttendance(data);
+    } catch (err) {
+      console.error("Load member attendance error:", err);
+      alert("Error loading member attendance.");
+    } finally {
+      setMemberAttendanceLoading(false);
+    }
+  };
+
+  const handleCheckInMember = async (memberId) => {
+    if (!userProfile?.churchId) return;
+
+    const alreadyPresent = memberAttendance.some((a) => a.memberId === memberId);
+    if (alreadyPresent) return;
+
+    try {
+      setLoading(true);
+      const normalizedServiceType =
+        memberAttendanceForm.serviceType.trim() || "Service";
+
+      await addDoc(collection(db, "memberAttendance"), {
+        churchId: userProfile.churchId,
+        memberId,
+        date: memberAttendanceForm.date,
+        serviceType: normalizedServiceType,
+        checkedInAt: new Date().toISOString(),
+        source: "ADMIN",
+      });
+
+      await loadMemberAttendance();
+    } catch (err) {
+      console.error("Create member attendance error:", err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "checkin" && userProfile?.churchId) {
+      loadMemberAttendance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId, memberAttendanceForm.date, memberAttendanceForm.serviceType]);
 
   // ---------- Giving ----------
   const loadGiving = async () => {
@@ -641,6 +714,24 @@ function App() {
     lastAttendanceDate = last.date || "";
   }
 
+  const normalizedMemberSearch = memberAttendanceForm.search
+    .toLowerCase()
+    .trim();
+  const filteredMembers = members.filter((m) => {
+    if (!normalizedMemberSearch) return true;
+    const fullName = `${m.firstName || ""} ${m.lastName || ""}`
+      .toLowerCase()
+      .trim();
+    const phone = (m.phone || "").toLowerCase();
+    const email = (m.email || "").toLowerCase();
+
+    return (
+      fullName.includes(normalizedMemberSearch) ||
+      phone.includes(normalizedMemberSearch) ||
+      email.includes(normalizedMemberSearch)
+    );
+  });
+
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
@@ -805,6 +896,20 @@ function App() {
             }}
           >
             Attendance
+          </button>
+          <button
+            onClick={() => setActiveTab("checkin")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "999px",
+              border: "none",
+              background:
+                activeTab === "checkin" ? "#111827" : "#e5e7eb",
+              color: activeTab === "checkin" ? "white" : "#111827",
+              cursor: "pointer",
+            }}
+          >
+            Check-in (Per Member)
           </button>
           <button
             onClick={() => setActiveTab("giving")}
@@ -1509,6 +1614,192 @@ function App() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "checkin" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Quick admin/usher check-in. Search a member and mark them
+              present for the selected service.
+            </p>
+
+            {/* Service info */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: "8px",
+                marginBottom: "12px",
+                maxWidth: "620px",
+              }}
+            >
+              <input
+                type="date"
+                value={memberAttendanceForm.date}
+                onChange={(e) =>
+                  setMemberAttendanceForm((f) => ({
+                    ...f,
+                    date: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Service type (e.g. Sunday Service)"
+                value={memberAttendanceForm.serviceType}
+                onChange={(e) =>
+                  setMemberAttendanceForm((f) => ({
+                    ...f,
+                    serviceType: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+            </div>
+
+            {/* Search + mark present */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                maxWidth: "760px",
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Search member by name or phone"
+                value={memberAttendanceForm.search}
+                onChange={(e) =>
+                  setMemberAttendanceForm((f) => ({
+                    ...f,
+                    search: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+
+              {memberAttendanceLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading check-ins…
+                </p>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  {filteredMembers.map((m) => {
+                      const isPresent = memberAttendance.some(
+                        (a) => a.memberId === m.id
+                      );
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 12px",
+                            borderRadius: "12px",
+                            border: "1px solid #e5e7eb",
+                            background: "#f9fafb",
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                fontWeight: 600,
+                                color: "#111827",
+                              }}
+                            >
+                              {m.firstName} {m.lastName}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#6b7280",
+                              }}
+                            >
+                              {m.phone || "No phone"}
+                            </div>
+                          </div>
+
+                          {isPresent ? (
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                color: "#16a34a",
+                                fontWeight: 600,
+                              }}
+                            >
+                              ✅ Present
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleCheckInMember(m.id)}
+                              disabled={loading}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: "10px",
+                                border: "none",
+                                background: loading ? "#9ca3af" : "#111827",
+                                color: "white",
+                                cursor: loading ? "default" : "pointer",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Mark present
+                            </button>
+                          )}
+                        </div>
+                      );
+                  })}
+
+                  {members.length === 0 && (
+                    <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                      No members yet. Add members in the CRM tab to start
+                      check-ins.
+                    </p>
+                  )}
+
+                  {members.length > 0 &&
+                    filteredMembers.length === 0 && (
+                      <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                        No members match that search.
+                      </p>
+                    )}
                 </div>
               )}
             </div>
