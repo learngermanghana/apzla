@@ -40,7 +40,7 @@ async function checkFirestore() {
   }
 }
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   const result = {
     status: 'ok'
   }
@@ -64,3 +64,5 @@ export default async function handler(request, response) {
 
   return response.status(200).json(result)
 }
+
+module.exports = handler
