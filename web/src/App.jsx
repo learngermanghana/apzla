@@ -54,7 +54,8 @@ function App() {
   const GIVING_PAGE_SIZE = 25;
 
   // Overview tab state
-  const [messages, setMessages] = useState([]);
+  const [memberAttendanceHistory, setMemberAttendanceHistory] = useState([]);
+  const [overviewMetricsLoading, setOverviewMetricsLoading] = useState(false);
 
   // Church creation form
   const [churchName, setChurchName] = useState("");
@@ -144,11 +145,11 @@ function App() {
 
   // ---------- Reset data when auth user changes ----------
   useEffect(() => {
-    setMessages([]);
     setMembers([]);
     setAttendance([]);
     setGiving([]);
     setSermons([]);
+    setMemberAttendanceHistory([]);
   }, [user?.uid]);
 
   // ---------- Auth handlers ----------
@@ -447,42 +448,6 @@ function App() {
     }
   };
 
-  // ---------- Firestore test (overview, scoped by church) ----------
-  const handleAddTestDoc = async () => {
-    if (!userProfile?.churchId) {
-      showToast("No church linked yet.", "error");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const colRef = collection(db, "testMessages");
-
-      await addDoc(colRef, {
-        text: `Hello from Apzla 👋 (church: ${
-          userProfile.churchName || userProfile.churchId
-        }, user: ${user?.email || "unknown"})`,
-        createdAt: new Date().toISOString(),
-        churchId: userProfile.churchId,
-      });
-
-      const q = query(colRef, where("churchId", "==", userProfile.churchId));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      setMessages(data);
-      showToast("Test message saved to Firestore.", "success");
-    } catch (err) {
-      console.error("Firestore error:", err);
-      showToast("Error talking to Firestore. Check the console.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ---------- Members (CRM) ----------
   const loadMembers = async ({ append = false } = {}) => {
     if (!userProfile?.churchId) return;
@@ -731,6 +696,35 @@ function App() {
   }, [activeTab, userProfile?.churchId]);
 
   // ---------- Member attendance (per-person check-ins) ----------
+  const loadMemberAttendanceHistory = async () => {
+    if (!userProfile?.churchId) return;
+
+    try {
+      setOverviewMetricsLoading(true);
+      const colRef = collection(db, "memberAttendance");
+      const qMemberAttendance = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId)
+      );
+
+      const snapshot = await getDocs(qMemberAttendance);
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      const sortedByDate = data.sort((a, b) => {
+        const aDate = a.date || "";
+        const bDate = b.date || "";
+        return bDate.localeCompare(aDate);
+      });
+
+      setMemberAttendanceHistory(sortedByDate);
+    } catch (err) {
+      console.error("Load member attendance history error:", err);
+      showToast("Error loading attendance insights.", "error");
+    } finally {
+      setOverviewMetricsLoading(false);
+    }
+  };
+
   const loadMemberAttendance = async () => {
     if (!userProfile?.churchId) return;
     try {
@@ -793,6 +787,35 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId, memberAttendanceForm.date, memberAttendanceForm.serviceType]);
+
+  useEffect(() => {
+    if (activeTab === "overview" && userProfile?.churchId) {
+      loadMemberAttendanceHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  const handleRefreshOverviewData = async () => {
+    if (!userProfile?.churchId) {
+      showToast("Link a church to view dashboard insights.", "error");
+      return;
+    }
+
+    try {
+      setOverviewMetricsLoading(true);
+      await Promise.all([
+        loadAttendance(),
+        loadMembers(),
+        loadMemberAttendanceHistory(),
+      ]);
+      showToast("Dashboard data refreshed.", "success");
+    } catch (err) {
+      console.error("Refresh dashboard data error:", err);
+      showToast("Unable to refresh dashboard data.", "error");
+    } finally {
+      setOverviewMetricsLoading(false);
+    }
+  };
 
   // ---------- Giving ----------
   const loadGiving = async ({ append = false } = {}) => {
@@ -1124,6 +1147,40 @@ function App() {
     totalAttendanceRecords > 0
       ? Math.round((totalAttendanceCount / totalAttendanceRecords) * 10) / 10
       : 0;
+
+  const memberLastAttendance = new Map();
+  memberAttendanceHistory.forEach((entry) => {
+    if (!memberLastAttendance.has(entry.memberId)) {
+      memberLastAttendance.set(entry.memberId, entry.date || "");
+    }
+  });
+
+  const absenteeCutoff = new Date();
+  absenteeCutoff.setDate(absenteeCutoff.getDate() - 28);
+
+  const membersMissingFourWeeks = members.filter((m) => {
+    const lastDateStr = memberLastAttendance.get(m.id);
+    if (!lastDateStr) return true;
+
+    const lastDate = new Date(lastDateStr);
+    if (Number.isNaN(lastDate.getTime())) return true;
+
+    return lastDate < absenteeCutoff;
+  });
+
+  const monthlyMemberAttendance = new Set();
+  memberAttendanceHistory.forEach((entry) => {
+    if (!entry.date) return;
+
+    const entryDate = new Date(entry.date);
+    if (
+      !Number.isNaN(entryDate.getTime()) &&
+      entryDate.getFullYear() === currentYear &&
+      entryDate.getMonth() === currentMonth
+    ) {
+      monthlyMemberAttendance.add(entry.memberId);
+    }
+  });
 
   // Follow-up templates (visitors)
   const visitorTemplate = `Hi, thank you for worshipping with us at ${
@@ -1840,20 +1897,22 @@ function App() {
             </div>
 
             <button
-              onClick={handleAddTestDoc}
-              disabled={loading}
+              onClick={handleRefreshOverviewData}
+              disabled={overviewMetricsLoading}
               style={{
                 padding: "10px 16px",
                 borderRadius: "8px",
                 border: "none",
-                background: loading ? "#6b7280" : "#111827",
+                background: overviewMetricsLoading ? "#6b7280" : "#111827",
                 color: "white",
-                cursor: loading ? "default" : "pointer",
+                cursor: overviewMetricsLoading ? "default" : "pointer",
                 fontSize: "14px",
                 fontWeight: 500,
               }}
             >
-              {loading ? "Working..." : "Add & Fetch Test Data"}
+              {overviewMetricsLoading
+                ? "Refreshing insights..."
+                : "Refresh dashboard data"}
             </button>
 
             <div style={{ marginTop: "24px" }}>
@@ -1864,45 +1923,145 @@ function App() {
                   marginBottom: "8px",
                 }}
               >
-                Messages from Firestore
+                Engagement insights
               </h2>
 
-              {messages.length === 0 ? (
-                <p style={{ color: "#9ca3af", fontSize: "14px" }}>
-                  No data yet. Click the button above to create the
-                  first record.
-                </p>
-              ) : (
-                <ul
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "12px",
+                }}
+              >
+                <div
                   style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: 0,
-                    fontSize: "14px",
-                    color: "#111827",
+                    padding: "14px",
+                    borderRadius: "12px",
+                    background: "#fff",
+                    border: "1px solid #e5e7eb",
                   }}
                 >
-                  {messages.map((m) => (
-                    <li
-                      key={m.id}
-                      style={{
-                        padding: "8px 0",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      <div>{m.text}</div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "#6b7280",
-                        }}
-                      >
-                        {m.createdAt}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    Members absent 4+ weeks
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 600 }}>
+                    {membersMissingFourWeeks.length}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    Includes members with no recorded attendance
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "14px",
+                    borderRadius: "12px",
+                    background: "#fff",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    Members present this month
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 600 }}>
+                    {monthlyMemberAttendance.size}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    Unique people checked in this month
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "14px",
+                    borderRadius: "12px",
+                    background: "#fff",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    Total members tracked
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 600 }}>
+                    {members.length}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    From the members & visitors directory
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>
+                    Consistently missing church
+                  </h3>
+                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                    {membersMissingFourWeeks.length} people need follow-up
+                  </span>
+                </div>
+
+                {membersMissingFourWeeks.length === 0 ? (
+                  <p style={{ color: "#6b7280", margin: 0 }}>
+                    Great work! Everyone has recent attendance records.
+                  </p>
+                ) : (
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      padding: 0,
+                      margin: 0,
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                      gap: "8px",
+                    }}
+                  >
+                    {membersMissingFourWeeks.slice(0, 8).map((member) => {
+                      const lastDateStr = memberLastAttendance.get(member.id);
+                      const lastDate = lastDateStr
+                        ? new Date(lastDateStr).toLocaleDateString()
+                        : "No attendance yet";
+
+                      return (
+                        <li
+                          key={member.id}
+                          style={{
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            padding: "10px",
+                            background: "#f9fafb",
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, color: "#111827" }}>
+                            {member.firstName} {member.lastName}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            Last attendance: {lastDate}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                            {member.status || "VISITOR"}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             </div>
           </>
         )}
