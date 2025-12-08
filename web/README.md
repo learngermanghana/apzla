@@ -1,31 +1,27 @@
-# React + Vite
+# Apzla frontend (Vite + React)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This app powers the Apzla dashboard experience. It is built with Vite and reads its Firebase configuration from environment variables so keys never live in the repo.
 
-## Local environment
+## Environment variables
 
-Create a `.env.local` file in the `web` directory with the following keys to configure Firebase:
+1. Copy `.env.example` to `.env.local` in this folder.
+2. Fill in the Firebase values for your project:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
 
+The Vite `VITE_` prefix ensures these values are exposed to the browser bundle. During local development they come from `.env.local`; in production (e.g. Vercel) set the same keys in the project settings so builds and previews pick them up automatically.
+
+## Local development
+
+```bash
+npm install
+npm run dev
 ```
-VITE_FIREBASE_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN
-VITE_FIREBASE_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET
-VITE_FIREBASE_MESSAGING_SENDER_ID
-VITE_FIREBASE_APP_ID
-```
 
-These values are read at build time via `import.meta.env`.
+## Deployment on Vercel
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The repo is wired for Vercel via the root `vercel.json`. When importing the project into Vercel, add the same Firebase keys above as environment variables on the project so the static build has access to them. No Firebase credentials should be committed to the repo.
