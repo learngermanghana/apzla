@@ -5,6 +5,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   doc,
   updateDoc,
   deleteDoc,
@@ -36,6 +37,15 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [churchSettings, setChurchSettings] = useState({
+    name: "",
+    country: "",
+    city: "",
+  });
+  const [subscriptionInfo, setSubscriptionInfo] = useState(null);
+  const [paystackLoading, setPaystackLoading] = useState(false);
 
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
   const [activeTab, setActiveTab] = useState("overview");
@@ -202,6 +212,192 @@ function App() {
 
   const handleLogout = async () => {
     await signOut(auth);
+  };
+
+  const loadChurchSettings = async () => {
+    if (!userProfile?.churchId) return;
+
+    setAccountLoading(true);
+
+    try {
+      const churchRef = doc(db, "churches", userProfile.churchId);
+      const snapshot = await getDoc(churchRef);
+
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setChurchSettings({
+          name: data.name || "",
+          country: data.country || "",
+          city: data.city || "",
+        });
+
+        setSubscriptionInfo({
+          status: data.subscriptionStatus || "INACTIVE",
+          plan: data.subscriptionPlan || "Annual (GHS 1440)",
+          amount: data.subscriptionAmount || 1440,
+          currency: data.subscriptionCurrency || "GHS",
+          paidAt: data.subscriptionPaidAt || null,
+          expiresAt: data.subscriptionExpiresAt || null,
+          reference: data.subscriptionReference || null,
+        });
+      }
+    } catch (err) {
+      console.error("Load church settings error:", err);
+      showToast("Unable to load church settings.", "error");
+    } finally {
+      setAccountLoading(false);
+    }
+  };
+
+  const handleOpenAccountSettings = async () => {
+    if (!userProfile?.churchId) {
+      showToast("Link a church to manage account settings.", "error");
+      return;
+    }
+
+    setChurchSettings({
+      name: userProfile.churchName || "",
+      country: "",
+      city: "",
+    });
+    setSubscriptionInfo(null);
+    setShowAccountSettings(true);
+    await loadChurchSettings();
+  };
+
+  const handleSaveChurchSettings = async () => {
+    if (!userProfile?.churchId || !user) return;
+
+    if (!churchSettings.name.trim()) {
+      showToast("Please enter a church name.", "error");
+      return;
+    }
+
+    setAccountLoading(true);
+
+    try {
+      await updateDoc(doc(db, "churches", userProfile.churchId), {
+        name: churchSettings.name.trim(),
+        country: churchSettings.country.trim(),
+        city: churchSettings.city.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      await updateDoc(doc(db, "users", user.uid), {
+        churchName: churchSettings.name.trim(),
+      });
+
+      setUserProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              churchName: churchSettings.name.trim(),
+            }
+          : prev,
+      );
+
+      showToast("Church details updated.", "success");
+    } catch (err) {
+      console.error("Save church settings error:", err);
+      showToast("Unable to update church details.", "error");
+    } finally {
+      setAccountLoading(false);
+    }
+  };
+
+  const loadPaystackScript = () =>
+    new Promise((resolve, reject) => {
+      if (window.PaystackPop) {
+        resolve(window.PaystackPop);
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://js.paystack.co/v1/inline.js";
+      script.onload = () => resolve(window.PaystackPop);
+      script.onerror = () => reject(new Error("Paystack script failed to load"));
+      document.body.appendChild(script);
+    });
+
+  const handleRecordSubscription = async (response) => {
+    if (!userProfile?.churchId) return;
+
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+    const subscriptionData = {
+      subscriptionStatus: "ACTIVE",
+      subscriptionPlan: "Annual (GHS 1440)",
+      subscriptionAmount: 1440,
+      subscriptionCurrency: "GHS",
+      subscriptionReference: response?.reference || `APZLA-${Date.now()}`,
+      subscriptionPaidAt: new Date().toISOString(),
+      subscriptionPaidBy: user?.email || "",
+      subscriptionExpiresAt: expiresAt.toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await updateDoc(doc(db, "churches", userProfile.churchId), subscriptionData);
+      setSubscriptionInfo({
+        status: subscriptionData.subscriptionStatus,
+        plan: subscriptionData.subscriptionPlan,
+        amount: subscriptionData.subscriptionAmount,
+        currency: subscriptionData.subscriptionCurrency,
+        paidAt: subscriptionData.subscriptionPaidAt,
+        expiresAt: subscriptionData.subscriptionExpiresAt,
+        reference: subscriptionData.subscriptionReference,
+      });
+      showToast("Subscription activated for 1 year.", "success");
+    } catch (err) {
+      console.error("Record subscription error:", err);
+      showToast("Could not save subscription status.", "error");
+    }
+  };
+
+  const handlePaystackSubscription = async () => {
+    if (!userProfile?.churchId || !user?.email) {
+      showToast("Log in and link a church before paying.", "error");
+      return;
+    }
+
+    const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+    if (!paystackKey) {
+      showToast("Add VITE_PAYSTACK_PUBLIC_KEY to proceed with payment.", "error");
+      return;
+    }
+
+    setPaystackLoading(true);
+
+    try {
+      await loadPaystackScript();
+
+      const handler = window.PaystackPop?.setup({
+        key: paystackKey,
+        email: user.email,
+        amount: 1440 * 100, // amount in pesewas (GHS)
+        currency: "GHS",
+        ref: `APZLA-${Date.now()}`,
+        metadata: {
+          churchId: userProfile.churchId,
+          churchName: churchSettings.name || userProfile.churchName,
+          plan: "Annual",
+        },
+        callback: async (response) => {
+          await handleRecordSubscription(response);
+          setPaystackLoading(false);
+        },
+        onClose: () => {
+          setPaystackLoading(false);
+        },
+      });
+
+      handler?.openIframe();
+    } catch (err) {
+      console.error("Paystack init error:", err);
+      showToast("Unable to start payment.", "error");
+      setPaystackLoading(false);
+    }
   };
 
   // ---------- Create church + user profile ----------
@@ -975,6 +1171,179 @@ function App() {
         ))}
       </div>
 
+      {showAccountSettings && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <div>
+                <p className="modal-pill">Account &amp; Billing</p>
+                <h2 style={{ margin: "4px 0", fontSize: "20px" }}>
+                  Manage church profile and subscription
+                </h2>
+                <p style={{ margin: 0, color: "#4b5563", fontSize: "13px" }}>
+                  Update how your church appears and renew your annual plan
+                  (GHS 120/mo billed yearly).
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAccountSettings(false)}
+                style={{
+                  border: "none",
+                  background: "#e5e7eb",
+                  color: "#111827",
+                  borderRadius: "12px",
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="modal-grid">
+              <div className="modal-section">
+                <div className="modal-section-header">
+                  <div>
+                    <p className="modal-label">Church profile</p>
+                    <h3 className="modal-title">Basics</h3>
+                  </div>
+                  <span className="modal-chip">Editable</span>
+                </div>
+
+                <div className="modal-form-grid">
+                  <label className="modal-field">
+                    <span>Church name</span>
+                    <input
+                      type="text"
+                      value={churchSettings.name}
+                      onChange={(e) =>
+                        setChurchSettings((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Grace Chapel International"
+                    />
+                  </label>
+                  <label className="modal-field">
+                    <span>Country</span>
+                    <input
+                      type="text"
+                      value={churchSettings.country}
+                      onChange={(e) =>
+                        setChurchSettings((prev) => ({
+                          ...prev,
+                          country: e.target.value,
+                        }))
+                      }
+                      placeholder="Country"
+                    />
+                  </label>
+                  <label className="modal-field">
+                    <span>City</span>
+                    <input
+                      type="text"
+                      value={churchSettings.city}
+                      onChange={(e) =>
+                        setChurchSettings((prev) => ({
+                          ...prev,
+                          city: e.target.value,
+                        }))
+                      }
+                      placeholder="City"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  onClick={handleSaveChurchSettings}
+                  disabled={accountLoading}
+                  style={{
+                    background: accountLoading ? "#e5e7eb" : "#111827",
+                    color: accountLoading ? "#6b7280" : "white",
+                    border: "none",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    cursor: accountLoading ? "not-allowed" : "pointer",
+                    fontWeight: 600,
+                    width: "100%",
+                    marginTop: "10px",
+                  }}
+                >
+                  {accountLoading ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+
+              <div className="modal-section">
+                <div className="modal-section-header">
+                  <div>
+                    <p className="modal-label">Subscription</p>
+                    <h3 className="modal-title">Annual plan</h3>
+                  </div>
+                  <span className="modal-chip chip-green">GHS 120/mo</span>
+                </div>
+
+                <div className="subscription-card">
+                  <div>
+                    <p className="subscription-status">
+                      Status: {subscriptionInfo?.status || "INACTIVE"}
+                    </p>
+                    <p className="subscription-meta">
+                      Plan: {subscriptionInfo?.plan || "Annual (GHS 1440)"}
+                    </p>
+                    <p className="subscription-meta">
+                      Next renewal:
+                      {subscriptionInfo?.expiresAt
+                        ? ` ${new Date(
+                            subscriptionInfo.expiresAt,
+                          ).toLocaleDateString()}`
+                        : " Not set"}
+                    </p>
+                    {subscriptionInfo?.reference && (
+                      <p className="subscription-meta">
+                        Reference: {subscriptionInfo.reference}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handlePaystackSubscription}
+                    disabled={paystackLoading}
+                    style={{
+                      background: paystackLoading ? "#e5e7eb" : "#16a34a",
+                      color: paystackLoading ? "#6b7280" : "white",
+                      border: "none",
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      cursor: paystackLoading ? "not-allowed" : "pointer",
+                      fontWeight: 700,
+                      width: "100%",
+                    }}
+                  >
+                    {paystackLoading
+                      ? "Opening Paystack..."
+                      : "Pay annual subscription (GHS 1440)"}
+                  </button>
+                  <p className="subscription-footnote">
+                    Powered by Paystack. Annual billing is required (12 months
+                    × GHS 120).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           background: "white",
@@ -1035,21 +1404,38 @@ function App() {
             </p>
           </div>
 
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "999px",
-              border: "none",
-              background: "#ef4444",
-              color: "white",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: 500,
-            }}
-          >
-            Logout
-          </button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={handleOpenAccountSettings}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "999px",
+                border: "none",
+                background: "#e5e7eb",
+                color: "#111827",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 600,
+              }}
+            >
+              Account &amp; billing
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "999px",
+                border: "none",
+                background: "#ef4444",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 500,
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
