@@ -189,6 +189,145 @@
   background: #f9fafb;
 }
 
+.checkin-admin-card {
+  margin-top: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+  background: #f8fafc;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.checkin-admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkin-admin-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.checkin-admin-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.checkin-admin-toggle {
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #111827;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkin-admin-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.checkin-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.checkin-admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.checkin-admin-field input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.checkin-admin-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.checkin-admin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.checkin-admin-note {
+  font-size: 12px;
+  color: #475569;
+}
+
+.checkin-admin-submit {
+  background: #111827;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.checkin-link-box {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.checkin-link-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.checkin-link-value {
+  word-break: break-all;
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.checkin-link-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.checkin-link-actions button {
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #111827;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
