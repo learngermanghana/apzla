@@ -16,6 +16,12 @@
     linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
 }
 
+@@ -14,50 +14,94 @@
+    radial-gradient(circle at 85% 15%, rgba(16, 185, 129, 0.14) 0, transparent 30%),
+    radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.12) 0, transparent 32%),
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+
 .auth-overlay {
   position: absolute;
   inset: 0;
@@ -34,6 +40,50 @@
   width: 100%;
   position: relative;
   z-index: 1;
+}
+
+.auth-hero-photo {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  isolation: isolate;
+}
+
+.auth-hero-photo img {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.05);
+}
+
+.auth-hero-photo-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 40%, rgba(15, 23, 42, 0.55));
+  z-index: 1;
+}
+
+.auth-hero-photo-caption {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #0f172a;
+  z-index: 2;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.auth-hero-photo-caption span {
+  font-size: 18px;
 }
 
 @media (max-width: 900px) {
