@@ -370,10 +370,23 @@ function App() {
 
     setPaystackLoading(true);
 
+    const handlePaystackSuccess = async (response) => {
+      await handleRecordSubscription(response);
+      setPaystackLoading(false);
+    };
+
+    const handlePaystackClose = () => {
+      setPaystackLoading(false);
+    };
+
     try {
       await loadPaystackScript();
 
-      const handler = window.PaystackPop?.setup({
+      if (!window.PaystackPop || typeof window.PaystackPop.setup !== "function") {
+        throw new Error("Paystack failed to initialize");
+      }
+
+      const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: user.email,
         amount: 120 * 100, // amount in pesewas (GHS)
@@ -384,16 +397,15 @@ function App() {
           churchName: churchSettings.name || userProfile.churchName,
           plan: "Monthly",
         },
-        callback: async (response) => {
-          await handleRecordSubscription(response);
-          setPaystackLoading(false);
-        },
-        onClose: () => {
-          setPaystackLoading(false);
-        },
+        callback: handlePaystackSuccess,
+        onClose: handlePaystackClose,
       });
 
-      handler?.openIframe();
+      if (!handler || typeof handler.openIframe !== "function") {
+        throw new Error("Paystack handler unavailable");
+      }
+
+      handler.openIframe();
     } catch (err) {
       console.error("Paystack init error:", err);
       showToast("Unable to start payment.", "error");
