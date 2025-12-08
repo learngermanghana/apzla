@@ -6,6 +6,8 @@ import {
   addDoc,
   getDocs,
   doc,
+  updateDoc,
+  deleteDoc,
   setDoc,
   query,
   limit,
@@ -54,6 +56,15 @@ function App() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberPageCursor, setMemberPageCursor] = useState(null);
   const [membersHasMore, setMembersHasMore] = useState(true);
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editingMemberForm, setEditingMemberForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    status: "VISITOR",
+  });
+  const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
     firstName: "",
     lastName: "",
@@ -347,6 +358,84 @@ function App() {
       showToast(err.message || "Unable to save member.", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startEditingMember = (member) => {
+    setEditingMemberId(member.id);
+    setEditingMemberForm({
+      firstName: member.firstName || "",
+      lastName: member.lastName || "",
+      phone: member.phone || "",
+      email: member.email || "",
+      status: (member.status || "VISITOR").toUpperCase(),
+    });
+  };
+
+  const cancelEditingMember = () => {
+    setEditingMemberId(null);
+    setEditingMemberForm({
+      firstName: "",
+      lastName: "",
+      phone: "",
+      email: "",
+      status: "VISITOR",
+    });
+  };
+
+  const handleUpdateMember = async () => {
+    if (!editingMemberId || !userProfile?.churchId) return;
+
+    if (!editingMemberForm.firstName.trim()) {
+      showToast("First name is required.", "error");
+      return;
+    }
+
+    try {
+      setMemberActionLoading(true);
+      const docRef = doc(db, "members", editingMemberId);
+      const payload = {
+        firstName: editingMemberForm.firstName.trim(),
+        lastName: editingMemberForm.lastName.trim(),
+        phone: editingMemberForm.phone.trim(),
+        email: editingMemberForm.email.trim(),
+        status: editingMemberForm.status,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateDoc(docRef, payload);
+
+      setMembers((prev) =>
+        prev.map((m) => (m.id === editingMemberId ? { ...m, ...payload } : m))
+      );
+      showToast("Member updated.", "success");
+      cancelEditingMember();
+    } catch (err) {
+      console.error("Update member error:", err);
+      showToast(err.message || "Unable to update member.", "error");
+    } finally {
+      setMemberActionLoading(false);
+    }
+  };
+
+  const handleDeleteMember = async (memberId) => {
+    if (!userProfile?.churchId || !memberId) return;
+
+    const confirmed = window.confirm("Delete this member? This cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+      setMemberActionLoading(true);
+      await deleteDoc(doc(db, "members", memberId));
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+      if (editingMemberId === memberId) {
+        cancelEditingMember();
+      }
+      showToast("Member deleted.", "success");
+    } catch (err) {
+      console.error("Delete member error:", err);
+      showToast(err.message || "Unable to delete member.", "error");
+    } finally {
+      setMemberActionLoading(false);
     }
   };
 
@@ -846,6 +935,10 @@ function App() {
   } today. We’re glad you came. God bless you!${
     followupPastorName ? ` – ${followupPastorName}` : ""
   }`;
+
+  const visitorTemplateEncoded = encodeURIComponent(visitorTemplate);
+  const visitorEmailSubject = encodeURIComponent("Thank you for worshipping with us");
+  const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
 
   const visitorMembers = members.filter(
     (m) => (m.status || "").toUpperCase() === "VISITOR"
@@ -1604,30 +1697,216 @@ function App() {
                         <th style={{ padding: "6px 4px" }}>Phone</th>
                         <th style={{ padding: "6px 4px" }}>Email</th>
                         <th style={{ padding: "6px 4px" }}>Status</th>
+                        <th style={{ padding: "6px 4px" }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {members.map((m) => (
-                        <tr
-                          key={m.id}
-                          style={{
-                            borderBottom: "1px solid #f3f4f6",
-                          }}
-                        >
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.firstName} {m.lastName}
-                          </td>
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.phone || "-"}
-                          </td>
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.email || "-"}
-                          </td>
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.status}
-                          </td>
-                        </tr>
-                      ))}
+                      {members.map((m) => {
+                        const isEditing = editingMemberId === m.id;
+                        return (
+                          <tr
+                            key={m.id}
+                            style={{
+                              borderBottom: "1px solid #f3f4f6",
+                            }}
+                          >
+                            <td style={{ padding: "6px 4px" }}>
+                              {isEditing ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: "6px",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <input
+                                    type="text"
+                                    value={editingMemberForm.firstName}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        firstName: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="First name"
+                                    style={{
+                                      padding: "6px 8px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #d1d5db",
+                                      width: "120px",
+                                    }}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editingMemberForm.lastName}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        lastName: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Last name"
+                                    style={{
+                                      padding: "6px 8px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #d1d5db",
+                                      width: "120px",
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <>{m.firstName} {m.lastName}</>
+                              )}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editingMemberForm.phone}
+                                  onChange={(e) =>
+                                    setEditingMemberForm((f) => ({
+                                      ...f,
+                                      phone: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Phone"
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                    width: "140px",
+                                  }}
+                                />
+                              ) : (
+                                <>{m.phone || "-"}</>
+                              )}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {isEditing ? (
+                                <input
+                                  type="email"
+                                  value={editingMemberForm.email}
+                                  onChange={(e) =>
+                                    setEditingMemberForm((f) => ({
+                                      ...f,
+                                      email: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Email"
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                    width: "200px",
+                                  }}
+                                />
+                              ) : (
+                                <>{m.email || "-"}</>
+                              )}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {isEditing ? (
+                                <select
+                                  value={editingMemberForm.status}
+                                  onChange={(e) =>
+                                    setEditingMemberForm((f) => ({
+                                      ...f,
+                                      status: e.target.value,
+                                    }))
+                                  }
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                  }}
+                                >
+                                  <option value="VISITOR">Visitor</option>
+                                  <option value="NEW_CONVERT">New Convert</option>
+                                  <option value="REGULAR">Regular</option>
+                                  <option value="WORKER">Worker</option>
+                                  <option value="PASTOR">Pastor</option>
+                                  <option value="INACTIVE">Inactive</option>
+                                </select>
+                              ) : (
+                                <>{m.status}</>
+                              )}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {isEditing ? (
+                                <div
+                                  style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
+                                >
+                                  <button
+                                    onClick={handleUpdateMember}
+                                    disabled={memberActionLoading}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                      border: "none",
+                                      background: "#111827",
+                                      color: "white",
+                                      cursor: memberActionLoading ? "default" : "pointer",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    {memberActionLoading ? "Saving..." : "Save"}
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingMember}
+                                    disabled={memberActionLoading}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #e5e7eb",
+                                      background: "white",
+                                      color: "#111827",
+                                      cursor: memberActionLoading ? "default" : "pointer",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
+                                >
+                                  <button
+                                    onClick={() => startEditingMember(m)}
+                                    disabled={memberActionLoading}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #e5e7eb",
+                                      background: "white",
+                                      color: "#111827",
+                                      cursor: memberActionLoading ? "default" : "pointer",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteMember(m.id)}
+                                    disabled={memberActionLoading}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #ef4444",
+                                      background: memberActionLoading ? "#fee2e2" : "#fef2f2",
+                                      color: "#b91c1c",
+                                      cursor: memberActionLoading ? "default" : "pointer",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2412,27 +2691,110 @@ function App() {
                         <th style={{ padding: "6px 4px" }}>Name</th>
                         <th style={{ padding: "6px 4px" }}>Phone</th>
                         <th style={{ padding: "6px 4px" }}>Email</th>
+                        <th style={{ padding: "6px 4px" }}>Message options</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visitorMembers.map((m) => (
-                        <tr
-                          key={m.id}
-                          style={{
-                            borderBottom: "1px solid #f3f4f6",
-                          }}
-                        >
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.firstName} {m.lastName}
-                          </td>
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.phone || "-"}
-                          </td>
-                          <td style={{ padding: "6px 4px" }}>
-                            {m.email || "-"}
-                          </td>
-                        </tr>
-                      ))}
+                      {visitorMembers.map((m) => {
+                        const phoneForLink = formatPhoneForLink(m.phone);
+                        const whatsappLink = phoneForLink
+                          ? `https://wa.me/${phoneForLink}?text=${visitorTemplateEncoded}`
+                          : `https://wa.me/?text=${visitorTemplateEncoded}`;
+                        const telegramLink = `https://t.me/share/url?text=${visitorTemplateEncoded}`;
+                        const smsLink = phoneForLink
+                          ? `sms:${phoneForLink}?body=${visitorTemplateEncoded}`
+                          : `sms:?body=${visitorTemplateEncoded}`;
+                        const emailLink = `mailto:${m.email || ""}?subject=${visitorEmailSubject}&body=${visitorTemplateEncoded}`;
+
+                        return (
+                          <tr
+                            key={m.id}
+                            style={{
+                              borderBottom: "1px solid #f3f4f6",
+                            }}
+                          >
+                            <td style={{ padding: "6px 4px" }}>
+                              {m.firstName} {m.lastName}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {m.phone || "-"}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {m.email || "-"}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "6px",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <a
+                                  href={whatsappLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #22c55e",
+                                    background: "#ecfdf3",
+                                    color: "#15803d",
+                                    fontSize: "12px",
+                                    textDecoration: "none",
+                                  }}
+                                >
+                                  WhatsApp
+                                </a>
+                                <a
+                                  href={telegramLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #0ea5e9",
+                                    background: "#e0f2fe",
+                                    color: "#0369a1",
+                                    fontSize: "12px",
+                                    textDecoration: "none",
+                                  }}
+                                >
+                                  Telegram
+                                </a>
+                                <a
+                                  href={smsLink}
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #6b7280",
+                                    background: "#f3f4f6",
+                                    color: "#111827",
+                                    fontSize: "12px",
+                                    textDecoration: "none",
+                                  }}
+                                >
+                                  SMS
+                                </a>
+                                <a
+                                  href={emailLink}
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #6366f1",
+                                    background: "#eef2ff",
+                                    color: "#4338ca",
+                                    fontSize: "12px",
+                                    textDecoration: "none",
+                                  }}
+                                >
+                                  Email
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
