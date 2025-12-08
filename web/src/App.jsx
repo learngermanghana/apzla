@@ -732,29 +732,6 @@ function App() {
     );
   });
 
-  const membersById = members.reduce((acc, m) => {
-    acc[m.id] = m;
-    return acc;
-  }, {});
-
-  const checkedInMembers = memberAttendance
-    .map((record) => {
-      const member = membersById[record.memberId];
-      return {
-        ...record,
-        fullName: member
-          ? `${member.firstName || ""} ${member.lastName || ""}`.trim()
-          : "Unknown member",
-        phone: member?.phone || "",
-      };
-    })
-    .sort((a, b) => {
-      if (a.checkedInAt && b.checkedInAt) {
-        return b.checkedInAt.localeCompare(a.checkedInAt);
-      }
-      return 0;
-    });
-
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
@@ -1656,44 +1633,6 @@ function App() {
               present for the selected service.
             </p>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "12px",
-                fontSize: "13px",
-                color: "#111827",
-              }}
-            >
-              <span
-                style={{
-                  background: "#e0f2fe",
-                  color: "#0369a1",
-                  padding: "6px 10px",
-                  borderRadius: "999px",
-                  fontWeight: 600,
-                }}
-              >
-                {checkedInMembers.length} checked-in for this service
-              </span>
-              <button
-                type="button"
-                onClick={loadMemberAttendance}
-                style={{
-                  border: "1px solid #d1d5db",
-                  background: "white",
-                  color: "#111827",
-                  borderRadius: "10px",
-                  padding: "6px 10px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
-              >
-                Refresh list
-              </button>
-            </div>
-
             {/* Service info */}
             <div
               style={{
@@ -1861,82 +1800,6 @@ function App() {
                         No members match that search.
                       </p>
                     )}
-
-                  {checkedInMembers.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: "4px",
-                        paddingTop: "8px",
-                        borderTop: "1px solid #e5e7eb",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#111827",
-                        }}
-                      >
-                        Already checked-in
-                      </div>
-                      {checkedInMembers.map((att) => (
-                        <div
-                          key={att.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "8px 10px",
-                            borderRadius: "8px",
-                            background: "#f9fafb",
-                            border: "1px solid #e5e7eb",
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: "13px",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {att.fullName}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                color: "#6b7280",
-                              }}
-                            >
-                              {att.phone || "No phone"}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              color: "#4b5563",
-                              textAlign: "right",
-                            }}
-                          >
-                            <div>{memberAttendanceForm.serviceType}</div>
-                            <div style={{ fontSize: "11px" }}>
-                              {att.checkedInAt
-                                ? new Date(att.checkedInAt).toLocaleTimeString(
-                                    [],
-                                    {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    }
-                                  )
-                                : "Time not recorded"}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
