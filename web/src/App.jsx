@@ -233,8 +233,8 @@ function App() {
 
         setSubscriptionInfo({
           status: data.subscriptionStatus || "INACTIVE",
-          plan: data.subscriptionPlan || "Annual (GHS 1440)",
-          amount: data.subscriptionAmount || 1440,
+          plan: data.subscriptionPlan || "Monthly (GHS 120)",
+          amount: data.subscriptionAmount || 120,
           currency: data.subscriptionCurrency || "GHS",
           paidAt: data.subscriptionPaidAt || null,
           expiresAt: data.subscriptionExpiresAt || null,
@@ -323,12 +323,12 @@ function App() {
     if (!userProfile?.churchId) return;
 
     const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    expiresAt.setMonth(expiresAt.getMonth() + 1);
 
     const subscriptionData = {
       subscriptionStatus: "ACTIVE",
-      subscriptionPlan: "Annual (GHS 1440)",
-      subscriptionAmount: 1440,
+      subscriptionPlan: "Monthly (GHS 120)",
+      subscriptionAmount: 120,
       subscriptionCurrency: "GHS",
       subscriptionReference: response?.reference || `APZLA-${Date.now()}`,
       subscriptionPaidAt: new Date().toISOString(),
@@ -348,7 +348,7 @@ function App() {
         expiresAt: subscriptionData.subscriptionExpiresAt,
         reference: subscriptionData.subscriptionReference,
       });
-      showToast("Subscription activated for 1 year.", "success");
+      showToast("Subscription activated for 1 month.", "success");
     } catch (err) {
       console.error("Record subscription error:", err);
       showToast("Could not save subscription status.", "error");
@@ -375,13 +375,13 @@ function App() {
       const handler = window.PaystackPop?.setup({
         key: paystackKey,
         email: user.email,
-        amount: 1440 * 100, // amount in pesewas (GHS)
+        amount: 120 * 100, // amount in pesewas (GHS)
         currency: "GHS",
         ref: `APZLA-${Date.now()}`,
         metadata: {
           churchId: userProfile.churchId,
           churchName: churchSettings.name || userProfile.churchName,
-          plan: "Annual",
+          plan: "Monthly",
         },
         callback: async (response) => {
           await handleRecordSubscription(response);
@@ -1189,8 +1189,8 @@ function App() {
                   Manage church profile and subscription
                 </h2>
                 <p style={{ margin: 0, color: "#4b5563", fontSize: "13px" }}>
-                  Update how your church appears and renew your annual plan
-                  (GHS 120/mo billed yearly).
+                  Update how your church appears and renew your monthly plan
+                  (GHS 120/month billed through Paystack).
                 </p>
               </div>
               <button
@@ -1287,7 +1287,7 @@ function App() {
                 <div className="modal-section-header">
                   <div>
                     <p className="modal-label">Subscription</p>
-                    <h3 className="modal-title">Annual plan</h3>
+                    <h3 className="modal-title">Monthly plan</h3>
                   </div>
                   <span className="modal-chip chip-green">GHS 120/mo</span>
                 </div>
@@ -1298,7 +1298,7 @@ function App() {
                       Status: {subscriptionInfo?.status || "INACTIVE"}
                     </p>
                     <p className="subscription-meta">
-                      Plan: {subscriptionInfo?.plan || "Annual (GHS 1440)"}
+                      Plan: {subscriptionInfo?.plan || "Monthly (GHS 120)"}
                     </p>
                     <p className="subscription-meta">
                       Next renewal:
@@ -1328,14 +1328,13 @@ function App() {
                       fontWeight: 700,
                       width: "100%",
                     }}
-                  >
+                    >
                     {paystackLoading
                       ? "Opening Paystack..."
-                      : "Pay annual subscription (GHS 1440)"}
+                      : "Pay monthly subscription (GHS 120)"}
                   </button>
                   <p className="subscription-footnote">
-                    Powered by Paystack. Annual billing is required (12 months
-                    × GHS 120).
+                    Powered by Paystack. Billing renews monthly at GHS 120.
                   </p>
                 </div>
               </div>
