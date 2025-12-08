@@ -8,6 +8,9 @@ import {
   doc,
   setDoc,
   query,
+  limit,
+  orderBy,
+  startAfter,
   where,
 } from "firebase/firestore";
 import {
@@ -35,6 +38,9 @@ function App() {
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
   const [activeTab, setActiveTab] = useState("overview");
 
+  const MEMBERS_PAGE_SIZE = 25;
+  const GIVING_PAGE_SIZE = 25;
+
   // Overview tab state
   const [messages, setMessages] = useState([]);
 
@@ -46,6 +52,8 @@ function App() {
   // Members (CRM)
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [memberPageCursor, setMemberPageCursor] = useState(null);
+  const [membersHasMore, setMembersHasMore] = useState(true);
   const [memberForm, setMemberForm] = useState({
     firstName: "",
     lastName: "",
@@ -79,6 +87,8 @@ function App() {
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
   const [givingLoading, setGivingLoading] = useState(false);
+  const [givingPageCursor, setGivingPageCursor] = useState(null);
+  const [givingHasMore, setGivingHasMore] = useState(true);
   const [givingForm, setGivingForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -267,21 +277,33 @@ function App() {
   };
 
   // ---------- Members (CRM) ----------
-  const loadMembers = async () => {
+  const loadMembers = async ({ append = false } = {}) => {
     if (!userProfile?.churchId) return;
     try {
       setMembersLoading(true);
       const colRef = collection(db, "members");
-      const qMembers = query(
-        colRef,
-        where("churchId", "==", userProfile.churchId)
-      );
+      const constraints = [
+        where("churchId", "==", userProfile.churchId),
+        orderBy("createdAt", "desc"),
+      ];
+
+      if (append && memberPageCursor) {
+        constraints.push(startAfter(memberPageCursor));
+      }
+
+      constraints.push(limit(MEMBERS_PAGE_SIZE));
+
+      const qMembers = query(colRef, ...constraints);
       const snapshot = await getDocs(qMembers);
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setMembers(data);
+      setMembers((prev) => (append ? [...prev, ...data] : data));
+
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+      setMemberPageCursor(lastDoc);
+      setMembersHasMore(snapshot.docs.length === MEMBERS_PAGE_SIZE);
     } catch (err) {
       console.error("Load members error:", err);
       showToast("Error loading members.", "error");
@@ -329,6 +351,8 @@ function App() {
   };
 
   useEffect(() => {
+    setMemberPageCursor(null);
+    setMembersHasMore(true);
     if (
       (activeTab === "members" ||
         activeTab === "overview" ||
@@ -340,6 +364,11 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
+
+  const loadMoreMembers = () => {
+    if (!membersHasMore || membersLoading) return;
+    return loadMembers({ append: true });
+  };
 
   // ---------- Attendance ----------
   const loadAttendance = async () => {
@@ -481,21 +510,33 @@ function App() {
   }, [activeTab, userProfile?.churchId, memberAttendanceForm.date, memberAttendanceForm.serviceType]);
 
   // ---------- Giving ----------
-  const loadGiving = async () => {
+  const loadGiving = async ({ append = false } = {}) => {
     if (!userProfile?.churchId) return;
     try {
       setGivingLoading(true);
       const colRef = collection(db, "giving");
-      const qGiving = query(
-        colRef,
-        where("churchId", "==", userProfile.churchId)
-      );
+      const constraints = [
+        where("churchId", "==", userProfile.churchId),
+        orderBy("createdAt", "desc"),
+      ];
+
+      if (append && givingPageCursor) {
+        constraints.push(startAfter(givingPageCursor));
+      }
+
+      constraints.push(limit(GIVING_PAGE_SIZE));
+
+      const qGiving = query(colRef, ...constraints);
       const snapshot = await getDocs(qGiving);
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setGiving(data);
+      setGiving((prev) => (append ? [...prev, ...data] : data));
+
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+      setGivingPageCursor(lastDoc);
+      setGivingHasMore(snapshot.docs.length === GIVING_PAGE_SIZE);
     } catch (err) {
       console.error("Load giving error:", err);
       showToast("Error loading giving records.", "error");
@@ -547,6 +588,8 @@ function App() {
   };
 
   useEffect(() => {
+    setGivingPageCursor(null);
+    setGivingHasMore(true);
     if (
       (activeTab === "giving" || activeTab === "overview") &&
       userProfile?.churchId
@@ -555,6 +598,11 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
+
+  const loadMoreGiving = () => {
+    if (!givingHasMore || givingLoading) return;
+    return loadGiving({ append: true });
+  };
 
   // ---------- Sermons ----------
   const loadSermons = async () => {
@@ -1584,6 +1632,25 @@ function App() {
                   </table>
                 </div>
               )}
+              {membersHasMore && members.length > 0 && (
+                <button
+                  onClick={loadMoreMembers}
+                  disabled={membersLoading}
+                  style={{
+                    marginTop: "12px",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                    background: membersLoading ? "#f3f4f6" : "white",
+                    color: "#111827",
+                    cursor: membersLoading ? "default" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                  }}
+                >
+                  {membersLoading ? "Loading..." : "Load more members"}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -2224,6 +2291,25 @@ function App() {
                     </tbody>
                   </table>
                 </div>
+              )}
+              {givingHasMore && giving.length > 0 && (
+                <button
+                  onClick={loadMoreGiving}
+                  disabled={givingLoading}
+                  style={{
+                    marginTop: "12px",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                    background: givingLoading ? "#f3f4f6" : "white",
+                    color: "#111827",
+                    cursor: givingLoading ? "default" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                  }}
+                >
+                  {givingLoading ? "Loading..." : "Load more giving records"}
+                </button>
               )}
             </div>
           </>
