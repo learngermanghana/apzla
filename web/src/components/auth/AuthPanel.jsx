@@ -258,7 +258,7 @@ export function AuthPanel({
             Secure, role-aware access for every ministry leader. Need help?
             Email us at hello@apzla.com.
           </p>
-        </div>
+        </Card>
       </div>
     </div>
   );
