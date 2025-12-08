@@ -45,6 +45,8 @@ function App() {
     city: "",
   });
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
+  const [churchPlan, setChurchPlan] = useState(null);
+  const [planLoading, setPlanLoading] = useState(false);
   const [paystackLoading, setPaystackLoading] = useState(false);
 
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
@@ -135,6 +137,82 @@ function App() {
   // Follow-up
   const [followupPastorName, setFollowupPastorName] = useState("");
 
+  const TRIAL_LENGTH_DAYS = 14;
+  const EXPIRY_SOON_THRESHOLD_DAYS = 3;
+
+  const addDays = (date, days) => {
+    const copy = new Date(date);
+    copy.setDate(copy.getDate() + days);
+    return copy;
+  };
+
+  const parseDate = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const daysUntil = (date) => {
+    if (!date) return null;
+    const msInDay = 1000 * 60 * 60 * 24;
+    return Math.ceil((date.getTime() - Date.now()) / msInDay);
+  };
+
+  const evaluateAccessStatus = (plan) => {
+    if (!plan) {
+      return {
+        state: "pending",
+        headline: "",
+        detail: "",
+        deadline: null,
+        daysRemaining: null,
+      };
+    }
+
+    const nowDate = new Date();
+    const subscriptionExpiresAt = parseDate(plan.subscriptionExpiresAt);
+    const trialEndsAt =
+      parseDate(plan.trialEndsAt) ||
+      (plan.createdAt ? addDays(new Date(plan.createdAt), TRIAL_LENGTH_DAYS) : null);
+    const expiryDate = subscriptionExpiresAt || trialEndsAt;
+
+    if (!expiryDate) {
+      return {
+        state: "active",
+        headline: "Subscription status",
+        detail: "Your plan is active.",
+        deadline: null,
+        daysRemaining: null,
+      };
+    }
+
+    if (expiryDate <= nowDate) {
+      const modeLabel = subscriptionExpiresAt ? "subscription" : "trial";
+      return {
+        state: "expired",
+        headline: "Access unavailable",
+        detail: `Your ${modeLabel} ended on ${expiryDate.toLocaleDateString()}. Please renew to continue.`,
+        deadline: expiryDate,
+        daysRemaining: 0,
+      };
+    }
+
+    const remaining = daysUntil(expiryDate);
+    const state = remaining !== null && remaining <= EXPIRY_SOON_THRESHOLD_DAYS
+      ? "expiring"
+      : "active";
+
+    const modeLabel = subscriptionExpiresAt ? "paid plan" : "trial";
+
+    return {
+      state,
+      headline: subscriptionExpiresAt ? "Subscription active" : "Trial active",
+      detail: `${remaining} day${remaining === 1 ? "" : "s"} left on your ${modeLabel} (ends ${expiryDate.toLocaleDateString()}).`,
+      deadline: expiryDate,
+      daysRemaining: remaining,
+    };
+  };
+
   const showToast = (message, variant = "info") => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
     setToasts((prev) => [...prev, { id, message, variant }]);
@@ -151,6 +229,48 @@ function App() {
     setSermons([]);
     setMemberAttendanceHistory([]);
   }, [user?.uid]);
+
+  useEffect(() => {
+    const fetchChurchPlan = async () => {
+      if (!userProfile?.churchId) {
+        setChurchPlan(null);
+        setSubscriptionInfo(null);
+        return;
+      }
+
+      setPlanLoading(true);
+
+      try {
+        const snapshot = await getDoc(doc(db, "churches", userProfile.churchId));
+
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setChurchPlan({ id: snapshot.id, ...data });
+          setSubscriptionInfo({
+            status: data.subscriptionStatus || "INACTIVE",
+            plan: data.subscriptionPlan || "Monthly (GHS 120)",
+            amount: data.subscriptionAmount || 120,
+            currency: data.subscriptionCurrency || "GHS",
+            paidAt: data.subscriptionPaidAt || null,
+            expiresAt: data.subscriptionExpiresAt || data.trialEndsAt || null,
+            reference: data.subscriptionReference || null,
+            trialStartedAt: data.trialStartedAt || null,
+            trialEndsAt: data.trialEndsAt || null,
+          });
+        } else {
+          setChurchPlan(null);
+          setSubscriptionInfo(null);
+        }
+      } catch (error) {
+        console.error("Load church plan error:", error);
+        showToast("Unable to load subscription status.", "error");
+      } finally {
+        setPlanLoading(false);
+      }
+    };
+
+    fetchChurchPlan();
+  }, [userProfile?.churchId]);
 
   // ---------- Auth handlers ----------
   const validateAuthInputs = () => {
@@ -238,9 +358,13 @@ function App() {
           amount: data.subscriptionAmount || 120,
           currency: data.subscriptionCurrency || "GHS",
           paidAt: data.subscriptionPaidAt || null,
-          expiresAt: data.subscriptionExpiresAt || null,
+          expiresAt: data.subscriptionExpiresAt || data.trialEndsAt || null,
           reference: data.subscriptionReference || null,
+          trialStartedAt: data.trialStartedAt || null,
+          trialEndsAt: data.trialEndsAt || null,
         });
+
+        setChurchPlan({ id: userProfile.churchId, ...data });
       }
     } catch (err) {
       console.error("Load church settings error:", err);
@@ -349,6 +473,11 @@ function App() {
         expiresAt: subscriptionData.subscriptionExpiresAt,
         reference: subscriptionData.subscriptionReference,
       });
+      setChurchPlan((prev) => ({
+        ...(prev || {}),
+        id: userProfile.churchId,
+        ...subscriptionData,
+      }));
       showToast("Subscription activated for 1 month.", "success");
     } catch (err) {
       console.error("Record subscription error:", err);
@@ -435,12 +564,18 @@ function App() {
     try {
       setLoading(true);
 
+      const trialStart = new Date();
+      const trialEnd = addDays(trialStart, TRIAL_LENGTH_DAYS);
+
       const churchRef = await addDoc(collection(db, "churches"), {
         name: churchName.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
         ownerUserId: user.uid,
-        createdAt: new Date().toISOString(),
+        createdAt: trialStart.toISOString(),
+        trialStartedAt: trialStart.toISOString(),
+        trialEndsAt: trialEnd.toISOString(),
+        subscriptionStatus: "TRIAL",
       });
 
       const churchId = churchRef.id;
@@ -451,6 +586,30 @@ function App() {
         role: "CHURCH_ADMIN",
         churchName: churchName.trim(),
         createdAt: new Date().toISOString(),
+      });
+
+      setChurchPlan({
+        id: churchId,
+        name: churchName.trim(),
+        country: churchCountry.trim(),
+        city: churchCity.trim(),
+        ownerUserId: user.uid,
+        createdAt: trialStart.toISOString(),
+        trialStartedAt: trialStart.toISOString(),
+        trialEndsAt: trialEnd.toISOString(),
+        subscriptionStatus: "TRIAL",
+      });
+
+      setSubscriptionInfo({
+        status: "TRIAL",
+        plan: "Trial (14 days)",
+        amount: 0,
+        currency: "GHS",
+        paidAt: null,
+        expiresAt: trialEnd.toISOString(),
+        reference: null,
+        trialStartedAt: trialStart.toISOString(),
+        trialEndsAt: trialEnd.toISOString(),
       });
 
       setUserProfile({
@@ -1008,6 +1167,7 @@ function App() {
   }, [activeTab, userProfile?.churchId]);
 
   const authValidationMessage = validateAuthInputs();
+  const accessStatus = evaluateAccessStatus(churchPlan);
 
   // ---------- UI: Auth screen ----------
   if (!user) {
@@ -1085,6 +1245,38 @@ function App() {
         onLogout={handleLogout}
         loading={loading}
       />
+    );
+  }
+
+  if (user && userProfile?.churchId && planLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px",
+            maxWidth: "420px",
+            width: "100%",
+            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: "14px", color: "#4b5563" }}>
+            Checking your subscription status…
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -1250,6 +1442,49 @@ function App() {
         ))}
       </div>
 
+      {accessStatus.detail && (
+        <div
+          className={`subscription-banner${
+            accessStatus.state === "expiring" ? " warning" : ""
+          }`}
+        >
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "12px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(135deg, #4338ca, #22c55e)",
+              color: "white",
+              fontWeight: 800,
+            }}
+            aria-hidden
+          >
+            ⏰
+          </div>
+          <div style={{ flex: 1 }}>
+            <strong style={{ display: "block" }}>{accessStatus.headline}</strong>
+            <p style={{ margin: "4px 0 0" }}>{accessStatus.detail}</p>
+          </div>
+          <button
+            onClick={() => setShowAccountSettings(true)}
+            style={{
+              border: "none",
+              background: "#111827",
+              color: "white",
+              padding: "8px 12px",
+              borderRadius: "10px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Manage billing
+          </button>
+        </div>
+      )}
+
       {showAccountSettings && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-card">
@@ -1380,12 +1615,18 @@ function App() {
                       Plan: {subscriptionInfo?.plan || "Monthly (GHS 120)"}
                     </p>
                     <p className="subscription-meta">
-                      Next renewal:
+                      {subscriptionInfo?.status === "TRIAL"
+                        ? "Trial ends:"
+                        : "Next renewal:"}
                       {subscriptionInfo?.expiresAt
                         ? ` ${new Date(
                             subscriptionInfo.expiresAt,
                           ).toLocaleDateString()}`
-                        : " Not set"}
+                        : subscriptionInfo?.trialEndsAt
+                          ? ` ${new Date(
+                              subscriptionInfo.trialEndsAt,
+                            ).toLocaleDateString()}`
+                          : " Not set"}
                     </p>
                     {subscriptionInfo?.reference && (
                       <p className="subscription-meta">
@@ -1417,6 +1658,65 @@ function App() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {accessStatus.state === "expired" && (
+        <div
+          className="modal-backdrop"
+          style={{
+            background: "rgba(15, 23, 42, 0.7)",
+            zIndex: showAccountSettings ? 55 : 70,
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{ maxWidth: "520px", textAlign: "center" }}
+          >
+            <p className="modal-pill">Billing</p>
+            <h2 style={{ margin: "8px 0" }}>Access temporarily blocked</h2>
+            <p style={{ color: "#4b5563", fontSize: "14px" }}>
+              {accessStatus.detail}
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                marginTop: "16px",
+                justifyContent: "center",
+              }}
+            >
+              <button
+                onClick={() => setShowAccountSettings(true)}
+                style={{
+                  background: "#111827",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 14px",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                Renew plan
+              </button>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: "#e5e7eb",
+                  color: "#111827",
+                  border: "none",
+                  padding: "10px 14px",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                Log out
+              </button>
             </div>
           </div>
         </div>
