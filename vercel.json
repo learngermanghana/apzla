@@ -23,6 +23,10 @@
       "dest": "/functions/api/$1.js"
     },
     {
+      "src": "/checkin(.*)",
+      "dest": "/web/index.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/web/$1"
     }
