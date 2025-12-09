@@ -1,53 +1,8 @@
-const crypto = require('crypto')
 const { admin, db, initError } = require('../lib/firestoreAdmin')
+const { verifyJwt } = require('../lib/jwtHelpers')
 
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'
-
-function base64UrlDecode(input) {
-  const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
-  const padLength = (4 - (normalized.length % 4)) % 4
-  const padded = normalized.padEnd(normalized.length + padLength, '=')
-  const buffer = Buffer.from(padded, 'base64')
-  return buffer.toString('utf8')
-}
-
-function verifyJwt(token) {
-  const parts = token.split('.')
-  if (parts.length !== 3) {
-    throw new Error('Token format is invalid.')
-  }
-
-  const [encodedHeader, encodedPayload, signature] = parts
-  const data = `${encodedHeader}.${encodedPayload}`
-  const expected = crypto
-    .createHmac('sha256', jwtSecret)
-    .update(data)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-
-  const signatureBuffer = Buffer.from(signature)
-  const expectedBuffer = Buffer.from(expected)
-
-  if (signatureBuffer.length !== expectedBuffer.length) {
-    throw new Error('Token signature mismatch.')
-  }
-
-  if (!crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
-    throw new Error('Token signature mismatch.')
-  }
-
-  const payload = JSON.parse(base64UrlDecode(encodedPayload))
-  const now = Math.floor(Date.now() / 1000)
-
-  if (payload.exp && now > payload.exp) {
-    throw new Error('Token has expired.')
-  }
-
-  return payload
-}
 
 function getTimestampMillis(timestamp) {
   if (!timestamp) return null
@@ -121,7 +76,7 @@ async function handler(request, response) {
 
   let payload
   try {
-    payload = verifyJwt(token)
+    payload = verifyJwt(token, jwtSecret)
   } catch (error) {
     return response.status(401).json({
       status: 'error',
