@@ -192,6 +192,11 @@ async function handler(request, response) {
     const checkinLink = normalizedBase
       ? `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
       : null
+    const qrImageUrl = checkinLink
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+          checkinLink
+        )}`
+      : null
 
     if (email && checkinLink) {
       await queueNotification({
@@ -208,6 +213,7 @@ async function handler(request, response) {
       token,
       nonce,
       link: checkinLink,
+      qrImageUrl,
       expiresAt,
       message: 'Check-in token issued successfully.',
     })
