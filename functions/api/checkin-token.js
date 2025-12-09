@@ -1,17 +1,12 @@
 const crypto = require('crypto')
+const { admin, db } = require('../lib/firestoreAdmin')
 
-const firestoreProjectId = process.env.FIRESTORE_PROJECT_ID
-const firestoreToken = process.env.FIRESTORE_BEARER_TOKEN
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'
 const tokenTtlMinutes = Number(process.env.CHECKIN_TOKEN_TTL_MINUTES) || 30
 const notificationCollection =
   process.env.FIRESTORE_NOTIFICATION_COLLECTION || 'notifications'
 const appBaseUrl = process.env.APP_BASE_URL
-
-const firestoreBase =
-  firestoreProjectId &&
-  `https://firestore.googleapis.com/v1/projects/${firestoreProjectId}/databases/(default)/documents`
 
 function base64UrlEncode(input) {
   return Buffer.from(input)
@@ -38,96 +33,36 @@ function signJwt(payload) {
   return `${data}.${signature}`
 }
 
-function buildFirestoreFields(fields) {
-  const mapped = {}
-
-  Object.entries(fields).forEach(([key, value]) => {
-    if (value === undefined || value === null) return
-
-    if (typeof value === 'boolean') {
-      mapped[key] = { booleanValue: value }
-    } else if (typeof value === 'number') {
-      mapped[key] = { integerValue: value }
-    } else if (value instanceof Date) {
-      mapped[key] = { timestampValue: value.toISOString() }
-    } else if (key.toLowerCase().includes('at') && typeof value === 'string') {
-      // Accept preformatted timestamps
-      mapped[key] = { timestampValue: value }
-    } else {
-      mapped[key] = { stringValue: String(value) }
-    }
-  })
-
-  return mapped
-}
-
 async function writeNonceRecord(nonce, payload) {
-  const endpoint = `${firestoreBase}/${nonceCollection}?documentId=${encodeURIComponent(
-    nonce
-  )}`
-
-  const body = {
-    fields: buildFirestoreFields({
-      nonce,
-      ...payload,
-      consumed: false,
-      status: 'issued',
-      issuedAt: new Date(),
-    }),
+  const data = {
+    nonce,
+    ...payload,
+    consumed: false,
+    status: 'issued',
+    issuedAt: admin.firestore.FieldValue.serverTimestamp(),
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${firestoreToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(
-      `Failed to write nonce: ${response.status} ${response.statusText} ${errorText}`
-    )
-  }
+  await db.collection(nonceCollection).doc(nonce).set(data)
 }
 
 async function queueNotification({ email, link, memberId, churchId, serviceDate }) {
   if (!email) return null
 
-  const endpoint = `${firestoreBase}/${notificationCollection}`
-  const body = {
-    fields: buildFirestoreFields({
-      channel: 'email',
-      email,
-      link,
-      memberId,
-      churchId,
-      serviceDate,
-      status: 'queued',
-      type: 'checkin-link',
-      createdAt: new Date(),
-      subject: 'Your check-in link',
-      message: `Tap to check in for service: ${link}`,
-    }),
+  const data = {
+    channel: 'email',
+    email,
+    link,
+    memberId,
+    churchId,
+    serviceDate,
+    status: 'queued',
+    type: 'checkin-link',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    subject: 'Your check-in link',
+    message: `Tap to check in for service: ${link}`,
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${firestoreToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(
-      `Failed to queue notification: ${response.status} ${response.statusText} ${errorText}`
-    )
-  }
+  await db.collection(notificationCollection).add(data)
 }
 
 async function handler(request, response) {
@@ -155,14 +90,6 @@ async function handler(request, response) {
     })
   }
 
-  if (!firestoreProjectId || !firestoreToken) {
-    return response.status(500).json({
-      status: 'error',
-      message:
-        'FIRESTORE_PROJECT_ID and FIRESTORE_BEARER_TOKEN must be configured to issue tokens.',
-    })
-  }
-
   const issuedAt = Math.floor(Date.now() / 1000)
   const expiresAt = issuedAt + tokenTtlMinutes * 60
   const nonce = crypto.randomUUID()
@@ -185,7 +112,7 @@ async function handler(request, response) {
       churchId,
       serviceDate,
       serviceType: payload.serviceType,
-      expiresAt: new Date(expiresAt * 1000).toISOString(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt * 1000),
     })
 
     const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')

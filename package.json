@@ -1,0 +1,16 @@
+{
+  "name": "apzla",
+  "version": "1.0.0",
+  "description": "This repository is organized for Vercel deployment with separate frontend and backend areas:",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "firebase-admin": "^12.5.0"
+  }
+}
