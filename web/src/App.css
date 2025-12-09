@@ -313,10 +313,26 @@
   font-weight: 600;
 }
 
-.checkin-link-actions {
-  display: flex;
-  gap: 8px;
-}
+  .checkin-link-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .checkin-link-qr-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .checkin-link-qr-actions button {
+    border: 1px solid #d1d5db;
+    background: #f8fafc;
+    color: #111827;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
 
 .checkin-link-actions button {
   border: 1px solid #d1d5db;
