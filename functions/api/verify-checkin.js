@@ -1,13 +1,8 @@
 const crypto = require('crypto')
+const { admin, db } = require('../lib/firestoreAdmin')
 
-const firestoreProjectId = process.env.FIRESTORE_PROJECT_ID
-const firestoreToken = process.env.FIRESTORE_BEARER_TOKEN
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'
-
-const firestoreBase =
-  firestoreProjectId &&
-  `https://firestore.googleapis.com/v1/projects/${firestoreProjectId}/databases/(default)/documents`
 
 function base64UrlDecode(input) {
   const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
@@ -54,76 +49,38 @@ function verifyJwt(token) {
   return payload
 }
 
-function parseFirestoreDocument(doc) {
-  if (!doc || !doc.fields) return null
-  const fields = doc.fields
-  return Object.fromEntries(
-    Object.entries(fields).map(([key, value]) => {
-      if ('stringValue' in value) return [key, value.stringValue]
-      if ('booleanValue' in value) return [key, value.booleanValue]
-      if ('integerValue' in value) return [key, Number(value.integerValue)]
-      if ('timestampValue' in value) return [key, value.timestampValue]
-      return [key, null]
-    })
-  )
+function getTimestampMillis(timestamp) {
+  if (!timestamp) return null
+  if (admin.firestore.Timestamp.isTimestamp(timestamp)) {
+    return timestamp.toMillis()
+  }
+  if (typeof timestamp.toDate === 'function') {
+    return timestamp.toDate().getTime()
+  }
+  const parsed = Date.parse(timestamp)
+  return Number.isNaN(parsed) ? null : parsed
 }
 
 async function fetchNonce(nonce) {
-  const endpoint = `${firestoreBase}/${nonceCollection}/${encodeURIComponent(nonce)}`
-  const response = await fetch(endpoint, {
-    headers: {
-      Authorization: `Bearer ${firestoreToken}`,
-    },
-  })
-
-  if (response.status === 404) {
+  const doc = await db.collection(nonceCollection).doc(nonce).get()
+  if (!doc.exists) {
     return null
   }
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(
-      `Failed to read nonce: ${response.status} ${response.statusText} ${errorText}`
-    )
-  }
-
-  const body = await response.json()
-  return parseFirestoreDocument(body)
+  return { id: doc.id, ...doc.data() }
 }
 
 async function markNonceConsumed(nonce, metadata) {
-  const endpoint = `${firestoreBase}/${nonceCollection}/${encodeURIComponent(
-    nonce
-  )}?updateMask.fieldPaths=consumed&updateMask.fieldPaths=consumedAt&updateMask.fieldPaths=consumedIp&updateMask.fieldPaths=status&updateMask.fieldPaths=lastVerifiedAt&updateMask.fieldPaths=lastVerificationMessage`
-
-  const body = {
-    fields: {
-      consumed: { booleanValue: true },
-      consumedAt: { timestampValue: new Date().toISOString() },
-      consumedIp: metadata.ip
-        ? { stringValue: metadata.ip }
-        : { stringValue: '' },
-      status: { stringValue: metadata.status || 'consumed' },
-      lastVerifiedAt: { timestampValue: new Date().toISOString() },
-      lastVerificationMessage: { stringValue: metadata.message || 'Consumed' },
-    },
+  const updateData = {
+    consumed: true,
+    consumedAt: admin.firestore.FieldValue.serverTimestamp(),
+    consumedIp: metadata.ip || '',
+    status: metadata.status || 'consumed',
+    lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastVerificationMessage: metadata.message || 'Consumed',
   }
 
-  const response = await fetch(endpoint, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${firestoreToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(
-      `Failed to mark nonce consumed: ${response.status} ${response.statusText} ${errorText}`
-    )
-  }
+  await db.collection(nonceCollection).doc(nonce).update(updateData)
 }
 
 async function handler(request, response) {
@@ -147,14 +104,6 @@ async function handler(request, response) {
     return response.status(500).json({
       status: 'error',
       message: 'CHECKIN_JWT_SECRET environment variable is not configured.',
-    })
-  }
-
-  if (!firestoreProjectId || !firestoreToken) {
-    return response.status(500).json({
-      status: 'error',
-      message:
-        'FIRESTORE_PROJECT_ID and FIRESTORE_BEARER_TOKEN must be configured to verify tokens.',
     })
   }
 
@@ -196,8 +145,8 @@ async function handler(request, response) {
       })
     }
 
-    const nowIso = new Date().toISOString()
-    if (nonceRecord.expiresAt && nowIso > nonceRecord.expiresAt) {
+    const expiresAtMillis = getTimestampMillis(nonceRecord.expiresAt)
+    if (expiresAtMillis && Date.now() > expiresAtMillis) {
       await markNonceConsumed(payload.nonce, {
         ip: request.headers['x-forwarded-for'] || request.socket?.remoteAddress,
         status: 'expired',

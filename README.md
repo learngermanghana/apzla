@@ -25,7 +25,7 @@ The included `vercel.json` uses Vercel's static build for the frontend and Node 
 ## Check-in links
 
 - **Issue a token + link**: `POST /api/checkin-token` with `memberId`, `churchId`, `serviceDate`, optional `serviceType`, `email`, and `baseUrl`.
-  - Requires `CHECKIN_JWT_SECRET`, `FIRESTORE_PROJECT_ID`, and `FIRESTORE_BEARER_TOKEN` environment variables (optional overrides: `FIRESTORE_CHECKIN_COLLECTION`, `FIRESTORE_NOTIFICATION_COLLECTION`, `CHECKIN_TOKEN_TTL_MINUTES`, `APP_BASE_URL`).
+  - Requires `CHECKIN_JWT_SECRET` plus Firebase Admin service account credentials (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`). Optional overrides: `FIRESTORE_CHECKIN_COLLECTION`, `FIRESTORE_NOTIFICATION_COLLECTION`, `CHECKIN_TOKEN_TTL_MINUTES`, `APP_BASE_URL`.
   - Stores a nonce document in Firestore and, when `email` and `baseUrl`/`APP_BASE_URL` are provided, queues a notification document containing the link `https://<app>/checkin?token=...`.
   - Returns both the direct link and a `qrImageUrl` (PNG) derived from that link so you can print or display a QR code for attendees to scan. The QR code is just the member-specific link encoded as an image; scanning it opens that URL.
   - **Identity logic**: each token embeds `memberId`, `churchId`, `serviceDate`, and a unique nonce. When `POST /api/verify-checkin` receives the token, it (a) validates the JWT signature with `CHECKIN_JWT_SECRET`, (b) fetches the nonce document, (c) confirms the stored fields match the token payload, and (d) marks the nonce consumed. That flow ensures a printed QR code or shared link still maps back to the single member who received it and cannot be reused.
