@@ -1200,6 +1200,71 @@ function App() {
     }
   };
 
+  const downloadCheckinQrImage = async () => {
+    if (!checkinTokenQr) return;
+    try {
+      const response = await fetch(checkinTokenQr, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("Unable to fetch QR image.");
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "checkin-qr.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      showToast("QR image downloaded.", "success");
+    } catch (err) {
+      console.error("Download QR image error:", err);
+      showToast(err.message || "Unable to download QR image.", "error");
+    }
+  };
+
+  const printCheckinQrImage = async () => {
+    if (!checkinTokenQr) return;
+    try {
+      const response = await fetch(checkinTokenQr, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("Unable to fetch QR image.");
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const printWindow = window.open("", "_blank", "width=420,height=520");
+
+      if (!printWindow) {
+        throw new Error("Popup blocked. Allow popups to print the QR code.");
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print Check-in QR</title>
+          </head>
+          <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#fff;">
+            <img src="${blobUrl}" style="width:320px;height:320px;object-fit:contain;" />
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 5000);
+    } catch (err) {
+      console.error("Print QR image error:", err);
+      showToast(err.message || "Unable to print QR image.", "error");
+    }
+  };
+
   const buildShareLinks = (link, { serviceType, serviceDate, memberName } = {}) => {
     if (!link) return null;
     const serviceLabel = serviceType || "Service";
@@ -3943,6 +4008,14 @@ function App() {
                                       padding: "8px",
                                     }}
                                   />
+                                  <div className="checkin-link-qr-actions">
+                                    <button type="button" onClick={downloadCheckinQrImage}>
+                                      Download QR image
+                                    </button>
+                                    <button type="button" onClick={printCheckinQrImage}>
+                                      Print QR
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
