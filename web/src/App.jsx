@@ -125,6 +125,11 @@ function App() {
   const [showCheckinIssuer, setShowCheckinIssuer] = useState(false);
   const canShareCheckinLink =
     typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const [memberCheckinLink, setMemberCheckinLink] = useState({
+    memberId: null,
+    link: "",
+  });
+  const [memberLinkLoadingId, setMemberLinkLoadingId] = useState(null);
 
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
@@ -1016,6 +1021,51 @@ function App() {
     }
   };
 
+  const issueCheckinTokenRequest = async (payload) => {
+    const normalizedPayload = {
+      ...payload,
+      memberId: payload.memberId?.trim(),
+      churchId: payload.churchId?.trim(),
+      serviceDate: payload.serviceDate,
+      serviceType: payload.serviceType?.trim(),
+      email: payload.email?.trim(),
+      baseUrl: payload.baseUrl?.trim() || defaultBaseUrl,
+    };
+
+    if (
+      !normalizedPayload.memberId ||
+      !normalizedPayload.churchId ||
+      !normalizedPayload.serviceDate
+    ) {
+      throw new Error("Member ID, church ID, and service date are required.");
+    }
+
+    const res = await fetch("/api/checkin-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(normalizedPayload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const message = data?.error || data?.message || "Unable to issue link.";
+      throw new Error(message);
+    }
+
+    const token = data?.token || data?.id;
+    const linkBase = normalizedPayload.baseUrl?.replace(/\/$/, "") || "";
+    const generatedLink =
+      data?.link ||
+      (token ? `${linkBase}/checkin?token=${encodeURIComponent(token)}` : "");
+
+    if (!generatedLink) {
+      throw new Error("The server did not return a check-in link.");
+    }
+
+    return generatedLink;
+  };
+
   const issueCheckinToken = async (event) => {
     event.preventDefault();
 
@@ -1044,29 +1094,7 @@ function App() {
 
     try {
       setCheckinTokenLoading(true);
-      const res = await fetch("/api/checkin-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const message = data?.error || data?.message || "Unable to issue link.";
-        throw new Error(message);
-      }
-
-      const token = data?.token || data?.id;
-      const linkBase = payload.baseUrl?.replace(/\/$/, "") || "";
-      const generatedLink =
-        data?.link ||
-        (token ? `${linkBase}/checkin?token=${encodeURIComponent(token)}` : "");
-
-      if (!generatedLink) {
-        throw new Error("The server did not return a check-in link.");
-      }
-
+      const generatedLink = await issueCheckinTokenRequest(payload);
       setCheckinTokenLink(generatedLink);
       showToast("Check-in link issued.", "success");
     } catch (err) {
@@ -1077,6 +1105,39 @@ function App() {
     }
   };
 
+  const issueMemberCheckinLink = async (member) => {
+    if (!userProfile?.churchId) {
+      showToast("Link a church to issue check-in links.", "error");
+      return;
+    }
+
+    if (!member?.email) {
+      showToast("Add an email address to this member to send a link.", "error");
+      return;
+    }
+
+    const payload = {
+      memberId: member.id,
+      churchId: userProfile.churchId,
+      serviceDate: memberAttendanceForm.date,
+      serviceType: memberAttendanceForm.serviceType,
+      email: member.email,
+      baseUrl: defaultBaseUrl,
+    };
+
+    try {
+      setMemberLinkLoadingId(member.id);
+      const generatedLink = await issueCheckinTokenRequest(payload);
+      setMemberCheckinLink({ memberId: member.id, link: generatedLink });
+      showToast("Check-in link ready to share.", "success");
+    } catch (err) {
+      console.error("Issue member check-in link error:", err);
+      showToast(err.message || "Unable to issue check-in link.", "error");
+    } finally {
+      setMemberLinkLoadingId(null);
+    }
+  };
+
   const copyCheckinLink = async () => {
     if (!checkinTokenLink) return;
     try {
@@ -1084,6 +1145,17 @@ function App() {
       showToast("Link copied to clipboard.", "success");
     } catch (err) {
       console.error("Copy check-in link error:", err);
+      showToast("Unable to copy link.", "error");
+    }
+  };
+
+  const copyMemberCheckinLink = async (link) => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast("Link copied to clipboard.", "success");
+    } catch (err) {
+      console.error("Copy member check-in link error:", err);
       showToast("Unable to copy link.", "error");
     }
   };
@@ -3416,62 +3488,160 @@ function App() {
                           className="checkin-card"
                           style={{
                             display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
+                            flexDirection: "column",
+                            gap: "8px",
                             padding: "10px 12px",
                             borderRadius: "12px",
                             border: "1px solid #e5e7eb",
                             background: "#f9fafb",
                           }}
                         >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: "14px",
-                                fontWeight: 600,
-                                color: "#111827",
-                              }}
-                            >
-                              {m.firstName} {m.lastName}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: "12px",
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                  color: "#111827",
+                                }}
+                              >
+                                {m.firstName} {m.lastName}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                }}
+                              >
+                                {m.phone || "No phone"}
+                              </div>
+                              {m.email && (
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#4b5563",
+                                  }}
+                                >
+                                  {m.email}
+                                </div>
+                              )}
                             </div>
+
                             <div
                               style={{
-                                fontSize: "12px",
-                                color: "#6b7280",
+                                display: "flex",
+                                gap: "8px",
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                justifyContent: "flex-end",
                               }}
                             >
-                              {m.phone || "No phone"}
+                              {isPresent ? (
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#16a34a",
+                                    fontWeight: 600,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  ✅ Present
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleCheckInMember(m.id)}
+                                  disabled={loading}
+                                  style={{
+                                    padding: "8px 12px",
+                                    borderRadius: "10px",
+                                    border: "none",
+                                    background: loading ? "#9ca3af" : "#111827",
+                                    color: "white",
+                                    cursor: loading ? "default" : "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Mark present
+                                </button>
+                              )}
+                              <button
+                                onClick={() => issueMemberCheckinLink(m)}
+                                disabled={memberLinkLoadingId === m.id || !m.email}
+                                style={{
+                                  padding: "8px 12px",
+                                  borderRadius: "10px",
+                                  border: "1px solid #d1d5db",
+                                  background:
+                                    memberLinkLoadingId === m.id ? "#e5e7eb" : "#ffffff",
+                                  color: "#111827",
+                                  cursor:
+                                    memberLinkLoadingId === m.id ? "default" : "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                }}
+                                title={
+                                  m.email
+                                    ? "Send a self check-in link to this member"
+                                    : "Add an email to the member profile to send a link"
+                                }
+                              >
+                                {memberLinkLoadingId === m.id
+                                  ? "Sending…"
+                                  : "Send check-in link"}
+                              </button>
                             </div>
                           </div>
 
-                          {isPresent ? (
-                            <span
-                              style={{
-                                fontSize: "12px",
-                                color: "#16a34a",
-                                fontWeight: 600,
-                              }}
-                            >
-                              ✅ Present
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleCheckInMember(m.id)}
-                              disabled={loading}
-                              style={{
-                                padding: "8px 12px",
-                                borderRadius: "10px",
-                                border: "none",
-                                background: loading ? "#9ca3af" : "#111827",
-                                color: "white",
-                                cursor: loading ? "default" : "pointer",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                              }}
-                            >
-                              Mark present
-                            </button>
-                          )}
+                          {memberCheckinLink.memberId === m.id &&
+                            memberCheckinLink.link && (
+                              <div className="checkin-link-box" style={{ marginTop: "4px" }}>
+                                <div>
+                                  <div className="checkin-link-label">
+                                    {memberAttendanceForm.serviceType || "Service"} •
+                                    {" "}
+                                    {memberAttendanceForm.date}
+                                  </div>
+                                  <div className="checkin-link-value">
+                                    {memberCheckinLink.link}
+                                  </div>
+                                </div>
+                                <div className="checkin-link-actions">
+                                  <button
+                                    type="button"
+                                    onClick={() => copyMemberCheckinLink(memberCheckinLink.link)}
+                                  >
+                                    Copy
+                                  </button>
+                                  <a
+                                    href={memberCheckinLink.link}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="checkin-link-open"
+                                    style={{
+                                      border: "1px solid #d1d5db",
+                                      background: "#f8fafc",
+                                      color: "#111827",
+                                      borderRadius: "10px",
+                                      padding: "8px 10px",
+                                      fontWeight: 600,
+                                      textDecoration: "none",
+                                      display: "inline-block",
+                                    }}
+                                  >
+                                    Open
+                                  </a>
+                                </div>
+                              </div>
+                            )}
                         </div>
                       );
                     })}
