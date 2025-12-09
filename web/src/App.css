@@ -508,3 +508,36 @@
     grid-template-columns: 1fr;
   }
 }
+
+.offline-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+  padding: 12px 16px;
+  max-width: 640px;
+  width: calc(100% - 24px);
+}
+
+.offline-banner__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.offline-banner__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.offline-banner__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #cbd5e1;
+}
