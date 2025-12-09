@@ -51,12 +51,17 @@ function verifyJwt(token) {
 
 function getTimestampMillis(timestamp) {
   if (!timestamp) return null
-  if (admin.firestore.Timestamp.isTimestamp(timestamp)) {
+  // Firestore Timestamp or any object with toMillis()
+  if (typeof timestamp.toMillis === 'function') {
     return timestamp.toMillis()
   }
+
+  // Some other Firestore date-like object
   if (typeof timestamp.toDate === 'function') {
     return timestamp.toDate().getTime()
   }
+
+  // Fallback: string / number that Date can parse
   const parsed = Date.parse(timestamp)
   return Number.isNaN(parsed) ? null : parsed
 }
