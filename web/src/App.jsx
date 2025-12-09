@@ -93,6 +93,25 @@ function App() {
     status: "VISITOR",
   });
 
+  const memberLookup = useMemo(() => {
+    const map = new Map();
+    members.forEach((member) => {
+      const fullName = `${member.firstName || ""} ${member.lastName || ""}`.trim();
+      const fallback = member.email || member.phone || member.id;
+      map.set(member.id, fullName || fallback);
+    });
+    return map;
+  }, [members]);
+
+  const recentMemberCheckins = useMemo(
+    () =>
+      memberAttendanceHistory.slice(0, 10).map((entry) => ({
+        ...entry,
+        memberName: memberLookup.get(entry.memberId) || entry.memberId,
+      })),
+    [memberAttendanceHistory, memberLookup]
+  );
+
   // Attendance
   const [attendance, setAttendance] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
@@ -1716,25 +1735,6 @@ function App() {
       monthlyMemberAttendance.add(entry.memberId);
     }
   });
-
-  const memberLookup = useMemo(() => {
-    const map = new Map();
-    members.forEach((member) => {
-      const fullName = `${member.firstName || ""} ${member.lastName || ""}`.trim();
-      const fallback = member.email || member.phone || member.id;
-      map.set(member.id, fullName || fallback);
-    });
-    return map;
-  }, [members]);
-
-  const recentMemberCheckins = useMemo(
-    () =>
-      memberAttendanceHistory.slice(0, 10).map((entry) => ({
-        ...entry,
-        memberName: memberLookup.get(entry.memberId) || entry.memberId,
-      })),
-    [memberAttendanceHistory, memberLookup]
-  );
 
   // Follow-up templates (visitors)
   const visitorTemplate = `Hi, thank you for worshipping with us at ${
