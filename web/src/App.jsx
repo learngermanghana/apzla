@@ -146,6 +146,7 @@ function App() {
     baseUrl: defaultBaseUrl,
   });
   const [checkinTokenLink, setCheckinTokenLink] = useState("");
+  const [checkinTokenQr, setCheckinTokenQr] = useState("");
   const [checkinTokenLoading, setCheckinTokenLoading] = useState(false);
   const [checkinTokenError, setCheckinTokenError] = useState("");
   const [showCheckinIssuer, setShowCheckinIssuer] = useState(false);
@@ -1097,12 +1098,19 @@ function App() {
     const generatedLink =
       data?.link ||
       (token ? `${linkBase}/checkin?token=${encodeURIComponent(token)}` : "");
+    const qrImageUrl =
+      data?.qrImageUrl ||
+      (generatedLink
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+            generatedLink
+          )}`
+        : "");
 
     if (!generatedLink) {
       throw new Error("The server did not return a check-in link.");
     }
 
-    return generatedLink;
+    return { link: generatedLink, qrImageUrl };
   };
 
   const issueCheckinToken = async (event) => {
@@ -1125,11 +1133,14 @@ function App() {
 
     setCheckinTokenError("");
     setCheckinTokenLink("");
+    setCheckinTokenQr("");
 
     try {
       setCheckinTokenLoading(true);
-      const generatedLink = await issueCheckinTokenRequest(payload);
+      const { link: generatedLink, qrImageUrl } =
+        await issueCheckinTokenRequest(payload);
       setCheckinTokenLink(generatedLink);
+      setCheckinTokenQr(qrImageUrl);
       showToast("Check-in link issued.", "success");
     } catch (err) {
       console.error("Issue check-in token error:", err);
@@ -1156,7 +1167,7 @@ function App() {
 
     try {
       setMemberLinkLoadingId(member.id);
-      const generatedLink = await issueCheckinTokenRequest(payload);
+      const { link: generatedLink } = await issueCheckinTokenRequest(payload);
       setMemberCheckinLink({ memberId: member.id, link: generatedLink });
       showToast("Check-in link ready to share.", "success");
     } catch (err) {
@@ -3915,6 +3926,25 @@ function App() {
                             <div>
                               <div className="checkin-link-label">Issued link</div>
                               <div className="checkin-link-value">{checkinTokenLink}</div>
+                              {checkinTokenQr && (
+                                <div className="checkin-link-qr">
+                                  <div className="checkin-link-label">QR code</div>
+                                  <img
+                                    src={checkinTokenQr}
+                                    alt="Check-in QR code"
+                                    style={{
+                                      marginTop: "8px",
+                                      width: "140px",
+                                      height: "140px",
+                                      objectFit: "contain",
+                                      border: "1px solid #e5e7eb",
+                                      borderRadius: "8px",
+                                      background: "#fff",
+                                      padding: "8px",
+                                    }}
+                                  />
+                                </div>
+                              )}
                             </div>
                             <div className="checkin-link-actions">
                               <button type="button" onClick={copyCheckinLink}>
