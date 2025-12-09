@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "functions/api/*.js",
+      "src": "functions/api/**/*.js",
       "use": "@vercel/node"
     },
     {
@@ -14,6 +14,10 @@
     }
   ],
   "routes": [
+    {
+      "src": "/api/transaction/verify/(?<reference>[^/]+)",
+      "dest": "/functions/api/transaction/verify/[reference].js?reference=$reference"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/functions/api/$1.js"
