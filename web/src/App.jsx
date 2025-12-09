@@ -154,6 +154,8 @@ function App() {
 
   // Follow-up
   const [followupPastorName, setFollowupPastorName] = useState("");
+  const [followupStatusFilter, setFollowupStatusFilter] = useState("VISITOR");
+  const [followupSearch, setFollowupSearch] = useState("");
 
   const TRIAL_LENGTH_DAYS = 14;
   const EXPIRY_SOON_THRESHOLD_DAYS = 3;
@@ -1572,9 +1574,62 @@ function App() {
   const visitorEmailSubject = encodeURIComponent("Thank you for worshipping with us");
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
 
-  const visitorMembers = members.filter(
-    (m) => (m.status || "").toUpperCase() === "VISITOR"
-  );
+  const followupStatusOptions = [
+    { value: "ALL", label: "All people" },
+    { value: "VISITOR", label: "Visitors" },
+    { value: "NON_VISITOR", label: "Members (non-visitors)" },
+    { value: "NEW_CONVERT", label: "New converts" },
+    { value: "REGULAR", label: "Regular members" },
+    { value: "WORKER", label: "Workers" },
+    { value: "PASTOR", label: "Pastors" },
+    { value: "INACTIVE", label: "Inactive" },
+  ];
+
+  const memberFollowupTemplate = `Hi, we missed you at ${
+    userProfile.churchName || "church"
+  } recently and wanted to check in. We hope to see you at the next service and are here to pray with you if needed.${
+    followupPastorName ? ` – ${followupPastorName}` : ""
+  }`;
+
+  const followupTemplate =
+    followupStatusFilter === "VISITOR"
+      ? visitorTemplate
+      : memberFollowupTemplate;
+  const followupTemplateEncoded = encodeURIComponent(followupTemplate);
+  const followupEmailSubject =
+    followupStatusFilter === "VISITOR"
+      ? visitorEmailSubject
+      : encodeURIComponent("We missed you at church");
+
+  const normalizedFollowupSearch = followupSearch.trim().toLowerCase();
+  const followupMembers = members.filter((m) => {
+    const status = (m.status || "VISITOR").toUpperCase();
+
+    if (followupStatusFilter === "ALL") return true;
+    if (followupStatusFilter === "NON_VISITOR") return status !== "VISITOR";
+
+    return status === followupStatusFilter;
+  });
+
+  const filteredFollowupMembers = followupMembers.filter((m) => {
+    if (!normalizedFollowupSearch) return true;
+
+    const valuesToSearch = [
+      m.firstName,
+      m.lastName,
+      m.phone,
+      m.email,
+      m.status,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+
+    return valuesToSearch.some((value) => value.includes(normalizedFollowupSearch));
+  });
+
+  const followupStatusLabel =
+    followupStatusOptions.find((option) => option.value === followupStatusFilter)
+      ?.label || "People";
 
   return (
     <div
@@ -3862,7 +3917,9 @@ function App() {
             >
               Apzla shows you who to follow up and gives you a ready
               message. Copy it and send with your own phone via SMS or
-              WhatsApp. No SMS cost is handled inside Apzla yet.
+              WhatsApp. No SMS cost is handled inside Apzla yet. Use the
+              filters to focus on visitors or members that need a check
+              in.
             </p>
 
             {/* Pastor name for signature */}
@@ -3897,7 +3954,101 @@ function App() {
               />
             </div>
 
-            {/* Visitors list */}
+            {/* Follow-up filters */}
+            <div
+              style={{
+                marginBottom: "16px",
+                padding: "12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "10px",
+                background: "#f9fafb",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  marginBottom: "10px",
+                  color: "#111827",
+                }}
+              >
+                Filters
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ flex: "1 1 220px", minWidth: "220px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Status focus
+                  </label>
+                  <select
+                    value={followupStatusFilter}
+                    onChange={(e) => setFollowupStatusFilter(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                      background: "white",
+                    }}
+                  >
+                    {followupStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: "1 1 220px", minWidth: "220px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Search by name, phone, or email
+                  </label>
+                  <input
+                    type="text"
+                    value={followupSearch}
+                    onChange={(e) => setFollowupSearch(e.target.value)}
+                    placeholder="Start typing to filter"
+                    style={{
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+              </div>
+              <p
+                style={{
+                  marginTop: "10px",
+                  color: "#6b7280",
+                  fontSize: "12px",
+                }}
+              >
+                Showing {filteredFollowupMembers.length} {followupStatusLabel.toLowerCase()} in your list.
+              </p>
+            </div>
+
+            {/* Follow-up list */}
             <div style={{ marginBottom: "20px" }}>
               <h2
                 style={{
@@ -3906,7 +4057,7 @@ function App() {
                   marginBottom: "6px",
                 }}
               >
-                Visitors in your members list
+                People to follow up
               </h2>
               <p
                 style={{
@@ -3915,19 +4066,19 @@ function App() {
                   fontSize: "13px",
                 }}
               >
-                These are members with status <strong>VISITOR</strong>.
-                Later, you can add per-service attendance so this shows{" "}
-                <em>&ldquo;visitors this Sunday&rdquo;</em>.
+                Focused on <strong>{followupStatusLabel}</strong>. Later, you can add
+                per-service attendance so this shows <em>&ldquo;visitors this Sunday&rdquo;</em>
+                and helps you follow up on members who missed church.
               </p>
 
               {membersLoading ? (
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
                   Loading members…
                 </p>
-              ) : visitorMembers.length === 0 ? (
+              ) : filteredFollowupMembers.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                  No visitors found yet. Add members with status
-                  &ldquo;Visitor&rdquo; in the Members tab.
+                  No people match this filter yet. Add members in the Members tab or
+                  adjust the filters above.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -3948,20 +4099,21 @@ function App() {
                         <th style={{ padding: "6px 4px" }}>Name</th>
                         <th style={{ padding: "6px 4px" }}>Phone</th>
                         <th style={{ padding: "6px 4px" }}>Email</th>
+                        <th style={{ padding: "6px 4px" }}>Status</th>
                         <th style={{ padding: "6px 4px" }}>Message options</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visitorMembers.map((m) => {
+                      {filteredFollowupMembers.map((m) => {
                         const phoneForLink = formatPhoneForLink(m.phone);
                         const whatsappLink = phoneForLink
-                          ? `https://wa.me/${phoneForLink}?text=${visitorTemplateEncoded}`
-                          : `https://wa.me/?text=${visitorTemplateEncoded}`;
-                        const telegramLink = `https://t.me/share/url?text=${visitorTemplateEncoded}`;
+                          ? `https://wa.me/${phoneForLink}?text=${followupTemplateEncoded}`
+                          : `https://wa.me/?text=${followupTemplateEncoded}`;
+                        const telegramLink = `https://t.me/share/url?text=${followupTemplateEncoded}`;
                         const smsLink = phoneForLink
-                          ? `sms:${phoneForLink}?body=${visitorTemplateEncoded}`
-                          : `sms:?body=${visitorTemplateEncoded}`;
-                        const emailLink = `mailto:${m.email || ""}?subject=${visitorEmailSubject}&body=${visitorTemplateEncoded}`;
+                          ? `sms:${phoneForLink}?body=${followupTemplateEncoded}`
+                          : `sms:?body=${followupTemplateEncoded}`;
+                        const emailLink = `mailto:${m.email || ""}?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
 
                         return (
                           <tr
@@ -3978,6 +4130,9 @@ function App() {
                             </td>
                             <td style={{ padding: "6px 4px" }}>
                               {m.email || "-"}
+                            </td>
+                            <td style={{ padding: "6px 4px" }}>
+                              {(m.status || "-").replace(/_/g, " ")}
                             </td>
                             <td style={{ padding: "6px 4px" }}>
                               <div
@@ -4081,10 +4236,12 @@ function App() {
                   style={{
                     fontSize: "13px",
                     fontWeight: 500,
-                    color: "#111827",
-                  }}
-                >
-                  Visitor thank-you message
+                  color: "#111827",
+                }}
+              >
+                  {followupStatusFilter === "VISITOR"
+                    ? "Visitor thank-you message"
+                    : "Member check-in message"}
                 </div>
                 <button
                   onClick={() => {
@@ -4096,7 +4253,7 @@ function App() {
                       return;
                     }
                     navigator.clipboard
-                      .writeText(visitorTemplate)
+                      .writeText(followupTemplate)
                       .then(() =>
                         showToast(
                           "Message copied. Paste it into WhatsApp or your SMS app.",
@@ -4127,7 +4284,7 @@ function App() {
 
               <textarea
                 readOnly
-                value={visitorTemplate}
+                value={followupTemplate}
                 rows={3}
                 style={{
                   width: "100%",
