@@ -31,6 +31,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  // Skip cross-origin requests (e.g., Firebase streaming endpoints) so they
+  // bypass the service worker entirely and avoid caching errors.
+  const requestURL = new URL(event.request.url);
+  if (requestURL.origin !== self.location.origin) return;
+
   if (event.request.mode === "navigate") {
     event.respondWith(
       (async () => {
