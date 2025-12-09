@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { db, auth } from "./firebase";
 import {
   collection,
@@ -149,13 +149,19 @@ function App() {
   const [checkinTokenLoading, setCheckinTokenLoading] = useState(false);
   const [checkinTokenError, setCheckinTokenError] = useState("");
   const [showCheckinIssuer, setShowCheckinIssuer] = useState(false);
-  const canShareCheckinLink =
-    typeof navigator !== "undefined" && typeof navigator.share === "function";
   const [memberCheckinLink, setMemberCheckinLink] = useState({
     memberId: null,
     link: "",
   });
   const [memberLinkLoadingId, setMemberLinkLoadingId] = useState(null);
+  const getOrCreateLocalMemberId = useCallback(() => {
+    if (typeof window === "undefined") return "";
+    const existing = localStorage.getItem("checkinDefaultMemberId");
+    if (existing) return existing;
+    const generated = `member-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
+    localStorage.setItem("checkinDefaultMemberId", generated);
+    return generated;
+  }, []);
 
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
@@ -284,12 +290,19 @@ function App() {
           ...parsed,
           baseUrl: parsed.baseUrl || prev.baseUrl || defaultBaseUrl,
           serviceDate: parsed.serviceDate || prev.serviceDate || todayStr,
+          memberId: parsed.memberId || prev.memberId || getOrCreateLocalMemberId(),
         }));
+        return;
       }
+
+      setCheckinTokenForm((prev) => ({
+        ...prev,
+        memberId: prev.memberId || getOrCreateLocalMemberId(),
+      }));
     } catch (err) {
       console.error("Restore check-in token form failed:", err);
     }
-  }, [defaultBaseUrl, todayStr]);
+  }, [defaultBaseUrl, todayStr, getOrCreateLocalMemberId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1110,11 +1123,6 @@ function App() {
       return;
     }
 
-    if (!payload.email) {
-      setCheckinTokenError("An email address is required to send the link.");
-      return;
-    }
-
     setCheckinTokenError("");
     setCheckinTokenLink("");
 
@@ -1134,11 +1142,6 @@ function App() {
   const issueMemberCheckinLink = async (member) => {
     if (!userProfile?.churchId) {
       showToast("Link a church to issue check-in links.", "error");
-      return;
-    }
-
-    if (!member?.email) {
-      showToast("Add an email address to this member to send a link.", "error");
       return;
     }
 
@@ -1186,22 +1189,27 @@ function App() {
     }
   };
 
-  const shareCheckinLink = async () => {
-    if (!checkinTokenLink) return;
-    if (!navigator?.share) {
-      showToast("Sharing is not supported on this device.", "error");
-      return;
-    }
+  const buildShareLinks = (link, { serviceType, serviceDate, memberName } = {}) => {
+    if (!link) return null;
+    const serviceLabel = serviceType || "Service";
+    const dateLabel = serviceDate ? ` on ${serviceDate}` : "";
+    const recipient = memberName ? `${memberName}, ` : "";
+    const message = `${recipient}here's your ${serviceLabel} check-in link${dateLabel}: ${link}`;
+    const encodedMessage = encodeURIComponent(message);
 
-    try {
-      await navigator.share({ title: "Service check-in", url: checkinTokenLink });
-    } catch (err) {
-      if (err?.name !== "AbortError") {
-        console.error("Share check-in link error:", err);
-        showToast("Unable to share link.", "error");
-      }
-    }
+    return {
+      whatsapp: `https://wa.me/?text=${encodedMessage}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodedMessage}`,
+      email: `mailto:?subject=${encodeURIComponent("Service check-in")}&body=${encodedMessage}`,
+    };
   };
+
+  const manualShareLinks = checkinTokenLink
+    ? buildShareLinks(checkinTokenLink, {
+        serviceType: checkinTokenForm.serviceType,
+        serviceDate: checkinTokenForm.serviceDate,
+      })
+    : null;
 
   useEffect(() => {
     if (activeTab === "checkin" && userProfile?.churchId) {
@@ -3643,7 +3651,7 @@ function App() {
                               )}
                               <button
                                 onClick={() => issueMemberCheckinLink(m)}
-                                disabled={memberLinkLoadingId === m.id || !m.email}
+                                disabled={memberLinkLoadingId === m.id}
                                 style={{
                                   padding: "8px 12px",
                                   borderRadius: "10px",
@@ -3657,60 +3665,95 @@ function App() {
                                   fontWeight: 600,
                                   whiteSpace: "nowrap",
                                 }}
-                                title={
-                                  m.email
-                                    ? "Send a self check-in link to this member"
-                                    : "Add an email to the member profile to send a link"
-                                }
+                                title="Create a self check-in link to share"
                               >
                                 {memberLinkLoadingId === m.id
-                                  ? "Sending…"
-                                  : "Send check-in link"}
+                                  ? "Preparing…"
+                                  : "Get check-in link"}
                               </button>
                             </div>
                           </div>
 
                           {memberCheckinLink.memberId === m.id &&
-                            memberCheckinLink.link && (
-                              <div className="checkin-link-box" style={{ marginTop: "4px" }}>
-                                <div>
-                                  <div className="checkin-link-label">
-                                    {memberAttendanceForm.serviceType || "Service"} •
-                                    {" "}
-                                    {memberAttendanceForm.date}
+                            memberCheckinLink.link &&
+                            (() => {
+                              const nameParts = `${m.firstName || ""} ${m.lastName || ""}`.trim();
+                              const memberName = nameParts || m.fullName || m.displayName;
+                              const memberShareLinks = buildShareLinks(memberCheckinLink.link, {
+                                serviceType: memberAttendanceForm.serviceType,
+                                serviceDate: memberAttendanceForm.date,
+                                memberName,
+                              });
+
+                              return (
+                                <div className="checkin-link-box" style={{ marginTop: "4px" }}>
+                                  <div>
+                                    <div className="checkin-link-label">
+                                      {memberAttendanceForm.serviceType || "Service"} •
+                                      {" "}
+                                      {memberAttendanceForm.date}
+                                    </div>
+                                    <div className="checkin-link-value">
+                                      {memberCheckinLink.link}
+                                    </div>
                                   </div>
-                                  <div className="checkin-link-value">
-                                    {memberCheckinLink.link}
+                                  <div className="checkin-link-actions">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        copyMemberCheckinLink(memberCheckinLink.link)
+                                      }
+                                    >
+                                      Copy
+                                    </button>
+                                    {memberShareLinks && (
+                                      <>
+                                        <a
+                                          href={memberShareLinks.whatsapp}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="checkin-link-open"
+                                        >
+                                          WhatsApp
+                                        </a>
+                                        <a
+                                          href={memberShareLinks.telegram}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="checkin-link-open"
+                                        >
+                                          Telegram
+                                        </a>
+                                        <a
+                                          href={memberShareLinks.email}
+                                          className="checkin-link-open"
+                                        >
+                                          Email
+                                        </a>
+                                      </>
+                                    )}
+                                    <a
+                                      href={memberCheckinLink.link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="checkin-link-open"
+                                      style={{
+                                        border: "1px solid #d1d5db",
+                                        background: "#f8fafc",
+                                        color: "#111827",
+                                        borderRadius: "10px",
+                                        padding: "8px 10px",
+                                        fontWeight: 600,
+                                        textDecoration: "none",
+                                        display: "inline-block",
+                                      }}
+                                    >
+                                      Open
+                                    </a>
                                   </div>
                                 </div>
-                                <div className="checkin-link-actions">
-                                  <button
-                                    type="button"
-                                    onClick={() => copyMemberCheckinLink(memberCheckinLink.link)}
-                                  >
-                                    Copy
-                                  </button>
-                                  <a
-                                    href={memberCheckinLink.link}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="checkin-link-open"
-                                    style={{
-                                      border: "1px solid #d1d5db",
-                                      background: "#f8fafc",
-                                      color: "#111827",
-                                      borderRadius: "10px",
-                                      padding: "8px 10px",
-                                      fontWeight: 600,
-                                      textDecoration: "none",
-                                      display: "inline-block",
-                                    }}
-                                  >
-                                    Open
-                                  </a>
-                                </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                         </div>
                       );
                     })}
@@ -3817,7 +3860,7 @@ function App() {
                           </label>
 
                           <label className="checkin-admin-field">
-                            <span>Recipient email*</span>
+                            <span>Recipient email (optional)</span>
                             <input
                               type="email"
                               value={checkinTokenForm.email}
@@ -3861,7 +3904,9 @@ function App() {
                             className="checkin-admin-submit"
                             disabled={checkinTokenLoading}
                           >
-                            {checkinTokenLoading ? "Issuing…" : "Send check-in link"}
+                            {checkinTokenLoading
+                              ? "Issuing…"
+                              : "Generate check-in link"}
                           </button>
                         </div>
 
@@ -3875,18 +3920,32 @@ function App() {
                               <button type="button" onClick={copyCheckinLink}>
                                 Copy
                               </button>
-                              <button
-                                type="button"
-                                onClick={shareCheckinLink}
-                                disabled={!canShareCheckinLink}
-                                title={
-                                  canShareCheckinLink
-                                    ? "Share link"
-                                    : "Device does not support the Web Share API"
-                                }
-                              >
-                                Share
-                              </button>
+                              {manualShareLinks && (
+                                <>
+                                  <a
+                                    href={manualShareLinks.whatsapp}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="checkin-link-open"
+                                  >
+                                    WhatsApp
+                                  </a>
+                                  <a
+                                    href={manualShareLinks.telegram}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="checkin-link-open"
+                                  >
+                                    Telegram
+                                  </a>
+                                  <a
+                                    href={manualShareLinks.email}
+                                    className="checkin-link-open"
+                                  >
+                                    Email
+                                  </a>
+                                </>
+                              )}
                             </div>
                           </div>
                         )}
