@@ -131,12 +131,14 @@ function App() {
   const [givingLoading, setGivingLoading] = useState(false);
   const [givingPageCursor, setGivingPageCursor] = useState(null);
   const [givingHasMore, setGivingHasMore] = useState(true);
+  const [givingMemberFilter, setGivingMemberFilter] = useState("");
   const [givingForm, setGivingForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
     type: "Offering", // Offering | Tithe | Special
     amount: "",
     notes: "",
+    memberId: "",
   });
 
   // Sermons
@@ -268,6 +270,7 @@ function App() {
     setMembers([]);
     setAttendance([]);
     setGiving([]);
+    setGivingMemberFilter("");
     setSermons([]);
     setMemberAttendanceHistory([]);
   }, [user?.uid]);
@@ -838,7 +841,8 @@ function App() {
       (activeTab === "members" ||
         activeTab === "overview" ||
         activeTab === "followup" ||
-        activeTab === "checkin") &&
+        activeTab === "checkin" ||
+        activeTab === "giving") &&
       userProfile?.churchId
     ) {
       loadMembers();
@@ -1145,15 +1149,20 @@ function App() {
   };
 
   // ---------- Giving ----------
-  const loadGiving = async ({ append = false } = {}) => {
+  const loadGiving = async ({ append = false, memberId = givingMemberFilter } = {}) => {
     if (!userProfile?.churchId) return;
     try {
       setGivingLoading(true);
       const colRef = collection(db, "giving");
       const constraints = [
         where("churchId", "==", userProfile.churchId),
-        orderBy("createdAt", "desc"),
       ];
+
+      if (memberId) {
+        constraints.push(where("memberId", "==", memberId));
+      }
+
+      constraints.push(orderBy("createdAt", "desc"));
 
       if (append && givingPageCursor) {
         constraints.push(startAfter(givingPageCursor));
@@ -1194,6 +1203,11 @@ function App() {
 
     try {
       setLoading(true);
+      const selectedMember =
+        givingForm.memberId && members.find((m) => m.id === givingForm.memberId);
+      const memberName = selectedMember
+        ? `${selectedMember.firstName || ""} ${selectedMember.lastName || ""}`.trim()
+        : "";
       await addDoc(collection(db, "giving"), {
         churchId: userProfile.churchId,
         date: givingForm.date,
@@ -1201,6 +1215,8 @@ function App() {
         type: givingForm.type,
         amount: Number(givingForm.amount),
         notes: givingForm.notes.trim(),
+        memberId: givingForm.memberId || null,
+        memberName,
         createdAt: new Date().toISOString(),
       });
 
@@ -1210,6 +1226,7 @@ function App() {
         type: "Offering",
         amount: "",
         notes: "",
+        memberId: "",
       });
 
       await loadGiving();
@@ -1225,14 +1242,16 @@ function App() {
   useEffect(() => {
     setGivingPageCursor(null);
     setGivingHasMore(true);
+    setGiving([]);
     if (
       (activeTab === "giving" || activeTab === "overview") &&
       userProfile?.churchId
     ) {
-      loadGiving();
+      const memberId = activeTab === "overview" ? "" : givingMemberFilter;
+      loadGiving({ memberId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, userProfile?.churchId]);
+  }, [activeTab, userProfile?.churchId, givingMemberFilter]);
 
   const loadMoreGiving = () => {
     if (!givingHasMore || givingLoading) return;
@@ -1464,6 +1483,21 @@ function App() {
       email.includes(normalizedMemberSearch)
     );
   });
+
+  const resolveGivingMember = (record) => {
+    if (record.memberName) return record.memberName;
+    if (record.memberId) {
+      const member = members.find((m) => m.id === record.memberId);
+      if (member) {
+        const name = `${member.firstName || ""} ${member.lastName || ""}`
+          .trim()
+          .replace(/\s+/g, " ");
+        return name || "Member";
+      }
+      return "Linked member";
+    }
+    return "—";
+  };
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -3681,6 +3715,32 @@ function App() {
               />
 
               <select
+                value={givingForm.memberId}
+                onChange={(e) =>
+                  setGivingForm((f) => ({ ...f, memberId: e.target.value }))
+                }
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="">Record against a member (optional)</option>
+                {members.map((m) => {
+                  const fullName = `${m.firstName || ""} ${m.lastName || ""}`
+                    .trim()
+                    .replace(/\s+/g, " ");
+                  return (
+                    <option key={m.id} value={m.id}>
+                      {fullName || "Unnamed member"}
+                    </option>
+                  );
+                })}
+              </select>
+
+              <select
                 value={givingForm.type}
                 onChange={(e) =>
                   setGivingForm((f) => ({ ...f, type: e.target.value }))
@@ -3758,15 +3818,59 @@ function App() {
             </button>
 
             <div>
-              <h2
+              <div
                 style={{
-                  fontSize: "16px",
-                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "flex-end",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  flexWrap: "wrap",
                   marginBottom: "8px",
                 }}
               >
-                Giving records
-              </h2>
+                <h2
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 500,
+                    margin: 0,
+                  }}
+                >
+                  Giving records
+                </h2>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label
+                    htmlFor="giving-member-filter"
+                    style={{ fontSize: "12px", color: "#6b7280" }}
+                  >
+                    Filter by member
+                  </label>
+                  <select
+                    id="giving-member-filter"
+                    value={givingMemberFilter}
+                    onChange={(e) => setGivingMemberFilter(e.target.value)}
+                    style={{
+                      minWidth: "240px",
+                      padding: "8px 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <option value="">All giving records</option>
+                    {members.map((m) => {
+                      const fullName = `${m.firstName || ""} ${m.lastName || ""}`
+                        .trim()
+                        .replace(/\s+/g, " ");
+                      return (
+                        <option key={m.id} value={m.id}>
+                          {fullName || "Unnamed member"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
 
               {givingLoading ? (
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
@@ -3795,6 +3899,7 @@ function App() {
                         <th style={{ padding: "6px 4px" }}>Date</th>
                         <th style={{ padding: "6px 4px" }}>Service</th>
                         <th style={{ padding: "6px 4px" }}>Type</th>
+                        <th style={{ padding: "6px 4px" }}>Member</th>
                         <th style={{ padding: "6px 4px" }}>Amount</th>
                         <th style={{ padding: "6px 4px" }}>Notes</th>
                       </tr>
@@ -3815,6 +3920,9 @@ function App() {
                           </td>
                           <td style={{ padding: "6px 4px" }}>
                             {g.type}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {resolveGivingMember(g)}
                           </td>
                           <td style={{ padding: "6px 4px" }}>
                             {g.amount?.toLocaleString?.() ?? g.amount}

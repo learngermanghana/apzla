@@ -52,6 +52,7 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     type: "Offering",
     amount: "",
     notes: "",
+    memberId: "",
   });
 
   const [sermons, setSermons] = useState([]);
@@ -320,6 +321,11 @@ export function useChurchData(userProfile, activeTab, todayStr) {
 
     try {
       setActionLoading(true);
+      const selectedMember =
+        givingForm.memberId && members.find((m) => m.id === givingForm.memberId);
+      const memberName = selectedMember
+        ? `${selectedMember.firstName || ""} ${selectedMember.lastName || ""}`.trim()
+        : "";
       await addDoc(collection(db, "giving"), {
         churchId: userProfile.churchId,
         date: givingForm.date,
@@ -327,6 +333,8 @@ export function useChurchData(userProfile, activeTab, todayStr) {
         type: givingForm.type,
         amount: Number(givingForm.amount),
         notes: givingForm.notes.trim(),
+        memberId: givingForm.memberId || null,
+        memberName,
         createdAt: new Date().toISOString(),
       });
 
@@ -336,6 +344,7 @@ export function useChurchData(userProfile, activeTab, todayStr) {
         type: "Offering",
         amount: "",
         notes: "",
+        memberId: "",
       });
 
       await loadGiving();
