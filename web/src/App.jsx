@@ -28,7 +28,14 @@ import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 
 function App() {
-  const { user, userProfile, setUserProfile, profileLoading } = useAuthProfile();
+  const {
+    user,
+    userProfile,
+    setUserProfile,
+    profileLoading,
+    profileError,
+    reloadProfile,
+  } = useAuthProfile();
 
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
@@ -1431,6 +1438,68 @@ function App() {
         disableSubmit={!!authValidationMessage || authLoading}
         validationMessage={authValidationMessage}
       />
+    );
+  }
+
+  // ---------- UI: profile load failure ----------
+  if (profileError) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px",
+            maxWidth: "480px",
+            width: "100%",
+            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+          }}
+        >
+          <h2 style={{ margin: "0 0 8px", fontSize: "20px" }}>
+            Unable to load your profile
+          </h2>
+          <p style={{ margin: "0 0 16px", color: "#4b5563" }}>{profileError}</p>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                background: "white",
+                cursor: "pointer",
+              }}
+            >
+              Log out
+            </button>
+            <button
+              type="button"
+              onClick={reloadProfile}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "10px",
+                border: "none",
+                background: "#4f46e5",
+                color: "white",
+                cursor: "pointer",
+              }}
+            >
+              Retry loading profile
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
