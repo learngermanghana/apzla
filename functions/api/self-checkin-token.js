@@ -5,8 +5,6 @@ const { signJwt } = require('../lib/jwtHelpers')
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'
 const tokenTtlMinutes = Number(process.env.CHECKIN_TOKEN_TTL_MINUTES) || 30
-const notificationCollection =
-  process.env.FIRESTORE_NOTIFICATION_COLLECTION || 'notifications'
 const appBaseUrl = process.env.APP_BASE_URL
 
 async function writeNonceRecord(nonce, payload) {
@@ -21,24 +19,11 @@ async function writeNonceRecord(nonce, payload) {
   await db.collection(nonceCollection).doc(nonce).set(data)
 }
 
-async function queueNotification({ email, link, memberId, churchId, serviceDate }) {
-  if (!email) return null
+function buildCheckinLink(token, baseUrl) {
+  const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
+  if (!normalizedBase) return null
 
-  const data = {
-    channel: 'email',
-    email,
-    link,
-    memberId,
-    churchId,
-    serviceDate,
-    status: 'queued',
-    type: 'checkin-link',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    subject: 'Your check-in link',
-    message: `Tap to check in for service: ${link}`,
-  }
-
-  await db.collection(notificationCollection).add(data)
+  return `${normalizedBase}/self-checkin?token=${encodeURIComponent(token)}`
 }
 
 async function handler(request, response) {
@@ -56,13 +41,12 @@ async function handler(request, response) {
     })
   }
 
-  const { memberId, churchId, serviceDate, serviceType, email, baseUrl } =
-    request.body || {}
+  const { churchId, serviceDate, serviceType, baseUrl } = request.body || {}
 
-  if (!memberId || !churchId || !serviceDate) {
+  if (!churchId || !serviceDate) {
     return response.status(400).json({
       status: 'error',
-      message: 'memberId, churchId, and serviceDate are required.',
+      message: 'churchId and serviceDate are required.',
     })
   }
 
@@ -78,7 +62,7 @@ async function handler(request, response) {
   const nonce = crypto.randomUUID()
 
   const payload = {
-    memberId,
+    mode: 'SELF',
     churchId,
     serviceDate,
     serviceType: serviceType || 'Service',
@@ -91,32 +75,19 @@ async function handler(request, response) {
 
   try {
     await writeNonceRecord(nonce, {
-      memberId,
+      mode: payload.mode,
       churchId,
       serviceDate,
       serviceType: payload.serviceType,
       expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt * 1000),
     })
 
-    const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
-    const checkinLink = normalizedBase
-      ? `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
-      : null
+    const checkinLink = buildCheckinLink(token, baseUrl)
     const qrImageUrl = checkinLink
       ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
           checkinLink
         )}`
       : null
-
-    if (email && checkinLink) {
-      await queueNotification({
-        email,
-        link: checkinLink,
-        memberId,
-        churchId,
-        serviceDate,
-      })
-    }
 
     return response.status(200).json({
       status: 'success',
@@ -125,12 +96,12 @@ async function handler(request, response) {
       link: checkinLink,
       qrImageUrl,
       expiresAt,
-      message: 'Check-in token issued successfully.',
+      message: 'Self check-in token issued successfully.',
     })
   } catch (error) {
     return response.status(500).json({
       status: 'error',
-      message: error.message || 'Unable to issue token.',
+      message: error.message || 'Unable to issue self check-in token.',
     })
   }
 }
