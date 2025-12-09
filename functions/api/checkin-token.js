@@ -1,5 +1,5 @@
 const crypto = require('crypto')
-const { admin, db } = require('../lib/firestoreAdmin')
+const { admin, db, initError } = require('../lib/firestoreAdmin')
 
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'
@@ -70,6 +70,13 @@ async function handler(request, response) {
     return response.status(405).json({
       status: 'error',
       message: 'Method not allowed. Use POST.',
+    })
+  }
+
+  if (initError) {
+    return response.status(500).json({
+      status: 'error',
+      message: initError.message || 'Unable to initialize Firebase.',
     })
   }
 
