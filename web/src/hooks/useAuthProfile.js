@@ -10,8 +10,6 @@ export function useAuthProfile() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
 
-  const PROFILE_TIMEOUT_MS = 10000;
-
   const loadProfile = async (firebaseUser) => {
     if (!firebaseUser) return;
 
@@ -20,15 +18,7 @@ export function useAuthProfile() {
 
     try {
       const profileRef = doc(db, "users", firebaseUser.uid);
-      const snapshot = await Promise.race([
-        getDoc(profileRef),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Profile fetch timed out. Please retry.")),
-            PROFILE_TIMEOUT_MS
-          )
-        ),
-      ]);
+      const snapshot = await getDoc(profileRef);
 
       if (snapshot.exists()) {
         setUserProfile({ id: snapshot.id, ...snapshot.data() });
