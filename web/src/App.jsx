@@ -2991,280 +2991,287 @@ function App() {
                   No members yet. Add your first member above.
                 </p>
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "10px",
-                    alignItems: "center",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="Search members by name, phone, or email"
-                    value={memberSearch}
-                    onChange={(e) => setMemberSearch(e.target.value)}
+                <>
+                  <div
                     style={{
-                      padding: "10px 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #d1d5db",
-                      fontSize: "14px",
-                      minWidth: "260px",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "10px",
+                      alignItems: "center",
+                      marginBottom: "10px",
                     }}
-                  />
-                  {memberSearch && (
-                    <button
-                      onClick={() => setMemberSearch("")}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Search members by name, phone, or email"
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
                       style={{
-                        padding: "8px 12px",
+                        padding: "10px 12px",
                         borderRadius: "10px",
-                        border: "1px solid #e5e7eb",
-                        background: "white",
-                        cursor: "pointer",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
+                        minWidth: "260px",
+                      }}
+                    />
+                    {memberSearch && (
+                      <button
+                        onClick={() => setMemberSearch("")}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "10px",
+                          border: "1px solid #e5e7eb",
+                          background: "white",
+                          cursor: "pointer",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <span style={{ color: "#6b7280", fontSize: "13px" }}>
+                      Showing {filteredMembers.length} of {members.length} members
+                    </span>
+                  </div>
+
+                  <div
+                    className="members-table-wrapper"
+                    style={{ overflowX: "auto" }}
+                  >
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
                         fontSize: "13px",
                       }}
                     >
-                      Clear
-                    </button>
-                  )}
-                  <span style={{ color: "#6b7280", fontSize: "13px" }}>
-                    Showing {filteredMembers.length} of {members.length} members
-                  </span>
-                </div>
-                <div className="members-table-wrapper" style={{ overflowX: "auto" }}>
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: "13px",
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          textAlign: "left",
-                          borderBottom: "1px solid #e5e7eb",
-                        }}
-                      >
-                        <th style={{ padding: "6px 4px" }}>Name</th>
-                        <th style={{ padding: "6px 4px" }}>Phone</th>
-                        <th style={{ padding: "6px 4px" }}>Email</th>
-                        <th style={{ padding: "6px 4px" }}>Status</th>
-                        <th style={{ padding: "6px 4px" }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredMembers.map((m) => {
-                        const isEditing = editingMemberId === m.id;
-                        return (
-                          <tr
-                            key={m.id}
-                            style={{
-                              borderBottom: "1px solid #f3f4f6",
-                            }}
-                          >
-                            <td style={{ padding: "6px 4px" }}>
-                              {isEditing ? (
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "6px",
-                                    flexWrap: "wrap",
-                                  }}
-                                >
+                      <thead>
+                        <tr
+                          style={{
+                            textAlign: "left",
+                            borderBottom: "1px solid #e5e7eb",
+                          }}
+                        >
+                          <th style={{ padding: "6px 4px" }}>Name</th>
+                          <th style={{ padding: "6px 4px" }}>Phone</th>
+                          <th style={{ padding: "6px 4px" }}>Email</th>
+                          <th style={{ padding: "6px 4px" }}>Status</th>
+                          <th style={{ padding: "6px 4px" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMembers.map((m) => {
+                          const isEditing = editingMemberId === m.id;
+                          return (
+                            <tr
+                              key={m.id}
+                              style={{
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: "6px",
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      value={editingMemberForm.firstName}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          firstName: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="First name"
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        width: "120px",
+                                      }}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={editingMemberForm.lastName}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          lastName: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Last name"
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        width: "120px",
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <>{m.firstName} {m.lastName}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
                                   <input
                                     type="text"
-                                    value={editingMemberForm.firstName}
+                                    value={editingMemberForm.phone}
                                     onChange={(e) =>
                                       setEditingMemberForm((f) => ({
                                         ...f,
-                                        firstName: e.target.value,
+                                        phone: e.target.value,
                                       }))
                                     }
-                                    placeholder="First name"
+                                    placeholder="Phone"
                                     style={{
                                       padding: "6px 8px",
                                       borderRadius: "6px",
                                       border: "1px solid #d1d5db",
-                                      width: "120px",
+                                      width: "140px",
                                     }}
                                   />
+                                ) : (
+                                  <>{m.phone || "-"}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
                                   <input
-                                    type="text"
-                                    value={editingMemberForm.lastName}
+                                    type="email"
+                                    value={editingMemberForm.email}
                                     onChange={(e) =>
                                       setEditingMemberForm((f) => ({
                                         ...f,
-                                        lastName: e.target.value,
+                                        email: e.target.value,
                                       }))
                                     }
-                                    placeholder="Last name"
+                                    placeholder="Email"
                                     style={{
                                       padding: "6px 8px",
                                       borderRadius: "6px",
                                       border: "1px solid #d1d5db",
-                                      width: "120px",
+                                      width: "200px",
                                     }}
                                   />
-                                </div>
-                              ) : (
-                                <>{m.firstName} {m.lastName}</>
-                              )}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {isEditing ? (
-                                <input
-                                  type="text"
-                                  value={editingMemberForm.phone}
-                                  onChange={(e) =>
-                                    setEditingMemberForm((f) => ({
-                                      ...f,
-                                      phone: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Phone"
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #d1d5db",
-                                    width: "140px",
-                                  }}
-                                />
-                              ) : (
-                                <>{m.phone || "-"}</>
-                              )}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {isEditing ? (
-                                <input
-                                  type="email"
-                                  value={editingMemberForm.email}
-                                  onChange={(e) =>
-                                    setEditingMemberForm((f) => ({
-                                      ...f,
-                                      email: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Email"
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #d1d5db",
-                                    width: "200px",
-                                  }}
-                                />
-                              ) : (
-                                <>{m.email || "-"}</>
-                              )}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {isEditing ? (
-                                <select
-                                  value={editingMemberForm.status}
-                                  onChange={(e) =>
-                                    setEditingMemberForm((f) => ({
-                                      ...f,
-                                      status: e.target.value,
-                                    }))
-                                  }
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #d1d5db",
-                                  }}
-                                >
-                                  <option value="VISITOR">Visitor</option>
-                                  <option value="NEW_CONVERT">New Convert</option>
-                                  <option value="REGULAR">Regular</option>
-                                  <option value="WORKER">Worker</option>
-                                  <option value="PASTOR">Pastor</option>
-                                  <option value="INACTIVE">Inactive</option>
-                                </select>
-                              ) : (
-                                <>{m.status}</>
-                              )}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {isEditing ? (
-                                <div
-                                  style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
-                                >
-                                  <button
-                                    onClick={handleUpdateMember}
-                                    disabled={memberActionLoading}
+                                ) : (
+                                  <>{m.email || "-"}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
+                                  <select
+                                    value={editingMemberForm.status}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        status: e.target.value,
+                                      }))
+                                    }
                                     style={{
-                                      padding: "6px 10px",
+                                      padding: "6px 8px",
                                       borderRadius: "6px",
-                                      border: "none",
-                                      background: "#111827",
-                                      color: "white",
-                                      cursor: memberActionLoading ? "default" : "pointer",
-                                      fontSize: "12px",
+                                      border: "1px solid #d1d5db",
                                     }}
                                   >
-                                    {memberActionLoading ? "Saving..." : "Save"}
-                                  </button>
-                                  <button
-                                    onClick={cancelEditingMember}
-                                    disabled={memberActionLoading}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #e5e7eb",
-                                      background: "white",
-                                      color: "#111827",
-                                      cursor: memberActionLoading ? "default" : "pointer",
-                                      fontSize: "12px",
-                                    }}
+                                    <option value="VISITOR">Visitor</option>
+                                    <option value="NEW_CONVERT">New Convert</option>
+                                    <option value="REGULAR">Regular</option>
+                                    <option value="WORKER">Worker</option>
+                                    <option value="PASTOR">Pastor</option>
+                                    <option value="INACTIVE">Inactive</option>
+                                  </select>
+                                ) : (
+                                  <>{m.status}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
+                                  <div
+                                    style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
                                   >
-                                    Cancel
-                                  </button>
-                                </div>
-                              ) : (
-                                <div
-                                  style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
-                                >
-                                  <button
-                                    onClick={() => startEditingMember(m)}
-                                    disabled={memberActionLoading}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #e5e7eb",
-                                      background: "white",
-                                      color: "#111827",
-                                      cursor: memberActionLoading ? "default" : "pointer",
-                                      fontSize: "12px",
-                                    }}
+                                    <button
+                                      onClick={handleUpdateMember}
+                                      disabled={memberActionLoading}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "none",
+                                        background: "#111827",
+                                        color: "white",
+                                        cursor: memberActionLoading ? "default" : "pointer",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      {memberActionLoading ? "Saving..." : "Save"}
+                                    </button>
+                                    <button
+                                      onClick={cancelEditingMember}
+                                      disabled={memberActionLoading}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #e5e7eb",
+                                        background: "white",
+                                        color: "#111827",
+                                        cursor: memberActionLoading ? "default" : "pointer",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
                                   >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteMember(m.id)}
-                                    disabled={memberActionLoading}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #ef4444",
-                                      background: memberActionLoading ? "#fee2e2" : "#fef2f2",
-                                      color: "#b91c1c",
-                                      cursor: memberActionLoading ? "default" : "pointer",
-                                      fontSize: "12px",
-                                    }}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                    <button
+                                      onClick={() => startEditingMember(m)}
+                                      disabled={memberActionLoading}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #e5e7eb",
+                                        background: "white",
+                                        color: "#111827",
+                                        cursor: memberActionLoading ? "default" : "pointer",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteMember(m.id)}
+                                      disabled={memberActionLoading}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #ef4444",
+                                        background: memberActionLoading ? "#fee2e2" : "#fef2f2",
+                                        color: "#b91c1c",
+                                        cursor: memberActionLoading ? "default" : "pointer",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
+
               {membersHasMore && members.length > 0 && (
                 <button
                   onClick={loadMoreMembers}
