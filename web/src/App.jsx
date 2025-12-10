@@ -138,31 +138,23 @@ function App() {
     search: "",
   });
   const [checkinTokenForm, setCheckinTokenForm] = useState({
-    memberId: "",
     churchId: "",
     serviceDate: todayStr,
-    serviceType: "",
-    email: "",
+    serviceType: "Sunday Service",
     baseUrl: defaultBaseUrl,
   });
   const [checkinTokenLink, setCheckinTokenLink] = useState("");
   const [checkinTokenQr, setCheckinTokenQr] = useState("");
+  const [checkinServiceCode, setCheckinServiceCode] = useState("");
   const [checkinTokenLoading, setCheckinTokenLoading] = useState(false);
   const [checkinTokenError, setCheckinTokenError] = useState("");
   const [showCheckinIssuer, setShowCheckinIssuer] = useState(false);
   const [memberCheckinLink, setMemberCheckinLink] = useState({
     memberId: null,
     link: "",
+    serviceCode: "",
   });
   const [memberLinkLoadingId, setMemberLinkLoadingId] = useState(null);
-  const getOrCreateLocalMemberId = useCallback(() => {
-    if (typeof window === "undefined") return "";
-    const existing = localStorage.getItem("checkinDefaultMemberId");
-    if (existing) return existing;
-    const generated = `member-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-    localStorage.setItem("checkinDefaultMemberId", generated);
-    return generated;
-  }, []);
 
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
@@ -292,19 +284,17 @@ function App() {
           ...parsed,
           baseUrl: parsed.baseUrl || prev.baseUrl || defaultBaseUrl,
           serviceDate: parsed.serviceDate || prev.serviceDate || todayStr,
-          memberId: parsed.memberId || prev.memberId || getOrCreateLocalMemberId(),
         }));
         return;
       }
 
       setCheckinTokenForm((prev) => ({
         ...prev,
-        memberId: prev.memberId || getOrCreateLocalMemberId(),
       }));
     } catch (err) {
       console.error("Restore check-in token form failed:", err);
     }
-  }, [defaultBaseUrl, todayStr, getOrCreateLocalMemberId]);
+  }, [defaultBaseUrl, todayStr]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1065,20 +1055,14 @@ function App() {
   const issueCheckinTokenRequest = async (payload) => {
     const normalizedPayload = {
       ...payload,
-      memberId: payload.memberId?.trim(),
       churchId: payload.churchId?.trim(),
       serviceDate: payload.serviceDate,
       serviceType: payload.serviceType?.trim(),
-      email: payload.email?.trim(),
       baseUrl: payload.baseUrl?.trim() || defaultBaseUrl,
     };
 
-    if (
-      !normalizedPayload.memberId ||
-      !normalizedPayload.churchId ||
-      !normalizedPayload.serviceDate
-    ) {
-      throw new Error("Member ID, church ID, and service date are required.");
+    if (!normalizedPayload.churchId || !normalizedPayload.serviceDate) {
+      throw new Error("Church ID and service date are required.");
     }
 
     const res = await fetch("/api/checkin-token", {
@@ -1111,7 +1095,7 @@ function App() {
       throw new Error("The server did not return a check-in link.");
     }
 
-    return { link: generatedLink, qrImageUrl };
+    return { link: generatedLink, qrImageUrl, serviceCode: data?.serviceCode || "" };
   };
 
   const issueCheckinToken = async (event) => {
@@ -1119,29 +1103,29 @@ function App() {
 
     const payload = {
       ...checkinTokenForm,
-      memberId: checkinTokenForm.memberId.trim(),
       churchId: checkinTokenForm.churchId.trim(),
       serviceDate: checkinTokenForm.serviceDate,
       serviceType: checkinTokenForm.serviceType.trim(),
-      email: checkinTokenForm.email.trim(),
       baseUrl: checkinTokenForm.baseUrl.trim(),
     };
 
-    if (!payload.memberId || !payload.churchId || !payload.serviceDate) {
-      setCheckinTokenError("Member ID, church ID, and service date are required.");
+    if (!payload.churchId || !payload.serviceDate) {
+      setCheckinTokenError("Church ID and service date are required.");
       return;
     }
 
     setCheckinTokenError("");
     setCheckinTokenLink("");
     setCheckinTokenQr("");
+    setCheckinServiceCode("");
 
     try {
       setCheckinTokenLoading(true);
-      const { link: generatedLink, qrImageUrl } =
+      const { link: generatedLink, qrImageUrl, serviceCode } =
         await issueCheckinTokenRequest(payload);
       setCheckinTokenLink(generatedLink);
       setCheckinTokenQr(qrImageUrl);
+      setCheckinServiceCode(serviceCode || "");
       showToast("Check-in link issued.", "success");
     } catch (err) {
       console.error("Issue check-in token error:", err);
@@ -1168,8 +1152,10 @@ function App() {
 
     try {
       setMemberLinkLoadingId(member.id);
-      const { link: generatedLink } = await issueCheckinTokenRequest(payload);
-      setMemberCheckinLink({ memberId: member.id, link: generatedLink });
+      const { link: generatedLink, serviceCode } = await issueCheckinTokenRequest(
+        payload
+      );
+      setMemberCheckinLink({ memberId: member.id, link: generatedLink, serviceCode });
       showToast("Check-in link ready to share.", "success");
     } catch (err) {
       console.error("Issue member check-in link error:", err);
@@ -1266,12 +1252,16 @@ function App() {
     }
   };
 
-  const buildShareLinks = (link, { serviceType, serviceDate, memberName } = {}) => {
+  const buildShareLinks = (
+    link,
+    { serviceType, serviceDate, memberName, serviceCode } = {}
+  ) => {
     if (!link) return null;
     const serviceLabel = serviceType || "Service";
     const dateLabel = serviceDate ? ` on ${serviceDate}` : "";
     const recipient = memberName ? `${memberName}, ` : "";
-    const message = `${recipient}here's your ${serviceLabel} check-in link${dateLabel}: ${link}`;
+    const codeNote = serviceCode ? ` (code: ${serviceCode})` : "";
+    const message = `${recipient}here's your ${serviceLabel} check-in link${dateLabel}${codeNote}: ${link}`;
     const encodedMessage = encodeURIComponent(message);
 
     return {
@@ -1285,6 +1275,7 @@ function App() {
     ? buildShareLinks(checkinTokenLink, {
         serviceType: checkinTokenForm.serviceType,
         serviceDate: checkinTokenForm.serviceDate,
+        serviceCode: checkinServiceCode,
       })
     : null;
 
@@ -3829,6 +3820,7 @@ function App() {
                                 serviceType: memberAttendanceForm.serviceType,
                                 serviceDate: memberAttendanceForm.date,
                                 memberName,
+                                serviceCode: memberCheckinLink.serviceCode,
                               });
 
                               return (
@@ -3842,6 +3834,11 @@ function App() {
                                     <div className="checkin-link-value">
                                       {memberCheckinLink.link}
                                     </div>
+                                    {memberCheckinLink.serviceCode && (
+                                      <div className="checkin-link-label">
+                                        Service code: {memberCheckinLink.serviceCode}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="checkin-link-actions">
                                     <button
@@ -3926,8 +3923,10 @@ function App() {
                           Issue self check-in link
                         </div>
                         <p className="checkin-admin-subtitle">
-                          Create a one-time link for a member to confirm attendance
-                          remotely. Details are saved locally for quick re-issuing.
+                          Create one shared link for a service. Members will enter
+                          their phone number and the announced 6-digit service code
+                          to confirm attendance. Details are saved locally for quick
+                          re-issuing.
                         </p>
                       </div>
                       <button
@@ -3946,21 +3945,6 @@ function App() {
                         autoComplete="off"
                       >
                         <div className="checkin-admin-grid">
-                          <label className="checkin-admin-field">
-                            <span>Member ID*</span>
-                            <input
-                              type="text"
-                              value={checkinTokenForm.memberId}
-                              onChange={(e) =>
-                                setCheckinTokenForm((prev) => ({
-                                  ...prev,
-                                  memberId: e.target.value,
-                                }))
-                              }
-                              placeholder="e.g. member document ID"
-                            />
-                          </label>
-
                           <label className="checkin-admin-field">
                             <span>Church ID*</span>
                             <input
@@ -4001,23 +3985,8 @@ function App() {
                                   serviceType: e.target.value,
                                 }))
                               }
-                              placeholder="Sunday Service, Midweek, etc."
-                            />
-                          </label>
-
-                          <label className="checkin-admin-field">
-                            <span>Recipient email (optional)</span>
-                            <input
-                              type="email"
-                              value={checkinTokenForm.email}
-                              onChange={(e) =>
-                                setCheckinTokenForm((prev) => ({
-                                  ...prev,
-                                  email: e.target.value,
-                                }))
-                              }
-                              placeholder="member@email.com"
-                            />
+                            placeholder="Sunday Service, Midweek, etc."
+                          />
                           </label>
 
                           <label className="checkin-admin-field">
@@ -4061,6 +4030,11 @@ function App() {
                             <div>
                               <div className="checkin-link-label">Issued link</div>
                               <div className="checkin-link-value">{checkinTokenLink}</div>
+                              {checkinServiceCode && (
+                                <div className="checkin-link-label">
+                                  Service code to announce: {checkinServiceCode}
+                                </div>
+                              )}
                               {checkinTokenQr && (
                                 <div className="checkin-link-qr">
                                   <div className="checkin-link-label">QR code</div>
