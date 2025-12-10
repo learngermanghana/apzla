@@ -170,6 +170,15 @@ export default function CheckinPage() {
           Verify your link to mark attendance instantly.
         </p>
 
+        <div className="checkin-helper">
+          <div className="checkin-helper-title">Where to enter the service code</div>
+          <div className="checkin-helper-body">
+            The form has three steps in order: phone number, <strong>service code</strong>,
+            then the token box. If you do not immediately see the service code input,
+            look right after the phone field before the token textarea.
+          </div>
+        </div>
+
         <StatusBanner tone={statusTone} message={feedback.message} />
 
         {summary && (
