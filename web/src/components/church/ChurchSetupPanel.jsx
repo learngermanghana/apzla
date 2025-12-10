@@ -7,9 +7,11 @@ import Pill from "../ui/Pill";
 export function ChurchSetupPanel({
   userEmail,
   churchName,
+  churchAddress,
   churchCountry,
   churchCity,
   onChangeChurchName,
+  onChangeChurchAddress,
   onChangeChurchCountry,
   onChangeChurchCity,
   onCreateChurch,
@@ -94,6 +96,12 @@ export function ChurchSetupPanel({
           />
           <Input
             type="text"
+            placeholder="Street address"
+            value={churchAddress}
+            onChange={onChangeChurchAddress}
+          />
+          <Input
+            type="text"
             placeholder="Country"
             value={churchCountry}
             onChange={onChangeChurchCountry}
@@ -122,9 +130,11 @@ export function ChurchSetupPanel({
 ChurchSetupPanel.propTypes = {
   userEmail: PropTypes.string.isRequired,
   churchName: PropTypes.string.isRequired,
+  churchAddress: PropTypes.string.isRequired,
   churchCountry: PropTypes.string.isRequired,
   churchCity: PropTypes.string.isRequired,
   onChangeChurchName: PropTypes.func.isRequired,
+  onChangeChurchAddress: PropTypes.func.isRequired,
   onChangeChurchCountry: PropTypes.func.isRequired,
   onChangeChurchCity: PropTypes.func.isRequired,
   onCreateChurch: PropTypes.func.isRequired,
