@@ -186,6 +186,7 @@ function App() {
   });
 
   // Follow-up
+  const [followupAudience, setFollowupAudience] = useState("VISITOR");
   const [followupPastorName, setFollowupPastorName] = useState("");
 
   const TRIAL_LENGTH_DAYS = 14;
@@ -1925,20 +1926,39 @@ function App() {
     );
   });
 
-  // Follow-up templates (visitors)
+  // Follow-up templates
   const visitorTemplate = `Hi, thank you for worshipping with us at ${
     userProfile.churchName || "our church"
   } today. We’re glad you came. God bless you!${
     followupPastorName ? ` – ${followupPastorName}` : ""
   }`;
 
-  const visitorTemplateEncoded = encodeURIComponent(visitorTemplate);
+  const memberTemplate = `Hi from ${
+    userProfile.churchName || "our church"
+  }. We appreciate you as part of our church family and are praying you’re well.${
+    followupPastorName ? ` – ${followupPastorName}` : ""
+  }`;
+
+  const followupTemplate =
+    followupAudience === "VISITOR" ? visitorTemplate : memberTemplate;
+  const followupTemplateEncoded = encodeURIComponent(followupTemplate);
   const visitorEmailSubject = encodeURIComponent("Thank you for worshipping with us");
+  const memberEmailSubject = encodeURIComponent(
+    `Hello from ${userProfile.churchName || "our church"}`
+  );
+  const followupEmailSubject =
+    followupAudience === "VISITOR"
+      ? visitorEmailSubject
+      : memberEmailSubject;
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
 
   const visitorMembers = members.filter(
     (m) => (m.status || "").toUpperCase() === "VISITOR"
   );
+
+  const followupTargets =
+    followupAudience === "VISITOR" ? visitorMembers : members;
+  const isVisitorAudience = followupAudience === "VISITOR";
 
   return (
     <div
@@ -4547,7 +4567,48 @@ function App() {
               />
             </div>
 
-            {/* Visitors list */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+                marginBottom: "12px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "#111827",
+                }}
+              >
+                Choose audience
+              </span>
+              {["VISITOR", "MEMBER"].map((audience) => {
+                const isActive = followupAudience === audience;
+                return (
+                  <button
+                    key={audience}
+                    onClick={() => setFollowupAudience(audience)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "20px",
+                      border: isActive ? "1px solid #111827" : "1px solid #d1d5db",
+                      background: isActive ? "#111827" : "white",
+                      color: isActive ? "white" : "#374151",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {audience === "VISITOR" ? "Visitors" : "Members"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Audience list */}
             <div style={{ marginBottom: "20px" }}>
               <h2
                 style={{
@@ -4556,7 +4617,9 @@ function App() {
                   marginBottom: "6px",
                 }}
               >
-                Visitors in your members list
+                {isVisitorAudience
+                  ? "Visitors in your members list"
+                  : "Members you can message"}
               </h2>
               <p
                 style={{
@@ -4565,19 +4628,26 @@ function App() {
                   fontSize: "13px",
                 }}
               >
-                These are members with status <strong>VISITOR</strong>.
-                Later, you can add per-service attendance so this shows{" "}
-                <em>&ldquo;visitors this Sunday&rdquo;</em>.
+                {isVisitorAudience ? (
+                  <>
+                    These are members with status <strong>VISITOR</strong>. Later,
+                    you can add per-service attendance so this shows
+                    <em> “visitors this Sunday.”</em>
+                  </>
+                ) : (
+                  <>Send a quick note of appreciation or care to any member.</>
+                )}
               </p>
 
               {membersLoading ? (
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
                   Loading members…
                 </p>
-              ) : visitorMembers.length === 0 ? (
+              ) : followupTargets.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                  No visitors found yet. Add members with status
-                  &ldquo;Visitor&rdquo; in the Members tab.
+                  {isVisitorAudience
+                    ? "No visitors found yet. Add members with status “Visitor” in the Members tab."
+                    : "No members found yet. Add members in the Members tab to start messaging."}
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -4602,16 +4672,16 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {visitorMembers.map((m) => {
+                      {followupTargets.map((m) => {
                         const phoneForLink = formatPhoneForLink(m.phone);
                         const whatsappLink = phoneForLink
-                          ? `https://wa.me/${phoneForLink}?text=${visitorTemplateEncoded}`
-                          : `https://wa.me/?text=${visitorTemplateEncoded}`;
-                        const telegramLink = `https://t.me/share/url?text=${visitorTemplateEncoded}`;
+                          ? `https://wa.me/${phoneForLink}?text=${followupTemplateEncoded}`
+                          : `https://wa.me/?text=${followupTemplateEncoded}`;
+                        const telegramLink = `https://t.me/share/url?text=${followupTemplateEncoded}`;
                         const smsLink = phoneForLink
-                          ? `sms:${phoneForLink}?body=${visitorTemplateEncoded}`
-                          : `sms:?body=${visitorTemplateEncoded}`;
-                        const emailLink = `mailto:${m.email || ""}?subject=${visitorEmailSubject}&body=${visitorTemplateEncoded}`;
+                          ? `sms:${phoneForLink}?body=${followupTemplateEncoded}`
+                          : `sms:?body=${followupTemplateEncoded}`;
+                        const emailLink = `mailto:${m.email || ""}?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
 
                         return (
                           <tr
@@ -4734,7 +4804,9 @@ function App() {
                     color: "#111827",
                   }}
                 >
-                  Visitor thank-you message
+                  {isVisitorAudience
+                    ? "Visitor thank-you message"
+                    : "Member check-in message"}
                 </div>
                 <button
                   onClick={() => {
@@ -4746,7 +4818,7 @@ function App() {
                       return;
                     }
                     navigator.clipboard
-                      .writeText(visitorTemplate)
+                      .writeText(followupTemplate)
                       .then(() =>
                         showToast(
                           "Message copied. Paste it into WhatsApp or your SMS app.",
@@ -4777,7 +4849,7 @@ function App() {
 
               <textarea
                 readOnly
-                value={visitorTemplate}
+                value={followupTemplate}
                 rows={3}
                 style={{
                   width: "100%",
@@ -4796,9 +4868,9 @@ function App() {
                   color: "#6b7280",
                 }}
               >
-                Tip: You can also export phone numbers from the Members
-                tab and use this text in any bulk SMS or WhatsApp
-                broadcast tool.
+                {isVisitorAudience
+                  ? "Tip: You can also export phone numbers from the Members tab and use this text in any bulk SMS or WhatsApp broadcast tool."
+                  : "Tip: Export phone numbers from the Members tab to send this to your whole congregation via bulk SMS or WhatsApp."}
               </p>
             </div>
           </>
