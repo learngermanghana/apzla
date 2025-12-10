@@ -28,9 +28,11 @@ function StatusBanner({ tone = "info", message }) {
 
 export default function CheckinPage() {
   const [token, setToken] = useState("");
+  const [phone, setPhone] = useState("");
+  const [serviceCode, setServiceCode] = useState("");
   const [feedback, setFeedback] = useState({
     status: "idle",
-    message: "Paste your token to continue.",
+    message: "Paste your token, enter your phone number, and add the service code.",
   });
   const [summary, setSummary] = useState(null);
 
@@ -53,6 +55,16 @@ export default function CheckinPage() {
         return;
       }
 
+      if (!phone.trim()) {
+        setErrorFeedback("Enter the phone number linked to your profile.");
+        return;
+      }
+
+      if (!serviceCode.trim()) {
+        setErrorFeedback("Enter the 6-digit service code announced for this service.");
+        return;
+      }
+
       setFeedback({
         status: "loading",
         message: auto
@@ -64,7 +76,7 @@ export default function CheckinPage() {
         const res = await fetch("/api/verify-checkin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: value }),
+          body: JSON.stringify({ token: value, phone: phone.trim(), serviceCode: serviceCode.trim() }),
         });
 
         const body = await res.json().catch(() => ({ status: "error" }));
@@ -93,6 +105,8 @@ export default function CheckinPage() {
           serviceType: serviceType || "Service",
           status: "Verified",
           verifiedAt: new Date().toISOString(),
+          phone: payload.phone || phone.trim(),
+          serviceCode: payload.serviceCode || serviceCode.trim(),
         };
 
         setSummary(confirmation);
@@ -106,7 +120,7 @@ export default function CheckinPage() {
         );
       }
     },
-    [token]
+    [token, phone, serviceCode]
   );
 
   useEffect(() => {
@@ -114,9 +128,8 @@ export default function CheckinPage() {
     const tokenFromUrl = params.get("token") || "";
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
-      handleVerify(tokenFromUrl, { auto: true });
     }
-  }, [handleVerify]);
+  }, []);
 
   const recordAttendance = async ({
     memberId,
@@ -186,6 +199,14 @@ export default function CheckinPage() {
                 <div className="checkin-value">{summary.status}</div>
                 <div className="checkin-subvalue">Verified at {summary.verifiedAt}</div>
               </div>
+              <div>
+                <div className="checkin-label">Phone</div>
+                <div className="checkin-value">{summary.phone}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Service code</div>
+                <div className="checkin-value">{summary.serviceCode}</div>
+              </div>
             </div>
             <p className="checkin-summary-note">
               We have validated your token. These details are ready to be stored in
@@ -195,6 +216,31 @@ export default function CheckinPage() {
         )}
 
         <div className="checkin-form">
+          <label htmlFor="phone" className="checkin-label">
+            Phone number
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Enter the phone number you registered with"
+          />
+
+          <label htmlFor="serviceCode" className="checkin-label">
+            Service code
+          </label>
+          <input
+            id="serviceCode"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            value={serviceCode}
+            onChange={(e) => setServiceCode(e.target.value)}
+            placeholder="6-digit code announced for this service"
+          />
+
           <label htmlFor="token" className="checkin-label">
             Token
           </label>

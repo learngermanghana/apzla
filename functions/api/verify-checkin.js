@@ -30,17 +30,42 @@ async function fetchNonce(nonce) {
   return { id: doc.id, ...doc.data() }
 }
 
-async function markNonceConsumed(nonce, metadata) {
+async function recordNonceVerification(nonce, metadata) {
   const updateData = {
-    consumed: true,
-    consumedAt: admin.firestore.FieldValue.serverTimestamp(),
+    consumed: false,
+    consumedAt: null,
     consumedIp: metadata.ip || '',
-    status: metadata.status || 'consumed',
+    status: metadata.status || 'active',
     lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-    lastVerificationMessage: metadata.message || 'Consumed',
+    lastVerificationMessage: metadata.message || 'Verified',
+    lastServiceCode: metadata.serviceCode || '',
+    lastPhone: metadata.phone || '',
+    verificationCount: admin.firestore.FieldValue.increment(1),
   }
 
-  await db.collection(nonceCollection).doc(nonce).update(updateData)
+  await db.collection(nonceCollection).doc(nonce).set(updateData, { merge: true })
+}
+
+async function findMemberByPhone(churchId, phone) {
+  const normalizedPhone = `${phone || ''}`.trim()
+  if (!normalizedPhone) return null
+
+  const snap = await db
+    .collection('members')
+    .where('churchId', '==', churchId)
+    .where('phone', '==', normalizedPhone)
+    .limit(1)
+    .get()
+
+  return snap.empty ? null : snap.docs[0]
+}
+
+async function getChurchName(churchId) {
+  if (!churchId) return null
+  const snap = await db.collection('churches').doc(churchId).get()
+  if (!snap.exists) return null
+  const data = snap.data() || {}
+  return data.name || null
 }
 
 async function handler(request, response) {
@@ -58,12 +83,12 @@ async function handler(request, response) {
     })
   }
 
-  const { token } = request.body || {}
+  const { token, phone, serviceCode } = request.body || {}
 
-  if (!token) {
+  if (!token || !phone || !serviceCode) {
     return response.status(400).json({
       status: 'error',
-      message: 'A token is required for verification.',
+      message: 'token, phone, and serviceCode are required for verification.',
     })
   }
 
@@ -90,31 +115,23 @@ async function handler(request, response) {
     if (!nonceRecord) {
       return response.status(400).json({
         status: 'error',
-        message: 'Nonce not recognized or already purged.',
-      })
-    }
-
-    if (nonceRecord.consumed) {
-      return response.status(409).json({
-        status: 'error',
-        message: 'This check-in link has already been used.',
+        message: 'Service not found for this check-in link.',
       })
     }
 
     if (
-      nonceRecord.memberId !== payload.memberId ||
       nonceRecord.churchId !== payload.churchId ||
       nonceRecord.serviceDate !== payload.serviceDate
     ) {
       return response.status(400).json({
         status: 'error',
-        message: 'Token payload does not match stored nonce.',
+        message: 'Token payload does not match stored service details.',
       })
     }
 
     const expiresAtMillis = getTimestampMillis(nonceRecord.expiresAt)
     if (expiresAtMillis && Date.now() > expiresAtMillis) {
-      await markNonceConsumed(payload.nonce, {
+      await recordNonceVerification(payload.nonce, {
         ip: request.headers['x-forwarded-for'] || request.socket?.remoteAddress,
         status: 'expired',
         message: 'Token expired before verification.',
@@ -126,20 +143,53 @@ async function handler(request, response) {
       })
     }
 
-    await markNonceConsumed(payload.nonce, {
+    const expectedCode = `${nonceRecord.serviceCode || ''}`.trim()
+    if (!expectedCode) {
+      return response.status(400).json({
+        status: 'error',
+        message: 'Service code is not configured for this check-in link.',
+      })
+    }
+
+    if (`${serviceCode}`.trim() !== expectedCode) {
+      return response.status(400).json({
+        status: 'error',
+        message: 'Service code is incorrect. Please confirm with your church.',
+      })
+    }
+
+    const memberDoc = await findMemberByPhone(payload.churchId, phone)
+    if (!memberDoc) {
+      return response.status(404).json({
+        status: 'error',
+        message: 'No member found for that phone number in this church.',
+      })
+    }
+
+    const memberData = memberDoc.data() || {}
+    const memberName = `${memberData.firstName || ''} ${memberData.lastName || ''}`.trim()
+    const churchName = await getChurchName(payload.churchId)
+
+    await recordNonceVerification(payload.nonce, {
       ip: request.headers['x-forwarded-for'] || request.socket?.remoteAddress,
-      status: 'consumed',
-      message: 'Verified and consumed.',
+      status: 'verified',
+      message: 'Verified and recorded.',
+      serviceCode: expectedCode,
+      phone,
     })
 
     return response.status(200).json({
       status: 'success',
       data: {
-        memberId: payload.memberId,
+        memberId: memberDoc.id,
+        memberName: memberName || memberData.displayName || memberData.fullName || '',
         churchId: payload.churchId,
+        churchName: churchName || '',
         serviceDate: payload.serviceDate,
         serviceType: payload.serviceType || 'Service',
         nonce: payload.nonce,
+        phone,
+        serviceCode: expectedCode,
       },
       message: 'Check-in verified successfully.',
     })

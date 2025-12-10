@@ -289,6 +289,52 @@
   cursor: pointer;
 }
 
+.checkin-service-code-box {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  margin-top: 12px;
+}
+
+.checkin-service-code-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.checkin-service-code-value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.checkin-service-code-note {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.checkin-service-code-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.checkin-service-code-actions button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .checkin-link-box {
   display: flex;
   align-items: flex-start;

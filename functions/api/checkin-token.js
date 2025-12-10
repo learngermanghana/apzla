@@ -9,6 +9,11 @@ const notificationCollection =
   process.env.FIRESTORE_NOTIFICATION_COLLECTION || 'notifications'
 const appBaseUrl = process.env.APP_BASE_URL
 
+function generateServiceCode() {
+  // Generates a 6-digit string with leading zeros if necessary
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+}
+
 async function writeNonceRecord(nonce, payload) {
   const data = {
     nonce,
@@ -56,13 +61,13 @@ async function handler(request, response) {
     })
   }
 
-  const { memberId, churchId, serviceDate, serviceType, email, baseUrl } =
+  const { churchId, serviceDate, serviceType, email, baseUrl } =
     request.body || {}
 
-  if (!memberId || !churchId || !serviceDate) {
+  if (!churchId || !serviceDate) {
     return response.status(400).json({
       status: 'error',
-      message: 'memberId, churchId, and serviceDate are required.',
+      message: 'churchId and serviceDate are required.',
     })
   }
 
@@ -77,8 +82,9 @@ async function handler(request, response) {
   const expiresAt = issuedAt + tokenTtlMinutes * 60
   const nonce = crypto.randomUUID()
 
+  const serviceCode = generateServiceCode()
+
   const payload = {
-    memberId,
     churchId,
     serviceDate,
     serviceType: serviceType || 'Service',
@@ -91,10 +97,10 @@ async function handler(request, response) {
 
   try {
     await writeNonceRecord(nonce, {
-      memberId,
       churchId,
       serviceDate,
       serviceType: payload.serviceType,
+      serviceCode,
       expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt * 1000),
     })
 
@@ -112,7 +118,6 @@ async function handler(request, response) {
       await queueNotification({
         email,
         link: checkinLink,
-        memberId,
         churchId,
         serviceDate,
       })
@@ -125,6 +130,7 @@ async function handler(request, response) {
       link: checkinLink,
       qrImageUrl,
       expiresAt,
+      serviceCode,
       message: 'Check-in token issued successfully.',
     })
   } catch (error) {
