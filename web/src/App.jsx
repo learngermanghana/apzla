@@ -1950,6 +1950,9 @@ function App() {
     followupAudience === "VISITOR"
       ? visitorEmailSubject
       : memberEmailSubject;
+  const followupWhatsappLink = `https://wa.me/?text=${followupTemplateEncoded}`;
+  const followupTelegramLink = `https://t.me/share/url?text=${followupTemplateEncoded}`;
+  const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
 
   const visitorMembers = members.filter(
@@ -4872,6 +4875,103 @@ function App() {
                   ? "Tip: You can also export phone numbers from the Members tab and use this text in any bulk SMS or WhatsApp broadcast tool."
                   : "Tip: Export phone numbers from the Members tab to send this to your whole congregation via bulk SMS or WhatsApp."}
               </p>
+
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "10px 12px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  background: "white",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    Share this message
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Send it to yourself or your team chat.
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <a
+                    href={followupWhatsappLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #22c55e",
+                      background: "#ecfdf3",
+                      color: "#15803d",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    WhatsApp message
+                  </a>
+                  <a
+                    href={followupTelegramLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #0ea5e9",
+                      background: "#e0f2fe",
+                      color: "#0369a1",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Telegram
+                  </a>
+                  <a
+                    href={followupEmailLink}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #6366f1",
+                      background: "#eef2ff",
+                      color: "#4338ca",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Email
+                  </a>
+                </div>
+              </div>
             </div>
           </>
         )}
