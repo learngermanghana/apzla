@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+// web/src/components/checkin/CheckinPage.jsx
+import React, { useEffect, useState } from "react";
+import "./checkin.css";
+import { db } from "../../firebase";
 import {
   addDoc,
   collection,
@@ -6,139 +9,55 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "../../firebase";
-import "./checkin.css";
+import StatusBanner from "../StatusBanner";
 
-function StatusBanner({ tone = "info", message }) {
-  const palette = {
-    success: { bg: "#ecfdf3", text: "#166534" },
-    error: { bg: "#fef2f2", text: "#991b1b" },
-    info: { bg: "#eff6ff", text: "#1d4ed8" },
-  }[tone];
-
-  return (
-    <div
-      className="checkin-banner"
-      style={{ background: palette.bg, color: palette.text }}
-    >
-      {message}
-    </div>
-  );
-}
+const LOCAL_PHONE_KEY = "apzla_last_phone";
+const MAX_ATTEMPTS = 5;
 
 export default function CheckinPage() {
-  const [token, setToken] = useState("");
   const [phone, setPhone] = useState("");
   const [serviceCode, setServiceCode] = useState("");
-  const [feedback, setFeedback] = useState({
-    status: "idle",
-    message: "Paste your token, enter your phone number, and add the service code.",
-  });
+  const [token, setToken] = useState("");
   const [summary, setSummary] = useState(null);
 
-  const statusTone = useMemo(() => {
-    if (feedback.status === "success") return "success";
-    if (feedback.status === "error") return "error";
-    return "info";
-  }, [feedback.status]);
+  const [feedback, setFeedback] = useState({ ok: false, message: "" });
+  const [statusTone, setStatusTone] = useState("info");
 
-  const setErrorFeedback = (message) => {
-    setFeedback({ status: "error", message });
-    setSummary(null);
-  };
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attempts, setAttempts] = useState(0);
 
-  const handleVerify = useCallback(
-    async (incomingToken, { auto = false } = {}) => {
-      const value = (incomingToken ?? token).trim();
-      if (!value) {
-        setErrorFeedback("Paste a token to continue.");
-        return;
-      }
-
-      if (!phone.trim()) {
-        setErrorFeedback("Enter the phone number linked to your profile.");
-        return;
-      }
-
-      if (!serviceCode.trim()) {
-        setErrorFeedback("Enter the 6-digit service code announced for this service.");
-        return;
-      }
-
-      setFeedback({
-        status: "loading",
-        message: auto
-          ? "Verifying the token from your link…"
-          : "Verifying your check-in link…",
-      });
-
-      try {
-        const res = await fetch("/api/verify-checkin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: value, phone: phone.trim(), serviceCode: serviceCode.trim() }),
-        });
-
-        const body = await res.json().catch(() => ({ status: "error" }));
-        const failureMessage =
-          body.message ||
-          (body.reason === "expired"
-            ? "That check-in link has expired. Ask your church admin for a new one."
-            : "Unable to verify this token. Please confirm the full link was pasted.");
-
-        if (!res.ok || body.status !== "success") {
-          setErrorFeedback(failureMessage);
-          return;
-        }
-
-        const payload = body.data;
-        const { memberId, churchId, serviceDate, serviceType } = payload;
-
-        await recordAttendance({ memberId, churchId, serviceDate, serviceType });
-
-        const confirmation = {
-          memberId,
-          memberName: payload.memberName || "Member",
-          churchId,
-          churchName: payload.churchName || "Church",
-          serviceDate,
-          serviceType: serviceType || "Service",
-          status: "Verified",
-          verifiedAt: new Date().toISOString(),
-          phone: payload.phone || phone.trim(),
-          serviceCode: payload.serviceCode || serviceCode.trim(),
-        };
-
-        setSummary(confirmation);
-        setFeedback({
-          status: "success",
-          message: "Check-in verified! We'll record your attendance.",
-        });
-      } catch (err) {
-        setErrorFeedback(
-          err.message || "Unexpected verification error. Please try again."
-        );
-      }
-    },
-    [token, phone, serviceCode]
-  );
-
+  // Prefill phone from localStorage
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get("token") || "";
-    if (tokenFromUrl) {
-      setToken(tokenFromUrl);
+    try {
+      const saved = window.localStorage.getItem(LOCAL_PHONE_KEY);
+      if (saved) setPhone(saved);
+    } catch {
+      // ignore storage issues
     }
   }, []);
 
-  const recordAttendance = async ({
-    memberId,
+  const formatServiceDate = (isoDate) => {
+    if (!isoDate) return "";
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return isoDate;
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    });
+  };
+
+  const recordAttendanceIfNew = async ({
     churchId,
+    memberId,
     serviceDate,
     serviceType,
   }) => {
-    const normalizedService = serviceType || "Service";
-    const colRef = collection(db, "memberAttendance");
+    if (!churchId || !memberId || !serviceDate) return;
+
+    const colRef = collection(db, "attendance");
+    const normalizedService = (serviceType || "").toLowerCase();
+
     const qExisting = query(
       colRef,
       where("churchId", "==", churchId),
@@ -162,6 +81,119 @@ export default function CheckinPage() {
     });
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    const trimmedPhone = phone.trim();
+    const trimmedServiceCode = serviceCode.trim();
+    const trimmedToken = token.trim();
+
+    if (!trimmedPhone || !trimmedToken) {
+      setFeedback({
+        ok: false,
+        message: "Please fill in your phone number and token.",
+      });
+      setStatusTone("error");
+      return;
+    }
+
+    if (trimmedServiceCode.length !== 6) {
+      setFeedback({
+        ok: false,
+        message: "Please enter the 6-digit service code announced in church.",
+      });
+      setStatusTone("error");
+      return;
+    }
+
+    if (attempts >= MAX_ATTEMPTS) {
+      setFeedback({
+        ok: false,
+        message:
+          "Too many attempts. Please see an usher or church admin to help you check in.",
+      });
+      setStatusTone("error");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const res = await fetch("/api/self-checkin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: trimmedPhone,
+          serviceCode: trimmedServiceCode,
+          token: trimmedToken,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      setAttempts((prev) => prev + 1);
+
+      const ok = data.ok ?? res.ok;
+
+      if (!ok) {
+        const msg =
+          data.message ||
+          "We could not verify this check-in. Please check your details and try again.";
+        setFeedback({ ok: false, message: msg });
+        setStatusTone("error");
+        return;
+      }
+
+      // Save phone locally for future visits
+      try {
+        window.localStorage.setItem(LOCAL_PHONE_KEY, trimmedPhone);
+      } catch {
+        // ignore storage issues
+      }
+
+      // Handle duplicate / already checked in
+      if (data.alreadyCheckedIn) {
+        setFeedback({
+          ok: true,
+          message: data.message ||
+            "You have already checked in for this service. Thank you.",
+        });
+        setStatusTone("info");
+      } else {
+        setFeedback({
+          ok: true,
+          message:
+            data.message ||
+            "You are checked in. Thank you for attending this service.",
+        });
+        setStatusTone("success");
+      }
+
+      const newSummary = data.summary || null;
+      setSummary(newSummary);
+
+      // Also persist attendance in Firestore if needed
+      if (newSummary) {
+        await recordAttendanceIfNew({
+          churchId: newSummary.churchId,
+          memberId: newSummary.memberId,
+          serviceDate: newSummary.serviceDate,
+          serviceType: newSummary.serviceType,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setFeedback({
+        ok: false,
+        message:
+          "Something went wrong while checking you in. Please try again or see an usher.",
+      });
+      setStatusTone("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="checkin-page">
       <div className="checkin-card">
@@ -171,13 +203,27 @@ export default function CheckinPage() {
         </p>
 
         <div className="checkin-helper">
-          <div className="checkin-helper-title">Where to enter the service code</div>
+          <div className="checkin-helper-title">
+            Where to enter the service code
+          </div>
           <div className="checkin-helper-body">
-            The form has three steps in order: phone number, <strong>service code</strong>,
-            then the token box. If you do not immediately see the service code input,
-            look right after the phone field before the token textarea.
+            The form has three steps in order: phone number,{" "}
+            <strong>service code</strong>, then the token box. Use the same
+            phone number you shared with the church office.
           </div>
         </div>
+
+        {summary && (
+          <div className="checkin-service-meta">
+            <span className="checkin-chip">
+              {summary.churchName || "Your church"}
+            </span>
+            <span className="checkin-chip">
+              {summary.serviceType || "Service"} •{" "}
+              {formatServiceDate(summary.serviceDate)}
+            </span>
+          </div>
+        )}
 
         <StatusBanner tone={statusTone} message={feedback.message} />
 
@@ -188,85 +234,92 @@ export default function CheckinPage() {
               <div>
                 <div className="checkin-label">Member</div>
                 <div className="checkin-value">{summary.memberName}</div>
-                <div className="checkin-subvalue">ID: {summary.memberId}</div>
+                <div className="checkin-subvalue">
+                  ID: {summary.memberId}
+                </div>
               </div>
               <div>
                 <div className="checkin-label">Church</div>
                 <div className="checkin-value">{summary.churchName}</div>
-                <div className="checkin-subvalue">ID: {summary.churchId}</div>
+                <div className="checkin-subvalue">
+                  ID: {summary.churchId}
+                </div>
               </div>
               <div>
                 <div className="checkin-label">Service date</div>
-                <div className="checkin-value">{summary.serviceDate}</div>
+                <div className="checkin-value">
+                  {formatServiceDate(summary.serviceDate)}
+                </div>
               </div>
               <div>
                 <div className="checkin-label">Service</div>
                 <div className="checkin-value">{summary.serviceType}</div>
               </div>
-              <div>
-                <div className="checkin-label">Status</div>
-                <div className="checkin-value">{summary.status}</div>
-                <div className="checkin-subvalue">Verified at {summary.verifiedAt}</div>
-              </div>
-              <div>
-                <div className="checkin-label">Phone</div>
-                <div className="checkin-value">{summary.phone}</div>
-              </div>
-              <div>
-                <div className="checkin-label">Service code</div>
-                <div className="checkin-value">{summary.serviceCode}</div>
-              </div>
             </div>
-            <p className="checkin-summary-note">
-              We have validated your token. These details are ready to be stored in
-              attendance records for this service.
-            </p>
           </div>
         )}
 
-        <div className="checkin-form">
-          <label htmlFor="phone" className="checkin-label">
-            Phone number
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Enter the phone number you registered with"
-          />
+        <form onSubmit={handleSubmit} className="checkin-form">
+          {/* Phone field */}
+          <div className="checkin-field">
+            <label className="checkin-label" htmlFor="phone">
+              Phone number
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              className="checkin-input"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="024 000 0000"
+              required
+            />
+          </div>
 
-          <label htmlFor="serviceCode" className="checkin-label">
-            Service code
-          </label>
-          <input
-            id="serviceCode"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            value={serviceCode}
-            onChange={(e) => setServiceCode(e.target.value)}
-            placeholder="6-digit code announced for this service"
-          />
+          {/* Service code field */}
+          <div className="checkin-field">
+            <label className="checkin-label" htmlFor="serviceCode">
+              Service code
+            </label>
+            <input
+              id="serviceCode"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              className="checkin-input"
+              value={serviceCode}
+              onChange={(e) => setServiceCode(e.target.value)}
+              placeholder="6-digit code from the announcement"
+              required
+            />
+          </div>
 
-          <label htmlFor="token" className="checkin-label">
-            Token
-          </label>
-          <textarea
-            id="token"
-            value={token}
-            rows={3}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Paste the ?token=... value from your link"
-          />
+          {/* Token field */}
+          <div className="checkin-field">
+            <label className="checkin-label" htmlFor="token">
+              Check-in token
+            </label>
+            <textarea
+              id="token"
+              className="checkin-textarea"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="This is usually filled automatically from the link."
+              required
+            />
+          </div>
+
           <button
+            type="submit"
             className="checkin-button"
-            onClick={() => handleVerify()}
-            disabled={feedback.status === "loading"}
+            disabled={isSubmitting}
           >
-            {feedback.status === "loading" ? "Checking…" : "Verify & check in"}
+            {isSubmitting ? "Checking in…" : "Confirm attendance"}
           </button>
+        </form>
+
+        <div className="checkin-footer-help">
+          If you have issues checking in, please see an usher or church admin.
         </div>
       </div>
     </div>
