@@ -1,4 +1,3 @@
-// src/App.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { db, auth } from "./firebase";
 import {
