@@ -1558,6 +1558,153 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
 
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  let givingThisMonth = 0;
+  giving.forEach((g) => {
+    if (!g.date) return;
+    const d = new Date(g.date);
+    if (Number.isNaN(d.getTime())) return;
+    if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+      givingThisMonth += Number(g.amount || 0);
+    }
+  });
+
+  const totalAttendanceRecords = attendance.length;
+  let totalAttendanceCount = 0;
+  let attendanceThisMonthTotal = 0;
+
+  attendance.forEach((record) => {
+    const adults = Number(record.adults || 0);
+    const children = Number(record.children || 0);
+    const visitors = Number(record.visitors || 0);
+    const total = adults + children + visitors;
+
+    totalAttendanceCount += total;
+
+    if (record.date) {
+      const recordDate = new Date(record.date);
+
+      if (
+        !Number.isNaN(recordDate) &&
+        recordDate.getFullYear() === currentYear &&
+        recordDate.getMonth() === currentMonth
+      ) {
+        attendanceThisMonthTotal += total;
+      }
+    }
+  });
+
+  const averageAttendance =
+    totalAttendanceRecords > 0
+      ? Math.round((totalAttendanceCount / totalAttendanceRecords) * 10) / 10
+      : 0;
+
+  const attendanceTrend = useMemo(() => {
+    const sorted = attendance
+      .filter((record) => record.date)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return sorted.slice(-6).map((record) => {
+      const adults = Number(record.adults || 0);
+      const children = Number(record.children || 0);
+      const visitors = Number(record.visitors || 0);
+      const total = adults + children + visitors;
+
+      const parsedDate = new Date(record.date);
+      const label = Number.isNaN(parsedDate)
+        ? record.date
+        : parsedDate.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          });
+
+      return {
+        label,
+        total,
+        subtitle: record.serviceType || "Service",
+      };
+    });
+  }, [attendance]);
+
+  const givingTrend = useMemo(() => {
+    const monthMap = new Map();
+
+    giving.forEach((record) => {
+      if (!record.date) return;
+      const parsedDate = new Date(record.date);
+      if (Number.isNaN(parsedDate)) return;
+
+      const key = `${parsedDate.getFullYear()}-${String(
+        parsedDate.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      const current = monthMap.get(key) || 0;
+      monthMap.set(key, current + Number(record.amount || 0));
+    });
+
+    const entries = Array.from(monthMap.entries()).map(([key, amount]) => {
+      const [year, month] = key.split("-").map((v) => Number(v));
+      const date = new Date(year, month - 1, 1);
+      return {
+        label: date.toLocaleDateString("en-US", { month: "short" }),
+        year,
+        month,
+        amount,
+      };
+    });
+
+    entries.sort((a, b) =>
+      a.year === b.year ? a.month - b.month : a.year - b.year,
+    );
+
+    return entries.slice(-6);
+  }, [giving]);
+
+  const attendanceChartMax = useMemo(
+    () => Math.max(...attendanceTrend.map((p) => p.total || 0), 1),
+    [attendanceTrend],
+  );
+
+  const givingChartMax = useMemo(
+    () => Math.max(...givingTrend.map((p) => p.amount || 0), 1),
+    [givingTrend],
+  );
+
+  const memberLastAttendance = new Map();
+  memberAttendanceHistory.forEach((entry) => {
+    if (!memberLastAttendance.has(entry.memberId)) {
+      memberLastAttendance.set(entry.memberId, entry.date || "");
+    }
+  });
+
+  const absenteeCutoff = new Date();
+  absenteeCutoff.setDate(absenteeCutoff.getDate() - 28);
+
+  const membersMissingFourWeeks = members.filter((m) => {
+    const lastDateStr = memberLastAttendance.get(m.id);
+    if (!lastDateStr) return true;
+
+    const lastDate = new Date(lastDateStr);
+    if (Number.isNaN(lastDate.getTime())) return true;
+
+    return lastDate < absenteeCutoff;
+  });
+
+  const monthlyMemberAttendance = new Set();
+  memberAttendanceHistory.forEach((entry) => {
+    if (!entry.date) return;
+
+    const entryDate = new Date(entry.date);
+    if (
+      !Number.isNaN(entryDate.getTime()) &&
+      entryDate.getFullYear() === currentYear &&
+      entryDate.getMonth() === currentMonth
+    ) {
+      monthlyMemberAttendance.add(entry.memberId);
+    }
+  });
+
   const authValidationMessage = validateAuthInputs();
   const accessStatus = evaluateAccessStatus(churchPlan);
 
@@ -1818,153 +1965,6 @@ function App() {
     }
     return "—";
   };
-
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  let givingThisMonth = 0;
-  giving.forEach((g) => {
-    if (!g.date) return;
-    const d = new Date(g.date);
-    if (Number.isNaN(d.getTime())) return;
-    if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
-      givingThisMonth += Number(g.amount || 0);
-    }
-  });
-
-  const totalAttendanceRecords = attendance.length;
-  let totalAttendanceCount = 0;
-  let attendanceThisMonthTotal = 0;
-
-  attendance.forEach((record) => {
-    const adults = Number(record.adults || 0);
-    const children = Number(record.children || 0);
-    const visitors = Number(record.visitors || 0);
-    const total = adults + children + visitors;
-
-    totalAttendanceCount += total;
-
-    if (record.date) {
-      const recordDate = new Date(record.date);
-
-      if (
-        !Number.isNaN(recordDate) &&
-        recordDate.getFullYear() === currentYear &&
-        recordDate.getMonth() === currentMonth
-      ) {
-        attendanceThisMonthTotal += total;
-      }
-    }
-  });
-
-  const averageAttendance =
-    totalAttendanceRecords > 0
-      ? Math.round((totalAttendanceCount / totalAttendanceRecords) * 10) / 10
-      : 0;
-
-  const attendanceTrend = useMemo(() => {
-    const sorted = attendance
-      .filter((record) => record.date)
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    return sorted.slice(-6).map((record) => {
-      const adults = Number(record.adults || 0);
-      const children = Number(record.children || 0);
-      const visitors = Number(record.visitors || 0);
-      const total = adults + children + visitors;
-
-      const parsedDate = new Date(record.date);
-      const label = Number.isNaN(parsedDate)
-        ? record.date
-        : parsedDate.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          });
-
-      return {
-        label,
-        total,
-        subtitle: record.serviceType || "Service",
-      };
-    });
-  }, [attendance]);
-
-  const givingTrend = useMemo(() => {
-    const monthMap = new Map();
-
-    giving.forEach((record) => {
-      if (!record.date) return;
-      const parsedDate = new Date(record.date);
-      if (Number.isNaN(parsedDate)) return;
-
-      const key = `${parsedDate.getFullYear()}-${String(
-        parsedDate.getMonth() + 1,
-      ).padStart(2, "0")}`;
-      const current = monthMap.get(key) || 0;
-      monthMap.set(key, current + Number(record.amount || 0));
-    });
-
-    const entries = Array.from(monthMap.entries()).map(([key, amount]) => {
-      const [year, month] = key.split("-").map((v) => Number(v));
-      const date = new Date(year, month - 1, 1);
-      return {
-        label: date.toLocaleDateString("en-US", { month: "short" }),
-        year,
-        month,
-        amount,
-      };
-    });
-
-    entries.sort((a, b) =>
-      a.year === b.year ? a.month - b.month : a.year - b.year,
-    );
-
-    return entries.slice(-6);
-  }, [giving]);
-
-  const attendanceChartMax = useMemo(
-    () => Math.max(...attendanceTrend.map((p) => p.total || 0), 1),
-    [attendanceTrend],
-  );
-
-  const givingChartMax = useMemo(
-    () => Math.max(...givingTrend.map((p) => p.amount || 0), 1),
-    [givingTrend],
-  );
-
-  const memberLastAttendance = new Map();
-  memberAttendanceHistory.forEach((entry) => {
-    if (!memberLastAttendance.has(entry.memberId)) {
-      memberLastAttendance.set(entry.memberId, entry.date || "");
-    }
-  });
-
-  const absenteeCutoff = new Date();
-  absenteeCutoff.setDate(absenteeCutoff.getDate() - 28);
-
-  const membersMissingFourWeeks = members.filter((m) => {
-    const lastDateStr = memberLastAttendance.get(m.id);
-    if (!lastDateStr) return true;
-
-    const lastDate = new Date(lastDateStr);
-    if (Number.isNaN(lastDate.getTime())) return true;
-
-    return lastDate < absenteeCutoff;
-  });
-
-  const monthlyMemberAttendance = new Set();
-  memberAttendanceHistory.forEach((entry) => {
-    if (!entry.date) return;
-
-    const entryDate = new Date(entry.date);
-    if (
-      !Number.isNaN(entryDate.getTime()) &&
-      entryDate.getFullYear() === currentYear &&
-      entryDate.getMonth() === currentMonth
-    ) {
-      monthlyMemberAttendance.add(entry.memberId);
-    }
-  });
 
   const normalizedSermonSearch = normalizeSearchValue(sermonSearch);
   const filteredSermons = sermons.filter((s) => {
