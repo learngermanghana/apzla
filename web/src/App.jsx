@@ -1176,6 +1176,17 @@ function App() {
     }
   };
 
+  const copyServiceCode = async () => {
+    if (!checkinServiceCode) return;
+    try {
+      await navigator.clipboard.writeText(checkinServiceCode);
+      showToast("Service code copied.", "success");
+    } catch (err) {
+      console.error("Copy service code error:", err);
+      showToast("Unable to copy service code.", "error");
+    }
+  };
+
   const copyMemberCheckinLink = async (link) => {
     if (!link) return;
     try {
@@ -4007,6 +4018,26 @@ function App() {
 
                         {checkinTokenError && (
                           <div className="checkin-admin-error">{checkinTokenError}</div>
+                        )}
+
+                        {checkinServiceCode && (
+                          <div className="checkin-service-code-box">
+                            <div className="checkin-service-code-title">
+                              Announce this 6-digit code for the service
+                            </div>
+                            <div className="checkin-service-code-value">
+                              {checkinServiceCode}
+                            </div>
+                            <div className="checkin-service-code-note">
+                              Share this code with members along with the link. They must
+                              enter their phone number and this code to check in.
+                            </div>
+                            <div className="checkin-service-code-actions">
+                              <button type="button" onClick={copyServiceCode}>
+                                Copy code
+                              </button>
+                            </div>
+                          </div>
                         )}
 
                         <div className="checkin-admin-actions">
