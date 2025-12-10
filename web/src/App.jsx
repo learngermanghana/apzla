@@ -92,6 +92,7 @@ function App() {
     email: "",
     status: "VISITOR",
   });
+  const [memberSearch, setMemberSearch] = useState("");
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -182,6 +183,7 @@ function App() {
   // Sermons
   const [sermons, setSermons] = useState([]);
   const [sermonsLoading, setSermonsLoading] = useState(false);
+  const [sermonSearch, setSermonSearch] = useState("");
   const [sermonForm, setSermonForm] = useState({
     date: todayStr,
     title: "",
@@ -1710,23 +1712,30 @@ function App() {
     lastAttendanceDate = last.date || "";
   }
 
-  const normalizedMemberSearch = memberAttendanceForm.search
-    .toLowerCase()
-    .trim();
-  const filteredMembers = members.filter((m) => {
-    if (!normalizedMemberSearch) return true;
-    const fullName = `${m.firstName || ""} ${m.lastName || ""}`
+  const normalizeSearchValue = (value = "") => value.toLowerCase().trim();
+  const memberMatchesSearch = (member, searchValue) => {
+    const normalized = normalizeSearchValue(searchValue);
+    if (!normalized) return true;
+    const fullName = `${member.firstName || ""} ${member.lastName || ""}`
       .toLowerCase()
       .trim();
-    const phone = (m.phone || "").toLowerCase();
-    const email = (m.email || "").toLowerCase();
+    const phone = (member.phone || "").toLowerCase();
+    const email = (member.email || "").toLowerCase();
 
     return (
-      fullName.includes(normalizedMemberSearch) ||
-      phone.includes(normalizedMemberSearch) ||
-      email.includes(normalizedMemberSearch)
+      fullName.includes(normalized) ||
+      phone.includes(normalized) ||
+      email.includes(normalized)
     );
-  });
+  };
+
+  const filteredMembers = members.filter((m) =>
+    memberMatchesSearch(m, memberSearch)
+  );
+
+  const checkinSearchResults = members.filter((m) =>
+    memberMatchesSearch(m, memberAttendanceForm.search)
+  );
 
   const resolveGivingMember = (record) => {
     if (record.memberName) return record.memberName;
@@ -1818,6 +1827,24 @@ function App() {
     ) {
       monthlyMemberAttendance.add(entry.memberId);
     }
+  });
+
+  const normalizedSermonSearch = normalizeSearchValue(sermonSearch);
+  const filteredSermons = sermons.filter((s) => {
+    if (!normalizedSermonSearch) return true;
+
+    const valuesToCheck = [
+      s.date,
+      s.title,
+      s.preacher,
+      s.series,
+      s.scripture,
+      s.notes,
+    ];
+
+    return valuesToCheck.some((value) =>
+      (value || "").toLowerCase().includes(normalizedSermonSearch)
+    );
   });
 
   // Follow-up templates (visitors)
@@ -2968,6 +2995,47 @@ function App() {
                   No members yet. Add your first member above.
                 </p>
               ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "10px",
+                    alignItems: "center",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Search members by name, phone, or email"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                      minWidth: "260px",
+                    }}
+                  />
+                  {memberSearch && (
+                    <button
+                      onClick={() => setMemberSearch("")}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "10px",
+                        border: "1px solid #e5e7eb",
+                        background: "white",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <span style={{ color: "#6b7280", fontSize: "13px" }}>
+                    Showing {filteredMembers.length} of {members.length} members
+                  </span>
+                </div>
                 <div className="members-table-wrapper" style={{ overflowX: "auto" }}>
                   <table
                     style={{
@@ -2991,7 +3059,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {members.map((m) => {
+                      {filteredMembers.map((m) => {
                         const isEditing = editingMemberId === m.id;
                         return (
                           <tr
@@ -3631,7 +3699,7 @@ function App() {
                       gap: "8px",
                     }}
                   >
-                    {filteredMembers.map((m) => {
+                    {checkinSearchResults.map((m) => {
                       const isPresent = memberAttendance.some(
                         (a) => a.memberId === m.id
                       );
@@ -4833,6 +4901,48 @@ function App() {
                 Sermon history
               </h2>
 
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  alignItems: "center",
+                  marginBottom: "12px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Search sermons by title, preacher, or notes"
+                  value={sermonSearch}
+                  onChange={(e) => setSermonSearch(e.target.value)}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "14px",
+                    minWidth: "260px",
+                  }}
+                />
+                {sermonSearch && (
+                  <button
+                    onClick={() => setSermonSearch("")}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid #e5e7eb",
+                      background: "white",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+                <span style={{ color: "#6b7280", fontSize: "13px" }}>
+                  Showing {filteredSermons.length} of {sermons.length} sermons
+                </span>
+              </div>
+
               {sermonsLoading ? (
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
                   Loading sermons…
@@ -4840,6 +4950,10 @@ function App() {
               ) : sermons.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
                   No sermons logged yet. Save your first one above.
+                </p>
+              ) : filteredSermons.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No sermons match your search.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -4867,7 +4981,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sermons.map((s) => (
+                      {filteredSermons.map((s) => (
                         <tr
                           key={s.id}
                           style={{
