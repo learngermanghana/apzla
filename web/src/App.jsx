@@ -1893,49 +1893,6 @@ function App() {
         ))}
       </div>
 
-      {accessStatus.detail && (
-        <div
-          className={`subscription-banner${
-            accessStatus.state === "expiring" ? " warning" : ""
-          }`}
-        >
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "12px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "linear-gradient(135deg, #4338ca, #22c55e)",
-              color: "white",
-              fontWeight: 800,
-            }}
-            aria-hidden
-          >
-            ⏰
-          </div>
-          <div style={{ flex: 1 }}>
-            <strong style={{ display: "block" }}>{accessStatus.headline}</strong>
-            <p style={{ margin: "4px 0 0" }}>{accessStatus.detail}</p>
-          </div>
-          <button
-            onClick={() => setShowAccountSettings(true)}
-            style={{
-              border: "none",
-              background: "#111827",
-              color: "white",
-              padding: "8px 12px",
-              borderRadius: "10px",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Manage billing
-          </button>
-        </div>
-      )}
-
       {showAccountSettings && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-card">
@@ -2233,37 +2190,76 @@ function App() {
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              onClick={handleOpenAccountSettings}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "999px",
-                border: "none",
-                background: "#e5e7eb",
-                color: "#111827",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: 600,
-              }}
-            >
-              Account &amp; billing
-            </button>
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "999px",
-                border: "none",
-                background: "#ef4444",
-                color: "white",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: 500,
-              }}
-            >
-              Logout
-            </button>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              alignItems: "flex-end",
+              minWidth: "260px",
+            }}
+          >
+            {accessStatus.detail && (
+              <div
+                className={`subscription-chip${
+                  accessStatus.state === "expiring" ? " warning" : ""
+                }`}
+                onClick={() => setShowAccountSettings(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    setShowAccountSettings(true);
+                  }
+                }}
+                aria-label="View subscription details"
+              >
+                <div className="subscription-chip-icon" aria-hidden>
+                  ⏰
+                </div>
+                <div>
+                  <strong style={{ display: "block" }}>
+                    {accessStatus.headline}
+                  </strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px" }}>
+                    {accessStatus.detail}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button
+                onClick={handleOpenAccountSettings}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#e5e7eb",
+                  color: "#111827",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
+              >
+                Account &amp; billing
+              </button>
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#ef4444",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
 
