@@ -1734,9 +1734,16 @@ function App() {
     memberMatchesSearch(m, memberSearch)
   );
 
-  const checkinSearchResults = members.filter((m) =>
-    memberMatchesSearch(m, memberAttendanceForm.search)
+  const normalizedCheckinSearch = normalizeSearchValue(
+    memberAttendanceForm.search
   );
+  const hasCheckinSearch = normalizedCheckinSearch.length > 0;
+
+  const checkinSearchResults = hasCheckinSearch
+    ? members.filter((m) =>
+        memberMatchesSearch(m, memberAttendanceForm.search)
+      )
+    : [];
 
   const resolveGivingMember = (record) => {
     if (record.memberName) return record.memberName;
@@ -3703,11 +3710,12 @@ function App() {
                       gap: "8px",
                     }}
                   >
-                    {checkinSearchResults.map((m) => {
-                      const isPresent = memberAttendance.some(
-                        (a) => a.memberId === m.id
-                      );
-                      return (
+                    {hasCheckinSearch &&
+                      checkinSearchResults.map((m) => {
+                        const isPresent = memberAttendance.some(
+                          (a) => a.memberId === m.id
+                        );
+                        return (
                         <div
                           key={m.id}
                           className="checkin-card"
@@ -3919,8 +3927,15 @@ function App() {
                       </p>
                     )}
 
-                    {members.length > 0 &&
-                      filteredMembers.length === 0 && (
+                    {members.length > 0 && !hasCheckinSearch && (
+                      <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                        Search by name or phone to find a member.
+                      </p>
+                    )}
+
+                    {hasCheckinSearch &&
+                      members.length > 0 &&
+                      checkinSearchResults.length === 0 && (
                         <p style={{ fontSize: "14px", color: "#9ca3af" }}>
                           No members match that search.
                         </p>
