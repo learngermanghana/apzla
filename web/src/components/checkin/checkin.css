@@ -28,6 +28,25 @@
   color: #6b7280;
 }
 
+.checkin-helper {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  margin-bottom: 14px;
+}
+
+.checkin-helper-title {
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.checkin-helper-body {
+  color: #4b5563;
+  font-size: 14px;
+}
+
 .checkin-banner {
   padding: 12px 14px;
   border-radius: 10px;
