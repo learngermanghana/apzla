@@ -10,8 +10,14 @@ export function AuthPanel({
   setAuthMode,
   email,
   password,
+  churchName,
+  churchAddress,
+  churchCity,
   onEmailChange,
   onPasswordChange,
+  onChurchNameChange,
+  onChurchAddressChange,
+  onChurchCityChange,
   onSubmit,
   loading,
   errorMessage,
@@ -232,6 +238,31 @@ export function AuthPanel({
               onChange={onPasswordChange}
               style={{ background: "#f8fafc" }}
             />
+            {authMode === "register" && (
+              <>
+                <Input
+                  type="text"
+                  placeholder="Church name"
+                  value={churchName}
+                  onChange={onChurchNameChange}
+                  style={{ background: "#f8fafc" }}
+                />
+                <Input
+                  type="text"
+                  placeholder="Church address"
+                  value={churchAddress}
+                  onChange={onChurchAddressChange}
+                  style={{ background: "#f8fafc" }}
+                />
+                <Input
+                  type="text"
+                  placeholder="City"
+                  value={churchCity}
+                  onChange={onChurchCityChange}
+                  style={{ background: "#f8fafc" }}
+                />
+              </>
+            )}
             {inlineError && (
               <p
                 role="alert"
@@ -283,8 +314,14 @@ AuthPanel.propTypes = {
   setAuthMode: PropTypes.func.isRequired,
   email: PropTypes.string.isRequired,
   password: PropTypes.string.isRequired,
+  churchName: PropTypes.string,
+  churchAddress: PropTypes.string,
+  churchCity: PropTypes.string,
   onEmailChange: PropTypes.func.isRequired,
   onPasswordChange: PropTypes.func.isRequired,
+  onChurchNameChange: PropTypes.func,
+  onChurchAddressChange: PropTypes.func,
+  onChurchCityChange: PropTypes.func,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool.isRequired,
   errorMessage: PropTypes.string,
@@ -296,6 +333,12 @@ AuthPanel.defaultProps = {
   errorMessage: "",
   disableSubmit: false,
   validationMessage: "",
+  churchName: "",
+  churchAddress: "",
+  churchCity: "",
+  onChurchNameChange: undefined,
+  onChurchAddressChange: undefined,
+  onChurchCityChange: undefined,
 };
 
 export default AuthPanel;

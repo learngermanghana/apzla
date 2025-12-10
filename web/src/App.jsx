@@ -39,6 +39,9 @@ function App() {
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [registrationChurchName, setRegistrationChurchName] = useState("");
+  const [registrationChurchAddress, setRegistrationChurchAddress] = useState("");
+  const [registrationChurchCity, setRegistrationChurchCity] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,6 +50,7 @@ function App() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [churchSettings, setChurchSettings] = useState({
     name: "",
+    address: "",
     country: "",
     city: "",
   });
@@ -67,6 +71,7 @@ function App() {
 
   // Church creation form
   const [churchName, setChurchName] = useState("");
+  const [churchAddress, setChurchAddress] = useState("");
   const [churchCountry, setChurchCountry] = useState("Ghana");
   const [churchCity, setChurchCity] = useState("");
 
@@ -376,6 +381,13 @@ function App() {
     if (password.length < 6)
       return "Password must be at least 6 characters long.";
 
+    if (authMode === "register") {
+      if (!registrationChurchName.trim()) return "Church name is required.";
+      if (!registrationChurchAddress.trim())
+        return "Church address is required.";
+      if (!registrationChurchCity.trim()) return "City is required.";
+    }
+
     return "";
   };
 
@@ -390,8 +402,14 @@ function App() {
       setAuthLoading(true);
       setAuthError("");
       await createUserWithEmailAndPassword(auth, email.trim(), password);
+      setChurchName(registrationChurchName.trim());
+      setChurchAddress(registrationChurchAddress.trim());
+      setChurchCity(registrationChurchCity.trim());
       setEmail("");
       setPassword("");
+      setRegistrationChurchName("");
+      setRegistrationChurchAddress("");
+      setRegistrationChurchCity("");
     } catch (err) {
       console.error("Register error:", err);
       setAuthError(err.message);
@@ -438,6 +456,7 @@ function App() {
         const data = snapshot.data();
         setChurchSettings({
           name: data.name || "",
+          address: data.address || "",
           country: data.country || "",
           city: data.city || "",
         });
@@ -472,6 +491,7 @@ function App() {
 
     setChurchSettings({
       name: userProfile.churchName || "",
+      address: userProfile.churchAddress || "",
       country: "",
       city: "",
     });
@@ -488,11 +508,17 @@ function App() {
       return;
     }
 
+    if (!churchSettings.address.trim()) {
+      showToast("Please enter a church address.", "error");
+      return;
+    }
+
     setAccountLoading(true);
 
     try {
       await updateDoc(doc(db, "churches", userProfile.churchId), {
         name: churchSettings.name.trim(),
+        address: churchSettings.address.trim(),
         country: churchSettings.country.trim(),
         city: churchSettings.city.trim(),
         updatedAt: new Date().toISOString(),
@@ -500,6 +526,8 @@ function App() {
 
       await updateDoc(doc(db, "users", user.uid), {
         churchName: churchSettings.name.trim(),
+        churchAddress: churchSettings.address.trim(),
+        churchCity: churchSettings.city.trim(),
       });
 
       setUserProfile((prev) =>
@@ -507,6 +535,8 @@ function App() {
           ? {
               ...prev,
               churchName: churchSettings.name.trim(),
+              churchAddress: churchSettings.address.trim(),
+              churchCity: churchSettings.city.trim(),
             }
           : prev,
       );
@@ -651,6 +681,11 @@ function App() {
       return;
     }
 
+    if (!churchAddress.trim()) {
+      showToast("Please enter a church address.", "error");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -659,6 +694,7 @@ function App() {
 
       const churchRef = await addDoc(collection(db, "churches"), {
         name: churchName.trim(),
+        address: churchAddress.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
         ownerUserId: user.uid,
@@ -675,12 +711,15 @@ function App() {
         churchId,
         role: "CHURCH_ADMIN",
         churchName: churchName.trim(),
+        churchAddress: churchAddress.trim(),
+        churchCity: churchCity.trim(),
         createdAt: new Date().toISOString(),
       });
 
       setChurchPlan({
         id: churchId,
         name: churchName.trim(),
+        address: churchAddress.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
         ownerUserId: user.uid,
@@ -708,6 +747,8 @@ function App() {
         churchId,
         role: "CHURCH_ADMIN",
         churchName: churchName.trim(),
+        churchAddress: churchAddress.trim(),
+        churchCity: churchCity.trim(),
       });
 
       showToast("Church created and linked to your account.", "success");
@@ -1531,12 +1572,27 @@ function App() {
         }}
         email={email}
         password={password}
+        churchName={registrationChurchName}
+        churchAddress={registrationChurchAddress}
+        churchCity={registrationChurchCity}
         onEmailChange={(e) => {
           setEmail(e.target.value);
           setAuthError("");
         }}
         onPasswordChange={(e) => {
           setPassword(e.target.value);
+          setAuthError("");
+        }}
+        onChurchNameChange={(e) => {
+          setRegistrationChurchName(e.target.value);
+          setAuthError("");
+        }}
+        onChurchAddressChange={(e) => {
+          setRegistrationChurchAddress(e.target.value);
+          setAuthError("");
+        }}
+        onChurchCityChange={(e) => {
+          setRegistrationChurchCity(e.target.value);
           setAuthError("");
         }}
         onSubmit={authMode === "login" ? handleLogin : handleRegister}
@@ -1649,9 +1705,11 @@ function App() {
       <ChurchSetupPanel
         userEmail={user.email}
         churchName={churchName}
+        churchAddress={churchAddress}
         churchCountry={churchCountry}
         churchCity={churchCity}
         onChangeChurchName={(e) => setChurchName(e.target.value)}
+        onChangeChurchAddress={(e) => setChurchAddress(e.target.value)}
         onChangeChurchCountry={(e) => setChurchCountry(e.target.value)}
         onChangeChurchCity={(e) => setChurchCity(e.target.value)}
         onCreateChurch={handleCreateChurch}
@@ -2055,6 +2113,20 @@ function App() {
                         }))
                       }
                       placeholder="e.g. Grace Chapel International"
+                    />
+                  </label>
+                  <label className="modal-field">
+                    <span>Address</span>
+                    <input
+                      type="text"
+                      value={churchSettings.address}
+                      onChange={(e) =>
+                        setChurchSettings((prev) => ({
+                          ...prev,
+                          address: e.target.value,
+                        }))
+                      }
+                      placeholder="Street address"
                     />
                   </label>
                   <label className="modal-field">
