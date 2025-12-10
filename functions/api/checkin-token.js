@@ -29,11 +29,13 @@ async function writeNonceRecord(nonce, payload) {
 async function queueNotification({ email, link, memberId, churchId, serviceDate }) {
   if (!email) return null
 
+  const sanitizedMemberId = memberId ?? null
+
   const data = {
     channel: 'email',
     email,
     link,
-    memberId,
+    memberId: sanitizedMemberId,
     churchId,
     serviceDate,
     status: 'queued',
