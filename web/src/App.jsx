@@ -1803,6 +1803,76 @@ function App() {
       ? Math.round((totalAttendanceCount / totalAttendanceRecords) * 10) / 10
       : 0;
 
+  const attendanceTrend = useMemo(() => {
+    const sorted = attendance
+      .filter((record) => record.date)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return sorted.slice(-6).map((record) => {
+      const adults = Number(record.adults || 0);
+      const children = Number(record.children || 0);
+      const visitors = Number(record.visitors || 0);
+      const total = adults + children + visitors;
+
+      const parsedDate = new Date(record.date);
+      const label = Number.isNaN(parsedDate)
+        ? record.date
+        : parsedDate.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          });
+
+      return {
+        label,
+        total,
+        subtitle: record.serviceType || "Service",
+      };
+    });
+  }, [attendance]);
+
+  const givingTrend = useMemo(() => {
+    const monthMap = new Map();
+
+    giving.forEach((record) => {
+      if (!record.date) return;
+      const parsedDate = new Date(record.date);
+      if (Number.isNaN(parsedDate)) return;
+
+      const key = `${parsedDate.getFullYear()}-${String(
+        parsedDate.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      const current = monthMap.get(key) || 0;
+      monthMap.set(key, current + Number(record.amount || 0));
+    });
+
+    const entries = Array.from(monthMap.entries()).map(([key, amount]) => {
+      const [year, month] = key.split("-").map((v) => Number(v));
+      const date = new Date(year, month - 1, 1);
+      return {
+        label: date.toLocaleDateString("en-US", { month: "short" }),
+        year,
+        month,
+        amount,
+      };
+    });
+
+    entries.sort((a, b) =>
+      a.year === b.year ? a.month - b.month : a.year - b.year,
+    );
+
+    return entries.slice(-6);
+  }, [giving]);
+
+  const attendanceChartMax = useMemo(
+    () => Math.max(...attendanceTrend.map((p) => p.total || 0), 1),
+    [attendanceTrend],
+  );
+
+  const givingChartMax = useMemo(
+    () => Math.max(...givingTrend.map((p) => p.amount || 0), 1),
+    [givingTrend],
+  );
+
   const memberLastAttendance = new Map();
   memberAttendanceHistory.forEach((entry) => {
     if (!memberLastAttendance.has(entry.memberId)) {
@@ -2385,145 +2455,58 @@ function App() {
         {/* Tab content */}
         {activeTab === "overview" && (
           <>
-            <p
-              style={{
-                marginBottom: "16px",
-                color: "#6b7280",
-                fontSize: "14px",
-              }}
-            >
-              This is your starting dashboard for{" "}
-              <strong>{userProfile.churchName}</strong>. You can test
-              that Firestore works and that data is scoped to this
-              church only:
-            </p>
+            <div className="overview-hero">
+              <div>
+                <p className="eyebrow">Overview</p>
+                <h2 className="overview-title">Health snapshot</h2>
+                <p className="overview-subtitle">
+                  This is your starting dashboard for {" "}
+                  <strong>{userProfile.churchName}</strong>. Keep tabs on
+                  people, giving, and attendance at a glance.
+                </p>
+                <div className="overview-pills">
+                  <span className="pill">Realtime sync on</span>
+                  <span className="pill pill-muted">
+                    {totalMembers} people tracked
+                  </span>
+                </div>
+              </div>
+              <div className="overview-hero-metric">
+                <p>Latest attendance</p>
+                <strong>{lastAttendanceTotal || "—"}</strong>
+                <span>{lastAttendanceDate || "Awaiting first record"}</span>
+              </div>
+            </div>
 
             {/* Summary cards */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: "12px",
-                marginBottom: "20px",
-                maxWidth: "720px",
-              }}
-            >
-              {/* Total members */}
-              <div
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  background: "#f9fafb",
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#6b7280",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Total members
-                </div>
-                <div
-                  style={{
-                    fontSize: "22px",
-                    fontWeight: 600,
-                    color: "#111827",
-                  }}
-                >
-                  {totalMembers}
-                </div>
+            <div className="stat-grid">
+              <div className="stat-card">
+                <p className="eyebrow">Total members</p>
+                <div className="stat-value">{totalMembers}</div>
+                <p className="stat-helper">Directory count</p>
               </div>
 
-              {/* Last attendance */}
-              <div
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  background: "#f9fafb",
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#6b7280",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Last service attendance
-                </div>
-                <div
-                  style={{
-                    fontSize: "22px",
-                    fontWeight: 600,
-                    color: "#111827",
-                  }}
-                >
-                  {lastAttendanceTotal}
-                </div>
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    marginTop: "2px",
-                  }}
-                >
-                  {lastAttendanceDate
-                    ? lastAttendanceDate
-                    : "No attendance yet"}
-                </div>
+              <div className="stat-card stat-card--accent">
+                <p className="eyebrow">Last service attendance</p>
+                <div className="stat-value">{lastAttendanceTotal}</div>
+                <p className="stat-helper">
+                  {lastAttendanceDate ? lastAttendanceDate : "No attendance yet"}
+                </p>
               </div>
 
-              {/* Giving this month */}
-              <div
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  background: "#f9fafb",
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#6b7280",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Giving this month
-                </div>
-                <div
-                  style={{
-                    fontSize: "22px",
-                    fontWeight: 600,
-                    color: "#111827",
-                  }}
-                >
+              <div className="stat-card">
+                <p className="eyebrow">Giving this month</p>
+                <div className="stat-value">
                   {givingThisMonth.toLocaleString(undefined, {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 2,
                   })}
                 </div>
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    marginTop: "2px",
-                  }}
-                >
+                <p className="stat-helper">
                   {givingThisMonth > 0
                     ? "Current month total"
                     : "No giving records this month"}
-                </div>
+                </p>
               </div>
             </div>
 
@@ -2670,6 +2653,74 @@ function App() {
                       : "No attendance logged this month"}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="chart-grid">
+              <div className="chart-card">
+                <div className="chart-card__header">
+                  <div>
+                    <p className="eyebrow">Attendance trend</p>
+                    <h3 className="chart-title">Last services logged</h3>
+                  </div>
+                  <span className="pill pill-muted">Live</span>
+                </div>
+
+                {attendanceTrend.length > 0 ? (
+                  <div className="bar-chart" role="img" aria-label="Attendance trend by recent services">
+                    {attendanceTrend.map((point) => (
+                      <div className="bar-column" key={`${point.label}-${point.subtitle}`}>
+                        <div
+                          className="bar-fill"
+                          style={{
+                            height: `${Math.max(
+                              (point.total / attendanceChartMax) * 100,
+                              6,
+                            )}%`,
+                          }}
+                          title={`${point.subtitle}: ${point.total}`}
+                        />
+                        <span className="bar-label">{point.label}</span>
+                        <span className="bar-subtitle">{point.subtitle}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="chart-empty">Log attendance to see your trend.</p>
+                )}
+              </div>
+
+              <div className="chart-card">
+                <div className="chart-card__header">
+                  <div>
+                    <p className="eyebrow">Giving momentum</p>
+                    <h3 className="chart-title">Monthly totals</h3>
+                  </div>
+                  <span className="pill pill-muted">GHS</span>
+                </div>
+
+                {givingTrend.length > 0 ? (
+                  <div className="bar-chart" role="img" aria-label="Monthly giving totals">
+                    {givingTrend.map((point) => (
+                      <div className="bar-column" key={`${point.year}-${point.month}`}>
+                        <div
+                          className="bar-fill bar-fill--teal"
+                          style={{
+                            height: `${Math.max(
+                              (point.amount / givingChartMax) * 100,
+                              6,
+                            )}%`,
+                          }}
+                          title={`${point.label} ${point.year}: ${point.amount.toLocaleString()}`}
+                        />
+                        <span className="bar-label">{point.label}</span>
+                        <span className="bar-subtitle">{point.year}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="chart-empty">Add giving to see monthly trends.</p>
+                )}
               </div>
             </div>
 
