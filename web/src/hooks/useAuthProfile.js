@@ -45,6 +45,17 @@ export function useAuthProfile() {
     loadProfile(currentUser);
   };
 
+  const refreshUser = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return null;
+
+    await currentUser.reload();
+    // Clone the user object to trigger React updates
+    const updatedUser = { ...currentUser };
+    setUser(updatedUser);
+    return updatedUser;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -68,5 +79,6 @@ export function useAuthProfile() {
     profileLoading,
     profileError,
     reloadProfile,
+    refreshUser,
   };
 }

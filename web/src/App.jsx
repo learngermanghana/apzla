@@ -19,6 +19,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
+  sendEmailVerification,
 } from "firebase/auth";
 import { httpsCallableFromURL } from "firebase/functions";
 
@@ -37,6 +39,7 @@ function App() {
     profileLoading,
     profileError,
     reloadProfile,
+    refreshUser,
   } = useAuthProfile();
 
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
@@ -48,6 +51,12 @@ function App() {
   const [registrationChurchPhone, setRegistrationChurchPhone] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [passwordResetMessage, setPasswordResetMessage] = useState("");
+  const [passwordResetError, setPasswordResetError] = useState("");
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
@@ -456,8 +465,7 @@ function App() {
     if (!trimmedEmail) return "Email is required.";
 
     // Basic email pattern check to avoid immediate Firebase rejection
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(trimmedEmail)) return "Enter a valid email address.";
+    if (!isValidEmail(trimmedEmail)) return "Enter a valid email address.";
 
     if (!password) return "Password is required.";
     if (password.length < 6)
@@ -484,7 +492,24 @@ function App() {
     try {
       setAuthLoading(true);
       setAuthError("");
+      setPasswordResetMessage("");
+      setPasswordResetError("");
+      setVerificationMessage("");
+      setVerificationError("");
       await createUserWithEmailAndPassword(auth, email.trim(), password);
+      if (auth.currentUser) {
+        try {
+          await sendEmailVerification(auth.currentUser);
+          setVerificationMessage(
+            `Verification email sent to ${auth.currentUser.email}. Please confirm to continue.`
+          );
+        } catch (verificationError) {
+          console.error("Verification email error:", verificationError);
+          setVerificationError(
+            verificationError.message || "Unable to send verification email."
+          );
+        }
+      }
       setChurchName(registrationChurchName.trim());
       setChurchAddress(registrationChurchAddress.trim());
       setChurchCity(registrationChurchCity.trim());
@@ -513,6 +538,10 @@ function App() {
     try {
       setAuthLoading(true);
       setAuthError("");
+      setPasswordResetMessage("");
+      setPasswordResetError("");
+      setVerificationMessage("");
+      setVerificationError("");
       await signInWithEmailAndPassword(auth, email.trim(), password);
       setEmail("");
       setPassword("");
@@ -521,6 +550,83 @@ function App() {
       setAuthError(err.message);
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    const trimmedEmail = email.trim();
+    setPasswordResetMessage("");
+    setPasswordResetError("");
+
+    if (!trimmedEmail) {
+      setPasswordResetError("Enter your email to reset your password.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setPasswordResetError("Enter a valid email address.");
+      return;
+    }
+
+    try {
+      setPasswordResetLoading(true);
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setPasswordResetMessage("Password reset email sent. Check your inbox.");
+    } catch (err) {
+      console.error("Password reset error:", err);
+      setPasswordResetError(
+        err.message || "Unable to send password reset email. Please try again."
+      );
+    } finally {
+      setPasswordResetLoading(false);
+    }
+  };
+
+  const handleSendVerificationEmail = async () => {
+    setVerificationMessage("");
+    setVerificationError("");
+
+    if (!auth.currentUser) return;
+
+    try {
+      setVerificationLoading(true);
+      await sendEmailVerification(auth.currentUser);
+      setVerificationMessage(
+        `Verification email sent to ${auth.currentUser.email}. Check your inbox to confirm.`
+      );
+    } catch (err) {
+      console.error("Verification email error:", err);
+      setVerificationError(
+        err.message || "Unable to send verification email. Please try again."
+      );
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  const handleRefreshVerificationStatus = async () => {
+    setVerificationError("");
+    setVerificationMessage("");
+
+    if (!auth.currentUser) return;
+
+    try {
+      setVerificationLoading(true);
+      const updatedUser = await refreshUser();
+      if (updatedUser?.emailVerified) {
+        setVerificationMessage("Email verified! Loading your workspace...");
+      } else {
+        setVerificationMessage(
+          "Please click the verification link in your email, then select refresh."
+        );
+      }
+    } catch (err) {
+      console.error("Verification refresh error:", err);
+      setVerificationError(
+        err.message || "Unable to refresh verification status. Try again."
+      );
+    } finally {
+      setVerificationLoading(false);
     }
   };
 
@@ -1956,6 +2062,9 @@ function App() {
     }
   });
 
+  const isValidEmail = (value) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value || "").trim());
+
   const authValidationMessage = validateAuthInputs();
   const accessStatus = evaluateAccessStatus(churchPlan);
 
@@ -1967,6 +2076,8 @@ function App() {
         setAuthMode={(mode) => {
           setAuthMode(mode);
           setAuthError("");
+          setPasswordResetMessage("");
+          setPasswordResetError("");
         }}
         email={email}
         password={password}
@@ -1977,10 +2088,14 @@ function App() {
         onEmailChange={(e) => {
           setEmail(e.target.value);
           setAuthError("");
+          setPasswordResetMessage("");
+          setPasswordResetError("");
         }}
         onPasswordChange={(e) => {
           setPassword(e.target.value);
           setAuthError("");
+          setPasswordResetMessage("");
+          setPasswordResetError("");
         }}
         onChurchNameChange={(e) => {
           setRegistrationChurchName(e.target.value);
@@ -2003,7 +2118,120 @@ function App() {
         errorMessage={authError}
         disableSubmit={!!authValidationMessage || authLoading}
         validationMessage={authValidationMessage}
+        onForgotPassword={handlePasswordReset}
+        passwordResetMessage={passwordResetMessage}
+        passwordResetError={passwordResetError}
+        passwordResetLoading={passwordResetLoading}
       />
+    );
+  }
+
+  // ---------- UI: email verification required ----------
+  if (user && !user.emailVerified) {
+    const verificationNotice =
+      verificationMessage ||
+      `We sent a verification link to ${user.email}. Confirm your email to keep your account secure.`;
+
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          padding: "20px",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "24px",
+            maxWidth: "520px",
+            width: "100%",
+            boxShadow: "0 15px 30px rgba(15,23,42,0.1)",
+          }}
+        >
+          <h2 style={{ margin: "0 0 8px", fontSize: "22px" }}>
+            Confirm your email
+          </h2>
+          <p style={{ margin: "0 0 14px", color: "#374151", fontSize: "14px" }}>
+            {verificationNotice}
+          </p>
+          <p style={{ margin: "0 0 14px", color: "#6b7280", fontSize: "13px" }}>
+            Tip: check your spam folder if you don&apos;t see the verification email.
+          </p>
+          {verificationError && (
+            <p
+              role="alert"
+              style={{
+                margin: "0 0 10px",
+                color: "#b91c1c",
+                fontSize: "13px",
+                background: "#fef2f2",
+                border: "1px solid #fecdd3",
+                borderRadius: "10px",
+                padding: "10px 12px",
+              }}
+            >
+              {verificationError}
+            </p>
+          )}
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+              marginTop: "8px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleSendVerificationEmail}
+              disabled={verificationLoading}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "10px",
+                border: "none",
+                background: "#4f46e5",
+                color: "white",
+                cursor: verificationLoading ? "default" : "pointer",
+              }}
+            >
+              {verificationLoading ? "Sending..." : "Resend verification"}
+            </button>
+            <button
+              type="button"
+              onClick={handleRefreshVerificationStatus}
+              disabled={verificationLoading}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                background: "white",
+                cursor: verificationLoading ? "default" : "pointer",
+              }}
+            >
+              {verificationLoading ? "Checking..." : "I verified my email"}
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                background: "white",
+                cursor: "pointer",
+              }}
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
