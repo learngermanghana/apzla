@@ -23,6 +23,9 @@
       "dest": "/functions/api/$1.js"
     },
     {
+      "handle": "filesystem"
+    },
+    {
       "src": "/checkin(.*)",
       "dest": "/web/dist/index.html"
     },
