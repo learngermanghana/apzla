@@ -27,6 +27,8 @@ import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
 import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 
+const PREFERRED_BASE_URL = "https://www.apzla.com";
+
 function App() {
   const {
     user,
@@ -118,14 +120,26 @@ function App() {
     [memberAttendanceHistory, memberLookup]
   );
 
+  const normalizeBaseUrl = useCallback(
+    (rawBaseUrl) => {
+      const trimmed = (rawBaseUrl || "").trim();
+      if (!trimmed) return PREFERRED_BASE_URL;
+      if (trimmed.includes("localhost") || trimmed.includes("127.0.0.1")) {
+        return PREFERRED_BASE_URL;
+      }
+      return trimmed.replace(/\/$/, "") || PREFERRED_BASE_URL;
+    },
+    []
+  );
+
   // Attendance
   const [attendance, setAttendance] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
-  const defaultBaseUrl = useMemo(
-    () => (typeof window !== "undefined" ? window.location.origin : ""),
-    []
-  );
+  const defaultBaseUrl = useMemo(() => {
+    if (typeof window === "undefined") return PREFERRED_BASE_URL;
+    return normalizeBaseUrl(window.location.origin || PREFERRED_BASE_URL);
+  }, [normalizeBaseUrl]);
   const [attendanceForm, setAttendanceForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -348,7 +362,9 @@ function App() {
         setCheckinTokenForm((prev) => ({
           ...prev,
           ...parsed,
-          baseUrl: parsed.baseUrl || prev.baseUrl || defaultBaseUrl,
+          baseUrl: normalizeBaseUrl(
+            parsed.baseUrl || prev.baseUrl || defaultBaseUrl
+          ),
           serviceDate: parsed.serviceDate || prev.serviceDate || todayStr,
         }));
         return;
@@ -360,7 +376,7 @@ function App() {
     } catch (err) {
       console.error("Restore check-in token form failed:", err);
     }
-  }, [defaultBaseUrl, todayStr]);
+  }, [defaultBaseUrl, todayStr, normalizeBaseUrl]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -381,9 +397,9 @@ function App() {
     setCheckinTokenForm((prev) => ({
       ...prev,
       churchId: prev.churchId || userProfile?.churchId || "",
-      baseUrl: prev.baseUrl || defaultBaseUrl,
+      baseUrl: normalizeBaseUrl(prev.baseUrl || defaultBaseUrl),
     }));
-  }, [userProfile?.churchId, defaultBaseUrl]);
+  }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrl]);
 
   useEffect(() => {
     const fetchChurchPlan = async () => {
@@ -1182,7 +1198,7 @@ function App() {
       churchId: payload.churchId?.trim(),
       serviceDate: payload.serviceDate,
       serviceType: payload.serviceType?.trim(),
-      baseUrl: payload.baseUrl?.trim() || defaultBaseUrl,
+      baseUrl: normalizeBaseUrl(payload.baseUrl || defaultBaseUrl),
     };
 
     if (!normalizedPayload.churchId || !normalizedPayload.serviceDate) {
