@@ -10,10 +10,12 @@ export function ChurchSetupPanel({
   churchAddress,
   churchCountry,
   churchCity,
+  churchPhone,
   onChangeChurchName,
   onChangeChurchAddress,
   onChangeChurchCountry,
   onChangeChurchCity,
+  onChangeChurchPhone,
   onCreateChurch,
   onLogout,
   loading,
@@ -112,6 +114,12 @@ export function ChurchSetupPanel({
             value={churchCity}
             onChange={onChangeChurchCity}
           />
+          <Input
+            type="text"
+            placeholder="Church phone number"
+            value={churchPhone}
+            onChange={onChangeChurchPhone}
+          />
           <Button
             onClick={onCreateChurch}
             disabled={loading}
@@ -133,10 +141,12 @@ ChurchSetupPanel.propTypes = {
   churchAddress: PropTypes.string.isRequired,
   churchCountry: PropTypes.string.isRequired,
   churchCity: PropTypes.string.isRequired,
+  churchPhone: PropTypes.string.isRequired,
   onChangeChurchName: PropTypes.func.isRequired,
   onChangeChurchAddress: PropTypes.func.isRequired,
   onChangeChurchCountry: PropTypes.func.isRequired,
   onChangeChurchCity: PropTypes.func.isRequired,
+  onChangeChurchPhone: PropTypes.func.isRequired,
   onCreateChurch: PropTypes.func.isRequired,
   onLogout: PropTypes.func.isRequired,
   loading: PropTypes.bool.isRequired,
