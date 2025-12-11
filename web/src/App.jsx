@@ -30,8 +30,7 @@ import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsTab from "./components/tabs/SermonsTab";
 import FollowupTab from "./components/tabs/FollowupTab";
-
-const PREFERRED_BASE_URL = "https://www.apzla.com";
+import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
 
 function App() {
   const {
@@ -134,15 +133,8 @@ function App() {
     [memberAttendanceHistory, memberLookup]
   );
 
-  const normalizeBaseUrl = useCallback(
-    (rawBaseUrl) => {
-      const trimmed = (rawBaseUrl || "").trim();
-      if (!trimmed) return PREFERRED_BASE_URL;
-      if (trimmed.includes("localhost") || trimmed.includes("127.0.0.1")) {
-        return PREFERRED_BASE_URL;
-      }
-      return trimmed.replace(/\/$/, "") || PREFERRED_BASE_URL;
-    },
+  const normalizeBaseUrlMemo = useCallback(
+    (rawBaseUrl) => normalizeBaseUrl(rawBaseUrl),
     []
   );
 
@@ -152,8 +144,8 @@ function App() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const defaultBaseUrl = useMemo(() => {
     if (typeof window === "undefined") return PREFERRED_BASE_URL;
-    return normalizeBaseUrl(window.location.origin || PREFERRED_BASE_URL);
-  }, [normalizeBaseUrl]);
+    return normalizeBaseUrlMemo(window.location.origin || PREFERRED_BASE_URL);
+  }, [normalizeBaseUrlMemo]);
   const [attendanceForm, setAttendanceForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -217,12 +209,11 @@ function App() {
   });
   const onlineGivingLink = useMemo(() => {
     if (!userProfile?.churchId) return "";
-    const preferredBase = "https://www.apzla.com";
-    const origin = typeof window !== "undefined" ? window.location.origin : preferredBase;
-    const baseUrl = origin.includes("localhost") ? preferredBase : origin || preferredBase;
-    const normalizedBase = baseUrl.replace(/\/$/, "");
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : PREFERRED_BASE_URL;
+    const normalizedBase = normalizeBaseUrlMemo(origin);
     return `${normalizedBase}/give/${userProfile.churchId}`;
-  }, [userProfile?.churchId]);
+  }, [userProfile?.churchId, normalizeBaseUrlMemo]);
 
   const onlineGivingQrUrl = useMemo(() => {
     if (!onlineGivingLink) return "";
@@ -376,7 +367,7 @@ function App() {
         setCheckinTokenForm((prev) => ({
           ...prev,
           ...parsed,
-          baseUrl: normalizeBaseUrl(
+          baseUrl: normalizeBaseUrlMemo(
             parsed.baseUrl || prev.baseUrl || defaultBaseUrl
           ),
           serviceDate: parsed.serviceDate || prev.serviceDate || todayStr,
@@ -390,7 +381,7 @@ function App() {
     } catch (err) {
       console.error("Restore check-in token form failed:", err);
     }
-  }, [defaultBaseUrl, todayStr, normalizeBaseUrl]);
+  }, [defaultBaseUrl, todayStr, normalizeBaseUrlMemo]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -411,9 +402,9 @@ function App() {
     setCheckinTokenForm((prev) => ({
       ...prev,
       churchId: prev.churchId || userProfile?.churchId || "",
-      baseUrl: normalizeBaseUrl(prev.baseUrl || defaultBaseUrl),
+      baseUrl: normalizeBaseUrlMemo(prev.baseUrl || defaultBaseUrl),
     }));
-  }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrl]);
+  }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrlMemo]);
 
   useEffect(() => {
     const fetchChurchPlan = async () => {
@@ -1331,7 +1322,7 @@ function App() {
       churchId: payload.churchId?.trim(),
       serviceDate: payload.serviceDate,
       serviceType: payload.serviceType?.trim(),
-      baseUrl: normalizeBaseUrl(payload.baseUrl || defaultBaseUrl),
+      baseUrl: normalizeBaseUrlMemo(payload.baseUrl || defaultBaseUrl),
     };
 
     if (!normalizedPayload.churchId || !normalizedPayload.serviceDate) {
