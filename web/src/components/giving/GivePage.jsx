@@ -48,6 +48,19 @@ export default function GivePage() {
     return churchId ? `${normalizedBase}/give/${churchId}` : "";
   }, [churchId]);
 
+  const onlineGivingStatus = church?.onlineGivingStatus || "NOT_CONFIGURED";
+  const onlineGivingReady =
+    onlineGivingStatus === "ACTIVE" && !!church?.onlineGivingSubaccount;
+  const onlineGivingStatusMessage =
+    onlineGivingStatus === "PENDING_REVIEW"
+      ? "Online giving is pending review. The church admin will enable this link once approved."
+      : onlineGivingStatus === "REJECTED"
+        ? "Online giving was rejected. Please contact the church admin for assistance."
+        : onlineGivingStatus === "NOT_CONFIGURED"
+          ? "Online giving is not active yet. Please contact the church admin to apply."
+          : "";
+  const onlineGivingStatusTone = onlineGivingStatus === "REJECTED" ? "error" : "info";
+
   useEffect(() => {
     if (!churchId) {
       setFetchError("No church ID was provided in this link.");
@@ -115,6 +128,14 @@ export default function GivePage() {
       return;
     }
 
+    if (!onlineGivingReady) {
+      setStatus({
+        tone: "error",
+        message: "Online giving is not active for this church yet.",
+      });
+      return;
+    }
+
     const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
     if (!paystackKey) {
       setStatus({
@@ -140,6 +161,8 @@ export default function GivePage() {
         amount: Math.round(numericAmount * 100),
         currency: "GHS",
         ref: reference,
+        subaccount: church?.onlineGivingSubaccount,
+        bearer: "subaccount",
         metadata: {
           churchId,
           churchName: church?.name || churchId,
@@ -210,6 +233,10 @@ export default function GivePage() {
         ) : fetchError ? (
           <StatusBanner tone="error" message={fetchError} />
         ) : null}
+
+        {!onlineGivingReady && !loadingChurch && !fetchError && onlineGivingStatusMessage && (
+          <StatusBanner tone={onlineGivingStatusTone} message={onlineGivingStatusMessage} />
+        )}
 
         {givingLink && (
           <div className="give-link-box">{givingLink}</div>
@@ -295,12 +322,30 @@ export default function GivePage() {
           </div>
 
           <div style={{ gridColumn: "1 / -1" }}>
-            <button className="give-button" type="submit" disabled={submitting || !!fetchError}>
-              {submitting ? "Opening Paystack..." : "Pay with Paystack"}
-            </button>
-            <p className="give-note">
-              Paystack will charge your card and send the funds to the church account set by the admin.
-            </p>
+            {onlineGivingReady ? (
+              <>
+                <button
+                  className="give-button"
+                  type="submit"
+                  disabled={submitting || !!fetchError}
+                >
+                  {submitting ? "Opening Paystack..." : "Pay with Paystack"}
+                </button>
+                <p className="give-note">
+                  Paystack will charge your card and send the funds to the church account set by the
+                  admin.
+                </p>
+              </>
+            ) : (
+              <>
+                <button className="give-button" type="button" disabled>
+                  Online giving not enabled yet
+                </button>
+                <p className="give-note">
+                  This church is collecting online payments after Apzla finishes the review.
+                </p>
+              </>
+            )}
           </div>
         </form>
       </div>

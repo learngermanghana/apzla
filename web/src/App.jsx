@@ -167,6 +167,21 @@ function App() {
   const [givingPageCursor, setGivingPageCursor] = useState(null);
   const [givingHasMore, setGivingHasMore] = useState(true);
   const [givingMemberFilter, setGivingMemberFilter] = useState("");
+  const [onlineGivingStatus, setOnlineGivingStatus] = useState("NOT_CONFIGURED");
+  const [onlineGivingSubaccount, setOnlineGivingSubaccount] = useState(null);
+  const [onlineGivingAppliedAt, setOnlineGivingAppliedAt] = useState(null);
+  const [onlineGivingReviewedAt, setOnlineGivingReviewedAt] = useState(null);
+  const [onlineGivingReviewedBy, setOnlineGivingReviewedBy] = useState(null);
+  const [onlineGivingForm, setOnlineGivingForm] = useState({
+    bankName: "",
+    accountName: "",
+    accountNumber: "",
+    branchOrMomo: "",
+    contactName: "",
+    contactPhone: "",
+    confirmDetails: false,
+  });
+  const [onlineGivingActionLoading, setOnlineGivingActionLoading] = useState(false);
   const [givingForm, setGivingForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -190,6 +205,24 @@ function App() {
       onlineGivingLink
     )}`;
   }, [onlineGivingLink]);
+
+  const onlineGivingActive = onlineGivingStatus === "ACTIVE";
+  const onlineGivingPending = onlineGivingStatus === "PENDING_REVIEW";
+  const onlineGivingRejected = onlineGivingStatus === "REJECTED";
+  const onlineGivingStatusLabel = onlineGivingActive
+    ? "Active"
+    : onlineGivingPending
+      ? "Pending review"
+      : onlineGivingRejected
+        ? "Rejected"
+        : "Not configured";
+  const onlineGivingStatusBadge = onlineGivingActive
+    ? { bg: "#ecfdf3", color: "#166534", border: "#bbf7d0" }
+    : onlineGivingPending
+      ? { bg: "#fef9c3", color: "#854d0e", border: "#fef08a" }
+      : onlineGivingRejected
+        ? { bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" }
+        : { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" };
 
   // Sermons
   const [sermons, setSermons] = useState([]);
@@ -293,6 +326,14 @@ function App() {
     }, 4200);
   };
 
+  const syncOnlineGivingState = (data) => {
+    setOnlineGivingStatus(data?.onlineGivingStatus || "NOT_CONFIGURED");
+    setOnlineGivingSubaccount(data?.onlineGivingSubaccount || null);
+    setOnlineGivingAppliedAt(data?.onlineGivingAppliedAt || null);
+    setOnlineGivingReviewedAt(data?.onlineGivingReviewedAt || null);
+    setOnlineGivingReviewedBy(data?.onlineGivingReviewedBy || null);
+  };
+
   // ---------- Persist check-in token form ----------
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -345,6 +386,7 @@ function App() {
       if (!userProfile?.churchId) {
         setChurchPlan(null);
         setSubscriptionInfo(null);
+        syncOnlineGivingState(null);
         return;
       }
 
@@ -367,9 +409,11 @@ function App() {
             trialStartedAt: data.trialStartedAt || null,
             trialEndsAt: data.trialEndsAt || null,
           });
+          syncOnlineGivingState(data);
         } else {
           setChurchPlan(null);
           setSubscriptionInfo(null);
+          syncOnlineGivingState(null);
         }
       } catch (error) {
         console.error("Load church plan error:", error);
@@ -489,6 +533,7 @@ function App() {
         });
 
         setChurchPlan({ id: userProfile.churchId, ...data });
+        syncOnlineGivingState(data);
       }
     } catch (err) {
       console.error("Load church settings error:", err);
@@ -717,6 +762,11 @@ function App() {
         trialStartedAt: trialStart.toISOString(),
         trialEndsAt: trialEnd.toISOString(),
         subscriptionStatus: "TRIAL",
+        onlineGivingStatus: "NOT_CONFIGURED",
+        onlineGivingSubaccount: null,
+        onlineGivingAppliedAt: null,
+        onlineGivingReviewedAt: null,
+        onlineGivingReviewedBy: null,
       });
 
       const churchId = churchRef.id;
@@ -742,6 +792,11 @@ function App() {
         trialStartedAt: trialStart.toISOString(),
         trialEndsAt: trialEnd.toISOString(),
         subscriptionStatus: "TRIAL",
+        onlineGivingStatus: "NOT_CONFIGURED",
+        onlineGivingSubaccount: null,
+        onlineGivingAppliedAt: null,
+        onlineGivingReviewedAt: null,
+        onlineGivingReviewedBy: null,
       });
 
       setSubscriptionInfo({
@@ -755,6 +810,8 @@ function App() {
         trialStartedAt: trialStart.toISOString(),
         trialEndsAt: trialEnd.toISOString(),
       });
+
+      syncOnlineGivingState({ onlineGivingStatus: "NOT_CONFIGURED" });
 
       setUserProfile({
         id: user.uid,
@@ -1417,6 +1474,92 @@ function App() {
       showToast("Unable to refresh dashboard data.", "error");
     } finally {
       setOverviewMetricsLoading(false);
+    }
+  };
+
+  // ---------- Online giving application ----------
+  const handleSubmitOnlineGivingApplication = async () => {
+    if (!userProfile?.churchId) {
+      showToast("Link a church before applying for online giving.", "error");
+      return;
+    }
+
+    const requiredFields = [
+      { key: "bankName", label: "Bank name" },
+      { key: "accountName", label: "Account name" },
+      { key: "accountNumber", label: "Account number" },
+      { key: "contactName", label: "Contact person" },
+      { key: "contactPhone", label: "Contact phone" },
+    ];
+
+    const missing = requiredFields.find((field) => !onlineGivingForm[field.key].trim());
+    if (missing) {
+      showToast(`${missing.label} is required.`, "error");
+      return;
+    }
+
+    if (!onlineGivingForm.confirmDetails) {
+      showToast("Please confirm the settlement details are correct.", "error");
+      return;
+    }
+
+    try {
+      setOnlineGivingActionLoading(true);
+      const nowIso = new Date().toISOString();
+
+      await addDoc(collection(db, "onlineGivingApplications"), {
+        churchId: userProfile.churchId,
+        bankName: onlineGivingForm.bankName.trim(),
+        accountName: onlineGivingForm.accountName.trim(),
+        accountNumber: onlineGivingForm.accountNumber.trim(),
+        branchOrMomo: onlineGivingForm.branchOrMomo.trim() || null,
+        contactName: onlineGivingForm.contactName.trim(),
+        contactPhone: onlineGivingForm.contactPhone.trim(),
+        createdAt: nowIso,
+        status: "PENDING",
+      });
+
+      await updateDoc(doc(db, "churches", userProfile.churchId), {
+        onlineGivingStatus: "PENDING_REVIEW",
+        onlineGivingSubaccount: null,
+        onlineGivingAppliedAt: nowIso,
+        onlineGivingReviewedAt: null,
+        onlineGivingReviewedBy: null,
+      });
+
+      setOnlineGivingStatus("PENDING_REVIEW");
+      setOnlineGivingSubaccount(null);
+      setOnlineGivingAppliedAt(nowIso);
+      setOnlineGivingReviewedAt(null);
+      setOnlineGivingReviewedBy(null);
+      setChurchPlan((prev) =>
+        prev
+          ? {
+              ...prev,
+              onlineGivingStatus: "PENDING_REVIEW",
+              onlineGivingSubaccount: null,
+              onlineGivingAppliedAt: nowIso,
+              onlineGivingReviewedAt: null,
+              onlineGivingReviewedBy: null,
+            }
+          : prev,
+      );
+      setOnlineGivingForm({
+        bankName: "",
+        accountName: "",
+        accountNumber: "",
+        branchOrMomo: "",
+        contactName: "",
+        contactPhone: "",
+        confirmDetails: false,
+      });
+
+      showToast("Your online giving application was submitted.", "success");
+    } catch (err) {
+      console.error("Submit online giving application error:", err);
+      showToast(err.message || "Unable to submit your application.", "error");
+    } finally {
+      setOnlineGivingActionLoading(false);
     }
   };
 
@@ -4361,6 +4504,323 @@ function App() {
                 borderRadius: "12px",
                 padding: "16px",
                 marginBottom: "16px",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Online giving (Paystack)
+                  </p>
+                  <p style={{ margin: 0, color: "#111827", fontWeight: 600 }}>
+                    Let members pay tithes and offerings online.
+                  </p>
+                </div>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    background: onlineGivingStatusBadge.bg,
+                    color: onlineGivingStatusBadge.color,
+                    border: `1px solid ${onlineGivingStatusBadge.border}`,
+                    borderRadius: "999px",
+                    padding: "6px 12px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {onlineGivingStatusLabel}
+                </span>
+              </div>
+
+              {onlineGivingActive ? (
+                <div
+                  style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "1px solid #bbf7d0",
+                    background: "#ecfdf3",
+                    color: "#166534",
+                  }}
+                >
+                  <p style={{ margin: "0 0 6px", fontWeight: 700 }}>
+                    Online giving is active.
+                  </p>
+                  <p style={{ margin: "0 0 6px" }}>
+                    Paystack payments will settle to subaccount
+                    <strong> {onlineGivingSubaccount || "(missing code)"}</strong>.
+                  </p>
+                  {(onlineGivingReviewedAt || onlineGivingReviewedBy) && (
+                    <p style={{ margin: 0, fontSize: "13px", color: "#065f46" }}>
+                      Approved {onlineGivingReviewedAt ? `on ${new Date(onlineGivingReviewedAt).toLocaleString()}` : ""}
+                      {onlineGivingReviewedBy ? ` by ${onlineGivingReviewedBy}` : ""}.
+                    </p>
+                  )}
+                </div>
+              ) : onlineGivingPending ? (
+                <div
+                  style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "1px solid #fef08a",
+                    background: "#fefce8",
+                    color: "#854d0e",
+                  }}
+                >
+                  <p style={{ margin: "0 0 6px", fontWeight: 700 }}>
+                    Online giving application submitted.
+                  </p>
+                  <p style={{ margin: "0 0 8px" }}>
+                    Your online giving application has been received. We’ll review and
+                    enable your giving link soon.
+                  </p>
+                  {onlineGivingAppliedAt && (
+                    <p style={{ margin: 0, fontSize: "13px" }}>
+                      Submitted on {new Date(onlineGivingAppliedAt).toLocaleString()}.
+                    </p>
+                  )}
+                  <p style={{ margin: "12px 0 0", fontSize: "13px" }}>
+                    Permanent giving link (will work after approval): {onlineGivingLink || "--"}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {onlineGivingRejected && (
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "10px",
+                        border: "1px solid #fecdd3",
+                        background: "#fef2f2",
+                        color: "#991b1b",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Previous application was rejected. Update your details below and
+                      apply again.
+                    </div>
+                  )}
+
+                  <p style={{ margin: "0 0 4px", color: "#374151" }}>
+                    Submit your settlement details to request Paystack activation.
+                  </p>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSubmitOnlineGivingApplication();
+                    }}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                      gap: "12px",
+                    }}
+                  >
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Bank name</span>
+                      <input
+                        type="text"
+                        value={onlineGivingForm.bankName}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            bankName: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Account name</span>
+                      <input
+                        type="text"
+                        value={onlineGivingForm.accountName}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            accountName: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Account number</span>
+                      <input
+                        type="text"
+                        value={onlineGivingForm.accountNumber}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            accountNumber: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Branch / MoMo details (optional)</span>
+                      <input
+                        type="text"
+                        value={onlineGivingForm.branchOrMomo}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            branchOrMomo: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Contact person</span>
+                      <input
+                        type="text"
+                        value={onlineGivingForm.contactName}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            contactName: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Contact phone</span>
+                      <input
+                        type="text"
+                        value={onlineGivingForm.contactPhone}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            contactPhone: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </label>
+
+                    <label
+                      style={{
+                        gridColumn: "1 / -1",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "13px",
+                        color: "#374151",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={onlineGivingForm.confirmDetails}
+                        onChange={(e) =>
+                          setOnlineGivingForm((prev) => ({
+                            ...prev,
+                            confirmDetails: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span>I confirm these are the correct details for settlements.</span>
+                    </label>
+
+                    <div style={{ gridColumn: "1 / -1", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                      <button
+                        type="submit"
+                        disabled={onlineGivingActionLoading}
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          border: "1px solid #111827",
+                          background: "#111827",
+                          color: "white",
+                          fontWeight: 700,
+                          cursor: onlineGivingActionLoading ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {onlineGivingActionLoading ? "Submitting..." : "Apply for online giving"}
+                      </button>
+                      <a
+                        href="https://docs.google.com/forms/d/e/1FAIpQLScK188HUoj7BW8E11Kf42CYrYpJuM4cVi2No577Rt4VmNWJIw/viewform?usp=publish-editor"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          fontSize: "13px",
+                          color: "#1d4ed8",
+                          textDecoration: "underline",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Prefer Google Forms? Fill it instead
+                      </a>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "16px",
+                marginBottom: "16px",
                 display: "flex",
                 gap: "16px",
                 flexWrap: "wrap",
@@ -4396,8 +4856,9 @@ function App() {
                   </p>
                 )}
                 <p style={{ color: "#6b7280", fontSize: "13px", margin: "0 0 10px" }}>
-                  Share this permanent link on WhatsApp, flyers, projector slides,
-                  or your website so members can give online.
+                  {onlineGivingActive
+                    ? "Share this permanent link on WhatsApp, flyers, projector slides, or your website so members can give online."
+                    : "Permanent giving link (will work after approval). You can still share it so members know where to give once it is enabled."}
                 </p>
 
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
