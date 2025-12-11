@@ -25,6 +25,10 @@ export function AuthPanel({
   errorMessage,
   disableSubmit,
   validationMessage,
+  onForgotPassword,
+  passwordResetMessage,
+  passwordResetError,
+  passwordResetLoading,
 }) {
   const inlineError = errorMessage || validationMessage;
 
@@ -233,18 +237,38 @@ export function AuthPanel({
               onChange={onEmailChange}
               style={{ background: "#f8fafc" }}
             />
-            <Input
-              type="password"
-              placeholder="Password (min 6 characters)"
-              value={password}
-              onChange={onPasswordChange}
-              style={{ background: "#f8fafc" }}
-            />
-            {authMode === "register" && (
-              <>
-                <Input
-                  type="text"
-                  placeholder="Church name"
+          <Input
+            type="password"
+            placeholder="Password (min 6 characters)"
+            value={password}
+            onChange={onPasswordChange}
+            style={{ background: "#f8fafc" }}
+          />
+          {authMode === "login" && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                disabled={passwordResetLoading}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#4f46e5",
+                  cursor: passwordResetLoading ? "default" : "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  padding: "2px 0",
+                }}
+              >
+                {passwordResetLoading ? "Sending reset email..." : "Forgot password?"}
+              </button>
+            </div>
+          )}
+          {authMode === "register" && (
+            <>
+              <Input
+                type="text"
+                placeholder="Church name"
                   value={churchName}
                   onChange={onChurchNameChange}
                   style={{ background: "#f8fafc" }}
@@ -272,11 +296,11 @@ export function AuthPanel({
                 />
               </>
             )}
-            {inlineError && (
-              <p
-                role="alert"
-                style={{
-                  margin: 0,
+          {inlineError && (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
                   color: "#b91c1c",
                   fontSize: "13px",
                   background: "#fef2f2",
@@ -284,15 +308,46 @@ export function AuthPanel({
                   borderRadius: "10px",
                   padding: "10px 12px",
                 }}
-              >
-                {inlineError}
-              </p>
-            )}
-            <Button
-              onClick={onSubmit}
-              disabled={disableSubmit}
-              fullWidth
-              style={{ marginTop: "8px" }}
+            >
+              {inlineError}
+            </p>
+          )}
+          {authMode === "login" && passwordResetMessage && (
+            <p
+              style={{
+                margin: 0,
+                color: "#166534",
+                fontSize: "13px",
+                background: "#ecfdf3",
+                border: "1px solid #bbf7d0",
+                borderRadius: "10px",
+                padding: "10px 12px",
+              }}
+            >
+              {passwordResetMessage}
+            </p>
+          )}
+          {authMode === "login" && passwordResetError && (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
+                color: "#b91c1c",
+                fontSize: "13px",
+                background: "#fef2f2",
+                border: "1px solid #fecdd3",
+                borderRadius: "10px",
+                padding: "10px 12px",
+              }}
+            >
+              {passwordResetError}
+            </p>
+          )}
+          <Button
+            onClick={onSubmit}
+            disabled={disableSubmit}
+            fullWidth
+            style={{ marginTop: "8px" }}
             >
               {loading
                 ? "Working..."
@@ -338,6 +393,10 @@ AuthPanel.propTypes = {
   errorMessage: PropTypes.string,
   disableSubmit: PropTypes.bool,
   validationMessage: PropTypes.string,
+  onForgotPassword: PropTypes.func,
+  passwordResetMessage: PropTypes.string,
+  passwordResetError: PropTypes.string,
+  passwordResetLoading: PropTypes.bool,
 };
 
 AuthPanel.defaultProps = {
@@ -352,6 +411,10 @@ AuthPanel.defaultProps = {
   onChurchAddressChange: undefined,
   onChurchCityChange: undefined,
   onChurchPhoneChange: undefined,
+  onForgotPassword: undefined,
+  passwordResetMessage: "",
+  passwordResetError: "",
+  passwordResetLoading: false,
 };
 
 export default AuthPanel;
