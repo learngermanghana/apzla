@@ -1,6 +1,5 @@
 {
-  "version": 2,
-  "builds": [
+  "functions": [
     {
       "src": "functions/api/**/*.js",
       "use": "@vercel/node"
@@ -23,19 +22,16 @@
       "dest": "/functions/api/$1.js"
     },
     {
-      "handle": "filesystem"
-    },
-    {
       "src": "/checkin(.*)",
-      "dest": "/web/dist/index.html"
+      "dest": "/web/index.html"
     },
     {
       "src": "/give(.*)",
-      "dest": "/web/dist/index.html"
+      "dest": "/web/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/web/dist/$1"
+      "dest": "/web/$1"
     }
   ]
 }
