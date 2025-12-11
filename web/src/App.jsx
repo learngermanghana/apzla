@@ -30,6 +30,8 @@ import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsTab from "./components/tabs/SermonsTab";
 import FollowupTab from "./components/tabs/FollowupTab";
+import AccountSettingsModal from "./components/account/AccountSettingsModal";
+import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
 
 function App() {
@@ -341,6 +343,10 @@ function App() {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 4200);
   };
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   const syncOnlineGivingState = (data) => {
     setPayoutStatus(data?.payoutStatus || data?.onlineGivingStatus || "NOT_CONFIGURED");
@@ -2512,230 +2518,19 @@ function App() {
           "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      <div className="toast-container">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`toast toast-${toast.variant}`}
-          >
-            <span className="toast-message">{toast.message}</span>
-            <button
-              onClick={() =>
-                setToasts((prev) => prev.filter((t) => t.id !== toast.id))
-              }
-              aria-label="Dismiss toast"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
-      {showAccountSettings && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal-card">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: "12px",
-                marginBottom: "16px",
-              }}
-            >
-              <div>
-                <p className="modal-pill">Account &amp; Billing</p>
-                <h2 style={{ margin: "4px 0", fontSize: "20px" }}>
-                  Manage church profile and subscription
-                </h2>
-                <p style={{ margin: 0, color: "#4b5563", fontSize: "13px" }}>
-                  Update how your church appears and renew your monthly plan
-                  (GHS 120/month billed through Paystack).
-                </p>
-              </div>
-              <button
-                onClick={() => setShowAccountSettings(false)}
-                style={{
-                  border: "none",
-                  background: "#e5e7eb",
-                  color: "#111827",
-                  borderRadius: "12px",
-                  padding: "6px 10px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="modal-grid">
-              <div className="modal-section">
-                <div className="modal-section-header">
-                  <div>
-                    <p className="modal-label">Church profile</p>
-                    <h3 className="modal-title">Basics</h3>
-                  </div>
-                  <span className="modal-chip">Editable</span>
-                </div>
-
-                <div className="modal-form-grid">
-                  <label className="modal-field">
-                    <span>Church name</span>
-                    <input
-                      type="text"
-                      value={churchSettings.name}
-                      onChange={(e) =>
-                        setChurchSettings((prev) => ({
-                          ...prev,
-                          name: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. Grace Chapel International"
-                    />
-                  </label>
-                  <label className="modal-field">
-                    <span>Address</span>
-                    <input
-                      type="text"
-                      value={churchSettings.address}
-                      onChange={(e) =>
-                        setChurchSettings((prev) => ({
-                          ...prev,
-                          address: e.target.value,
-                        }))
-                      }
-                      placeholder="Street address"
-                    />
-                  </label>
-                  <label className="modal-field">
-                    <span>Country</span>
-                    <input
-                      type="text"
-                      value={churchSettings.country}
-                      onChange={(e) =>
-                        setChurchSettings((prev) => ({
-                          ...prev,
-                          country: e.target.value,
-                        }))
-                      }
-                      placeholder="Country"
-                    />
-                  </label>
-                  <label className="modal-field">
-                    <span>City</span>
-                    <input
-                      type="text"
-                      value={churchSettings.city}
-                      onChange={(e) =>
-                        setChurchSettings((prev) => ({
-                          ...prev,
-                          city: e.target.value,
-                        }))
-                      }
-                      placeholder="City"
-                    />
-                  </label>
-                  <label className="modal-field">
-                    <span>Phone</span>
-                    <input
-                      type="text"
-                      value={churchSettings.phone}
-                      onChange={(e) =>
-                        setChurchSettings((prev) => ({
-                          ...prev,
-                          phone: e.target.value,
-                        }))
-                      }
-                      placeholder="Church phone number"
-                    />
-                  </label>
-                </div>
-
-                <button
-                  onClick={handleSaveChurchSettings}
-                  disabled={accountLoading}
-                  style={{
-                    background: accountLoading ? "#e5e7eb" : "#111827",
-                    color: accountLoading ? "#6b7280" : "white",
-                    border: "none",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    cursor: accountLoading ? "not-allowed" : "pointer",
-                    fontWeight: 600,
-                    width: "100%",
-                    marginTop: "10px",
-                  }}
-                >
-                  {accountLoading ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-
-              <div className="modal-section">
-                <div className="modal-section-header">
-                  <div>
-                    <p className="modal-label">Subscription</p>
-                    <h3 className="modal-title">Monthly plan</h3>
-                  </div>
-                  <span className="modal-chip chip-green">GHS 120/mo</span>
-                </div>
-
-                <div className="subscription-card">
-                  <div>
-                    <p className="subscription-status">
-                      Status: {subscriptionInfo?.status || "INACTIVE"}
-                    </p>
-                    <p className="subscription-meta">
-                      Plan: {subscriptionInfo?.plan || "Monthly (GHS 120)"}
-                    </p>
-                    <p className="subscription-meta">
-                      {subscriptionInfo?.status === "TRIAL"
-                        ? "Trial ends:"
-                        : "Next renewal:"}
-                      {subscriptionInfo?.expiresAt
-                        ? ` ${new Date(
-                            subscriptionInfo.expiresAt,
-                          ).toLocaleDateString()}`
-                        : subscriptionInfo?.trialEndsAt
-                          ? ` ${new Date(
-                              subscriptionInfo.trialEndsAt,
-                            ).toLocaleDateString()}`
-                          : " Not set"}
-                    </p>
-                    {subscriptionInfo?.reference && (
-                      <p className="subscription-meta">
-                        Reference: {subscriptionInfo.reference}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={handlePaystackSubscription}
-                    disabled={paystackLoading}
-                    style={{
-                      background: paystackLoading ? "#e5e7eb" : "#16a34a",
-                      color: paystackLoading ? "#6b7280" : "white",
-                      border: "none",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      cursor: paystackLoading ? "not-allowed" : "pointer",
-                      fontWeight: 700,
-                      width: "100%",
-                    }}
-                    >
-                    {paystackLoading
-                      ? "Opening Paystack..."
-                      : "Pay monthly subscription (GHS 120)"}
-                  </button>
-                  <p className="subscription-footnote">
-                    Powered by Paystack. Billing renews monthly at GHS 120.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AccountSettingsModal
+        visible={showAccountSettings}
+        churchSettings={churchSettings}
+        setChurchSettings={setChurchSettings}
+        accountLoading={accountLoading}
+        subscriptionInfo={subscriptionInfo}
+        paystackLoading={paystackLoading}
+        onClose={() => setShowAccountSettings(false)}
+        onSaveChurchSettings={handleSaveChurchSettings}
+        onStartSubscription={handlePaystackSubscription}
+      />
 
       {accessStatus.state === "expired" && (
         <div
