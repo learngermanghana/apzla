@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, doc, getDoc } from "firebase/firestore";
 import StatusBanner from "../StatusBanner";
 import { db } from "../../firebase";
+import { PREFERRED_BASE_URL, normalizeBaseUrl } from "../../utils/baseUrl";
 import "./give.css";
 
 const GIVE_TYPES = ["Tithe", "Offering", "Special"];
@@ -41,10 +42,9 @@ export default function GivePage() {
   });
 
   const givingLink = useMemo(() => {
-    const preferredBase = "https://www.apzla.com";
-    const origin = typeof window !== "undefined" ? window.location.origin : preferredBase;
-    const baseUrl = origin.includes("localhost") ? preferredBase : origin || preferredBase;
-    const normalizedBase = baseUrl.replace(/\/$/, "");
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : PREFERRED_BASE_URL;
+    const normalizedBase = normalizeBaseUrl(origin);
     return churchId ? `${normalizedBase}/give/${churchId}` : "";
   }, [churchId]);
 
