@@ -35,7 +35,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/web/dist/index.html"
+      "dest": "/web/dist/$1"
     }
   ]
 }
