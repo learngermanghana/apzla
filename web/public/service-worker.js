@@ -1,4 +1,4 @@
-const CACHE_NAME = "apzla-offline-v3";
+const CACHE_NAME = "apzla-offline-v4";
 const OFFLINE_URL = "/offline.html";
 const ASSETS_TO_CACHE = [
   OFFLINE_URL,
@@ -42,6 +42,11 @@ self.addEventListener("fetch", (event) => {
   const requestURL = new URL(event.request.url);
   if (requestURL.origin !== self.location.origin) return;
 
+  // Avoid interfering with source map requests so developer tools can fall
+  // back to the network (or show the native 404) instead of receiving the
+  // offline HTML page, which causes JSON parse errors in the console.
+  if (event.request.url.endsWith(".map")) return;
+
   if (event.request.mode === "navigate") {
     event.respondWith(
       (async () => {
@@ -62,16 +67,19 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
+      const cache = await caches.open(CACHE_NAME);
       const cached = await caches.match(event.request);
       if (cached) return cached;
 
       try {
         const response = await fetch(event.request);
-        const cache = await caches.open(CACHE_NAME);
         cache.put(event.request, response.clone());
         return response;
       } catch (error) {
-        return caches.match(OFFLINE_URL);
+        // Propagate the original failure instead of returning the offline
+        // shell for non-navigation requests (e.g., source maps or JSON). This
+        // prevents HTML fallbacks from breaking developer tooling.
+        throw error;
       }
     })()
   );
