@@ -27,6 +27,10 @@
       "dest": "/web/index.html"
     },
     {
+      "src": "/give(.*)",
+      "dest": "/web/index.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/web/$1"
     }
