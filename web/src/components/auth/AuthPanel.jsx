@@ -13,11 +13,13 @@ export function AuthPanel({
   churchName,
   churchAddress,
   churchCity,
+  churchPhone,
   onEmailChange,
   onPasswordChange,
   onChurchNameChange,
   onChurchAddressChange,
   onChurchCityChange,
+  onChurchPhoneChange,
   onSubmit,
   loading,
   errorMessage,
@@ -261,6 +263,13 @@ export function AuthPanel({
                   onChange={onChurchCityChange}
                   style={{ background: "#f8fafc" }}
                 />
+                <Input
+                  type="text"
+                  placeholder="Church phone number"
+                  value={churchPhone}
+                  onChange={onChurchPhoneChange}
+                  style={{ background: "#f8fafc" }}
+                />
               </>
             )}
             {inlineError && (
@@ -317,11 +326,13 @@ AuthPanel.propTypes = {
   churchName: PropTypes.string,
   churchAddress: PropTypes.string,
   churchCity: PropTypes.string,
+  churchPhone: PropTypes.string,
   onEmailChange: PropTypes.func.isRequired,
   onPasswordChange: PropTypes.func.isRequired,
   onChurchNameChange: PropTypes.func,
   onChurchAddressChange: PropTypes.func,
   onChurchCityChange: PropTypes.func,
+  onChurchPhoneChange: PropTypes.func,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool.isRequired,
   errorMessage: PropTypes.string,
@@ -336,9 +347,11 @@ AuthPanel.defaultProps = {
   churchName: "",
   churchAddress: "",
   churchCity: "",
+  churchPhone: "",
   onChurchNameChange: undefined,
   onChurchAddressChange: undefined,
   onChurchCityChange: undefined,
+  onChurchPhoneChange: undefined,
 };
 
 export default AuthPanel;

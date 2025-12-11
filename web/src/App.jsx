@@ -43,6 +43,7 @@ function App() {
   const [registrationChurchName, setRegistrationChurchName] = useState("");
   const [registrationChurchAddress, setRegistrationChurchAddress] = useState("");
   const [registrationChurchCity, setRegistrationChurchCity] = useState("");
+  const [registrationChurchPhone, setRegistrationChurchPhone] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,6 +55,7 @@ function App() {
     address: "",
     country: "",
     city: "",
+    phone: "",
   });
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [churchPlan, setChurchPlan] = useState(null);
@@ -75,6 +77,7 @@ function App() {
   const [churchAddress, setChurchAddress] = useState("");
   const [churchCountry, setChurchCountry] = useState("Ghana");
   const [churchCity, setChurchCity] = useState("");
+  const [churchPhone, setChurchPhone] = useState("");
 
   // Members (CRM)
   const [members, setMembers] = useState([]);
@@ -449,6 +452,7 @@ function App() {
       if (!registrationChurchAddress.trim())
         return "Church address is required.";
       if (!registrationChurchCity.trim()) return "City is required.";
+      if (!registrationChurchPhone.trim()) return "Church phone is required.";
     }
 
     return "";
@@ -468,11 +472,13 @@ function App() {
       setChurchName(registrationChurchName.trim());
       setChurchAddress(registrationChurchAddress.trim());
       setChurchCity(registrationChurchCity.trim());
+      setChurchPhone(registrationChurchPhone.trim());
       setEmail("");
       setPassword("");
       setRegistrationChurchName("");
       setRegistrationChurchAddress("");
       setRegistrationChurchCity("");
+      setRegistrationChurchPhone("");
     } catch (err) {
       console.error("Register error:", err);
       setAuthError(err.message);
@@ -522,6 +528,7 @@ function App() {
           address: data.address || "",
           country: data.country || "",
           city: data.city || "",
+          phone: data.phone || "",
         });
 
         setSubscriptionInfo({
@@ -558,6 +565,7 @@ function App() {
       address: userProfile.churchAddress || "",
       country: "",
       city: "",
+      phone: userProfile.churchPhone || "",
     });
     setSubscriptionInfo(null);
     setShowAccountSettings(true);
@@ -577,6 +585,11 @@ function App() {
       return;
     }
 
+    if (!churchSettings.phone.trim()) {
+      showToast("Please enter a church phone number.", "error");
+      return;
+    }
+
     setAccountLoading(true);
 
     try {
@@ -585,6 +598,7 @@ function App() {
         address: churchSettings.address.trim(),
         country: churchSettings.country.trim(),
         city: churchSettings.city.trim(),
+        phone: churchSettings.phone.trim(),
         updatedAt: new Date().toISOString(),
       });
 
@@ -592,6 +606,7 @@ function App() {
         churchName: churchSettings.name.trim(),
         churchAddress: churchSettings.address.trim(),
         churchCity: churchSettings.city.trim(),
+        churchPhone: churchSettings.phone.trim(),
       });
 
       setUserProfile((prev) =>
@@ -601,6 +616,7 @@ function App() {
               churchName: churchSettings.name.trim(),
               churchAddress: churchSettings.address.trim(),
               churchCity: churchSettings.city.trim(),
+              churchPhone: churchSettings.phone.trim(),
             }
           : prev,
       );
@@ -750,6 +766,11 @@ function App() {
       return;
     }
 
+    if (!churchPhone.trim()) {
+      showToast("Please enter a church phone number.", "error");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -761,6 +782,7 @@ function App() {
         address: churchAddress.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
+        phone: churchPhone.trim(),
         ownerUserId: user.uid,
         createdAt: trialStart.toISOString(),
         trialStartedAt: trialStart.toISOString(),
@@ -785,6 +807,7 @@ function App() {
         churchName: churchName.trim(),
         churchAddress: churchAddress.trim(),
         churchCity: churchCity.trim(),
+        churchPhone: churchPhone.trim(),
         createdAt: new Date().toISOString(),
       });
 
@@ -794,6 +817,7 @@ function App() {
         address: churchAddress.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
+        phone: churchPhone.trim(),
         ownerUserId: user.uid,
         createdAt: trialStart.toISOString(),
         trialStartedAt: trialStart.toISOString(),
@@ -831,6 +855,7 @@ function App() {
         churchName: churchName.trim(),
         churchAddress: churchAddress.trim(),
         churchCity: churchCity.trim(),
+        churchPhone: churchPhone.trim(),
       });
 
       showToast("Church created and linked to your account.", "success");
@@ -1932,6 +1957,7 @@ function App() {
         churchName={registrationChurchName}
         churchAddress={registrationChurchAddress}
         churchCity={registrationChurchCity}
+        churchPhone={registrationChurchPhone}
         onEmailChange={(e) => {
           setEmail(e.target.value);
           setAuthError("");
@@ -1950,6 +1976,10 @@ function App() {
         }}
         onChurchCityChange={(e) => {
           setRegistrationChurchCity(e.target.value);
+          setAuthError("");
+        }}
+        onChurchPhoneChange={(e) => {
+          setRegistrationChurchPhone(e.target.value);
           setAuthError("");
         }}
         onSubmit={authMode === "login" ? handleLogin : handleRegister}
@@ -2065,10 +2095,12 @@ function App() {
         churchAddress={churchAddress}
         churchCountry={churchCountry}
         churchCity={churchCity}
+        churchPhone={churchPhone}
         onChangeChurchName={(e) => setChurchName(e.target.value)}
         onChangeChurchAddress={(e) => setChurchAddress(e.target.value)}
         onChangeChurchCountry={(e) => setChurchCountry(e.target.value)}
         onChangeChurchCity={(e) => setChurchCity(e.target.value)}
+        onChangeChurchPhone={(e) => setChurchPhone(e.target.value)}
         onCreateChurch={handleCreateChurch}
         onLogout={handleLogout}
         loading={loading}
@@ -2365,6 +2397,20 @@ function App() {
                         }))
                       }
                       placeholder="City"
+                    />
+                  </label>
+                  <label className="modal-field">
+                    <span>Phone</span>
+                    <input
+                      type="text"
+                      value={churchSettings.phone}
+                      onChange={(e) =>
+                        setChurchSettings((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                      placeholder="Church phone number"
                     />
                   </label>
                 </div>
