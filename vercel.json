@@ -24,15 +24,15 @@
     },
     {
       "src": "/checkin(.*)",
-      "dest": "/web/index.html"
+      "dest": "/web/dist/index.html"
     },
     {
       "src": "/give(.*)",
-      "dest": "/web/index.html"
+      "dest": "/web/dist/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/web/$1"
+      "dest": "/web/dist/$1"
     }
   ]
 }
