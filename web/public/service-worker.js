@@ -1,11 +1,17 @@
-const CACHE_NAME = "apzla-offline-v1";
+const CACHE_NAME = "apzla-offline-v3";
 const OFFLINE_URL = "/offline.html";
+const ASSETS_TO_CACHE = [
+  OFFLINE_URL,
+  "/",
+  "/manifest.webmanifest",
+  "/icons/apzla-icon.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      await cache.addAll([OFFLINE_URL, "/"]);
+      await cache.addAll(ASSETS_TO_CACHE);
     })()
   );
   self.skipWaiting();
