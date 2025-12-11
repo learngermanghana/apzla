@@ -175,6 +175,21 @@ function App() {
     notes: "",
     memberId: "",
   });
+  const onlineGivingLink = useMemo(() => {
+    if (!userProfile?.churchId) return "";
+    const preferredBase = "https://www.apzla.com";
+    const origin = typeof window !== "undefined" ? window.location.origin : preferredBase;
+    const baseUrl = origin.includes("localhost") ? preferredBase : origin || preferredBase;
+    const normalizedBase = baseUrl.replace(/\/$/, "");
+    return `${normalizedBase}/give/${userProfile.churchId}`;
+  }, [userProfile?.churchId]);
+
+  const onlineGivingQrUrl = useMemo(() => {
+    if (!onlineGivingLink) return "";
+    return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+      onlineGivingLink
+    )}`;
+  }, [onlineGivingLink]);
 
   // Sermons
   const [sermons, setSermons] = useState([]);
@@ -1240,19 +1255,23 @@ function App() {
     }
   };
 
-  const downloadCheckinQrImage = async () => {
-    if (!checkinTokenQr) return;
-    try {
-      const response = await fetch(checkinTokenQr, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error("Unable to fetch QR image.");
-      }
+  const fetchQrBlobUrl = async (qrUrl) => {
+    const response = await fetch(qrUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Unable to fetch QR image.");
+    }
 
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  };
+
+  const downloadQrImage = async (qrUrl, filename = "qr.png") => {
+    if (!qrUrl) return;
+    try {
+      const blobUrl = await fetchQrBlobUrl(qrUrl);
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = "checkin-qr.png";
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1264,16 +1283,10 @@ function App() {
     }
   };
 
-  const printCheckinQrImage = async () => {
-    if (!checkinTokenQr) return;
+  const printQrImage = async (qrUrl, title = "Print QR") => {
+    if (!qrUrl) return;
     try {
-      const response = await fetch(checkinTokenQr, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error("Unable to fetch QR image.");
-      }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const blobUrl = await fetchQrBlobUrl(qrUrl);
       const printWindow = window.open("", "_blank", "width=420,height=520");
 
       if (!printWindow) {
@@ -1283,7 +1296,7 @@ function App() {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Print Check-in QR</title>
+            <title>${title}</title>
           </head>
           <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#fff;">
             <img src="${blobUrl}" style="width:320px;height:320px;object-fit:contain;" />
@@ -1303,6 +1316,38 @@ function App() {
       console.error("Print QR image error:", err);
       showToast(err.message || "Unable to print QR image.", "error");
     }
+  };
+
+  const downloadCheckinQrImage = async () => {
+    await downloadQrImage(checkinTokenQr, "checkin-qr.png");
+  };
+
+  const printCheckinQrImage = async () => {
+    await printQrImage(checkinTokenQr, "Print Check-in QR");
+  };
+
+  const copyOnlineGivingLink = async () => {
+    if (!onlineGivingLink) return;
+    try {
+      await navigator.clipboard.writeText(onlineGivingLink);
+      showToast("Online giving link copied.", "success");
+    } catch (err) {
+      console.error("Copy online giving link error:", err);
+      showToast("Unable to copy online giving link.", "error");
+    }
+  };
+
+  const openOnlineGivingLink = () => {
+    if (!onlineGivingLink) return;
+    window.open(onlineGivingLink, "_blank", "noopener,noreferrer");
+  };
+
+  const downloadOnlineGivingQr = async () => {
+    await downloadQrImage(onlineGivingQrUrl, "online-giving-qr.png");
+  };
+
+  const printOnlineGivingQr = async () => {
+    await printQrImage(onlineGivingQrUrl, "Print Online Giving QR");
   };
 
   const buildShareLinks = (
@@ -4308,6 +4353,154 @@ function App() {
               Track collections, tithes, and special offerings for{" "}
               <strong>{userProfile.churchName}</strong>.
             </p>
+
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "16px",
+                marginBottom: "16px",
+                display: "flex",
+                gap: "16px",
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+              }}
+            >
+              <div style={{ flex: "1 1 260px", minWidth: "0" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    margin: "0 0 6px",
+                  }}
+                >
+                  Online giving link
+                </p>
+                {onlineGivingLink ? (
+                  <div
+                    style={{
+                      wordBreak: "break-all",
+                      fontWeight: 600,
+                      color: "#111827",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    {onlineGivingLink}
+                  </div>
+                ) : (
+                  <p style={{ color: "#9ca3af", margin: "0 0 8px" }}>
+                    Link will appear after a church is linked.
+                  </p>
+                )}
+                <p style={{ color: "#6b7280", fontSize: "13px", margin: "0 0 10px" }}>
+                  Share this permanent link on WhatsApp, flyers, projector slides,
+                  or your website so members can give online.
+                </p>
+
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={copyOnlineGivingLink}
+                    disabled={!onlineGivingLink}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: onlineGivingLink ? "#111827" : "#f3f4f6",
+                      color: onlineGivingLink ? "white" : "#9ca3af",
+                      cursor: onlineGivingLink ? "pointer" : "default",
+                      fontWeight: 600,
+                      fontSize: "13px",
+                    }}
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openOnlineGivingLink}
+                    disabled={!onlineGivingLink}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      color: onlineGivingLink ? "#111827" : "#9ca3af",
+                      cursor: onlineGivingLink ? "pointer" : "default",
+                      fontWeight: 600,
+                      fontSize: "13px",
+                    }}
+                  >
+                    Open link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadOnlineGivingQr}
+                    disabled={!onlineGivingQrUrl}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      color: onlineGivingQrUrl ? "#111827" : "#9ca3af",
+                      cursor: onlineGivingQrUrl ? "pointer" : "default",
+                      fontWeight: 600,
+                      fontSize: "13px",
+                    }}
+                  >
+                    Download QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={printOnlineGivingQr}
+                    disabled={!onlineGivingQrUrl}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      color: onlineGivingQrUrl ? "#111827" : "#9ca3af",
+                      cursor: onlineGivingQrUrl ? "pointer" : "default",
+                      fontWeight: 600,
+                      fontSize: "13px",
+                    }}
+                  >
+                    Print QR
+                  </button>
+                </div>
+              </div>
+
+              {onlineGivingQrUrl && (
+                <div
+                  style={{
+                    width: "200px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <img
+                    src={onlineGivingQrUrl}
+                    alt="Online giving QR code"
+                    style={{
+                      width: "100%",
+                      height: "200px",
+                      objectFit: "contain",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      background: "#f9fafb",
+                      padding: "8px",
+                    }}
+                  />
+                  <p style={{ margin: 0, fontSize: "12px", color: "#6b7280" }}>
+                    Members can scan to give online
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Giving form */}
             <div
