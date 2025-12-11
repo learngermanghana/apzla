@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { db, auth } from "./firebase";
+import { db, auth, functions } from "./firebase";
 import {
   collection,
   addDoc,
@@ -20,6 +20,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
+import { httpsCallableFromURL } from "firebase/functions";
 
 import AuthPanel from "./components/auth/AuthPanel";
 import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
@@ -167,18 +168,14 @@ function App() {
   const [givingPageCursor, setGivingPageCursor] = useState(null);
   const [givingHasMore, setGivingHasMore] = useState(true);
   const [givingMemberFilter, setGivingMemberFilter] = useState("");
-  const [onlineGivingStatus, setOnlineGivingStatus] = useState("NOT_CONFIGURED");
-  const [onlineGivingSubaccount, setOnlineGivingSubaccount] = useState(null);
+  const [payoutStatus, setPayoutStatus] = useState("NOT_CONFIGURED");
+  const [paystackSubaccountCode, setPaystackSubaccountCode] = useState(null);
   const [onlineGivingAppliedAt, setOnlineGivingAppliedAt] = useState(null);
-  const [onlineGivingReviewedAt, setOnlineGivingReviewedAt] = useState(null);
-  const [onlineGivingReviewedBy, setOnlineGivingReviewedBy] = useState(null);
-  const [onlineGivingForm, setOnlineGivingForm] = useState({
-    bankName: "",
+  const [payoutForm, setPayoutForm] = useState({
+    bankType: "",
     accountName: "",
     accountNumber: "",
-    branchOrMomo: "",
-    contactName: "",
-    contactPhone: "",
+    network: "",
     confirmDetails: false,
   });
   const [onlineGivingActionLoading, setOnlineGivingActionLoading] = useState(false);
@@ -206,21 +203,21 @@ function App() {
     )}`;
   }, [onlineGivingLink]);
 
-  const onlineGivingActive = onlineGivingStatus === "ACTIVE";
-  const onlineGivingPending = onlineGivingStatus === "PENDING_REVIEW";
-  const onlineGivingRejected = onlineGivingStatus === "REJECTED";
+  const onlineGivingActive = payoutStatus === "ACTIVE";
+  const onlineGivingPending = payoutStatus === "PENDING_SUBACCOUNT";
+  const onlineGivingFailed = payoutStatus === "FAILED_SUBACCOUNT";
   const onlineGivingStatusLabel = onlineGivingActive
     ? "Active"
     : onlineGivingPending
-      ? "Pending review"
-      : onlineGivingRejected
-        ? "Rejected"
+      ? "Creating subaccount"
+      : onlineGivingFailed
+        ? "Needs attention"
         : "Not configured";
   const onlineGivingStatusBadge = onlineGivingActive
     ? { bg: "#ecfdf3", color: "#166534", border: "#bbf7d0" }
     : onlineGivingPending
       ? { bg: "#fef9c3", color: "#854d0e", border: "#fef08a" }
-      : onlineGivingRejected
+      : onlineGivingFailed
         ? { bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" }
         : { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" };
 
@@ -327,11 +324,18 @@ function App() {
   };
 
   const syncOnlineGivingState = (data) => {
-    setOnlineGivingStatus(data?.onlineGivingStatus || "NOT_CONFIGURED");
-    setOnlineGivingSubaccount(data?.onlineGivingSubaccount || null);
+    setPayoutStatus(data?.payoutStatus || data?.onlineGivingStatus || "NOT_CONFIGURED");
+    setPaystackSubaccountCode(
+      data?.paystackSubaccountCode || data?.onlineGivingSubaccount || null
+    );
     setOnlineGivingAppliedAt(data?.onlineGivingAppliedAt || null);
-    setOnlineGivingReviewedAt(data?.onlineGivingReviewedAt || null);
-    setOnlineGivingReviewedBy(data?.onlineGivingReviewedBy || null);
+    setPayoutForm((prev) => ({
+      ...prev,
+      bankType: data?.payoutBankType || prev.bankType,
+      accountName: data?.payoutAccountName || prev.accountName,
+      accountNumber: data?.payoutAccountNumber || prev.accountNumber,
+      network: data?.payoutNetwork || prev.network,
+    }));
   };
 
   // ---------- Persist check-in token form ----------
@@ -762,11 +766,14 @@ function App() {
         trialStartedAt: trialStart.toISOString(),
         trialEndsAt: trialEnd.toISOString(),
         subscriptionStatus: "TRIAL",
-        onlineGivingStatus: "NOT_CONFIGURED",
-        onlineGivingSubaccount: null,
+        payoutStatus: "NOT_CONFIGURED",
+        paystackSubaccountCode: null,
+        payoutBankType: "",
+        payoutAccountName: "",
+        payoutAccountNumber: "",
+        payoutNetwork: "",
         onlineGivingAppliedAt: null,
-        onlineGivingReviewedAt: null,
-        onlineGivingReviewedBy: null,
+        onlineGivingEnabled: false,
       });
 
       const churchId = churchRef.id;
@@ -792,11 +799,14 @@ function App() {
         trialStartedAt: trialStart.toISOString(),
         trialEndsAt: trialEnd.toISOString(),
         subscriptionStatus: "TRIAL",
-        onlineGivingStatus: "NOT_CONFIGURED",
-        onlineGivingSubaccount: null,
+        payoutStatus: "NOT_CONFIGURED",
+        paystackSubaccountCode: null,
+        payoutBankType: "",
+        payoutAccountName: "",
+        payoutAccountNumber: "",
+        payoutNetwork: "",
         onlineGivingAppliedAt: null,
-        onlineGivingReviewedAt: null,
-        onlineGivingReviewedBy: null,
+        onlineGivingEnabled: false,
       });
 
       setSubscriptionInfo({
@@ -811,7 +821,7 @@ function App() {
         trialEndsAt: trialEnd.toISOString(),
       });
 
-      syncOnlineGivingState({ onlineGivingStatus: "NOT_CONFIGURED" });
+      syncOnlineGivingState({ payoutStatus: "NOT_CONFIGURED" });
 
       setUserProfile({
         id: user.uid,
@@ -1485,20 +1495,18 @@ function App() {
     }
 
     const requiredFields = [
-      { key: "bankName", label: "Bank name" },
+      { key: "bankType", label: "Bank / MoMo type" },
       { key: "accountName", label: "Account name" },
-      { key: "accountNumber", label: "Account number" },
-      { key: "contactName", label: "Contact person" },
-      { key: "contactPhone", label: "Contact phone" },
+      { key: "accountNumber", label: "Account number / phone" },
     ];
 
-    const missing = requiredFields.find((field) => !onlineGivingForm[field.key].trim());
+    const missing = requiredFields.find((field) => !payoutForm[field.key].trim());
     if (missing) {
       showToast(`${missing.label} is required.`, "error");
       return;
     }
 
-    if (!onlineGivingForm.confirmDetails) {
+    if (!payoutForm.confirmDetails) {
       showToast("Please confirm the settlement details are correct.", "error");
       return;
     }
@@ -1507,57 +1515,71 @@ function App() {
       setOnlineGivingActionLoading(true);
       const nowIso = new Date().toISOString();
 
-      await addDoc(collection(db, "onlineGivingApplications"), {
-        churchId: userProfile.churchId,
-        bankName: onlineGivingForm.bankName.trim(),
-        accountName: onlineGivingForm.accountName.trim(),
-        accountNumber: onlineGivingForm.accountNumber.trim(),
-        branchOrMomo: onlineGivingForm.branchOrMomo.trim() || null,
-        contactName: onlineGivingForm.contactName.trim(),
-        contactPhone: onlineGivingForm.contactPhone.trim(),
-        createdAt: nowIso,
-        status: "PENDING",
-      });
-
       await updateDoc(doc(db, "churches", userProfile.churchId), {
-        onlineGivingStatus: "PENDING_REVIEW",
-        onlineGivingSubaccount: null,
+        payoutBankType: payoutForm.bankType.trim(),
+        payoutAccountName: payoutForm.accountName.trim(),
+        payoutAccountNumber: payoutForm.accountNumber.trim(),
+        payoutNetwork: payoutForm.network.trim() || null,
+        payoutStatus: "PENDING_SUBACCOUNT",
+        paystackSubaccountCode: null,
         onlineGivingAppliedAt: nowIso,
-        onlineGivingReviewedAt: null,
-        onlineGivingReviewedBy: null,
+        onlineGivingEnabled: false,
       });
 
-      setOnlineGivingStatus("PENDING_REVIEW");
-      setOnlineGivingSubaccount(null);
+      setPayoutStatus("PENDING_SUBACCOUNT");
+      setPaystackSubaccountCode(null);
       setOnlineGivingAppliedAt(nowIso);
-      setOnlineGivingReviewedAt(null);
-      setOnlineGivingReviewedBy(null);
       setChurchPlan((prev) =>
         prev
           ? {
               ...prev,
-              onlineGivingStatus: "PENDING_REVIEW",
-              onlineGivingSubaccount: null,
+              payoutStatus: "PENDING_SUBACCOUNT",
+              paystackSubaccountCode: null,
+              payoutBankType: payoutForm.bankType.trim(),
+              payoutAccountName: payoutForm.accountName.trim(),
+              payoutAccountNumber: payoutForm.accountNumber.trim(),
+              payoutNetwork: payoutForm.network.trim() || "",
               onlineGivingAppliedAt: nowIso,
-              onlineGivingReviewedAt: null,
-              onlineGivingReviewedBy: null,
             }
           : prev,
       );
-      setOnlineGivingForm({
-        bankName: "",
-        accountName: "",
-        accountNumber: "",
-        branchOrMomo: "",
-        contactName: "",
-        contactPhone: "",
-        confirmDetails: false,
-      });
 
-      showToast("Your online giving application was submitted.", "success");
+      const callableBase =
+        typeof window !== "undefined" && window.location.origin
+          ? window.location.origin.replace(/\/$/, "")
+          : "https://www.apzla.com";
+      const createSubaccount = httpsCallableFromURL(
+        functions,
+        `${callableBase}/api/create-church-subaccount`
+      );
+      const result = await createSubaccount({ churchId: userProfile.churchId });
+      const subaccountCode = result?.data?.subaccountCode || null;
+
+      setPaystackSubaccountCode(subaccountCode);
+      setPayoutStatus("ACTIVE");
+      setChurchPlan((prev) =>
+        prev
+          ? {
+              ...prev,
+              payoutStatus: "ACTIVE",
+              paystackSubaccountCode: subaccountCode,
+              onlineGivingEnabled: true,
+            }
+          : prev,
+      );
+
+      showToast("Online giving is active. Your Paystack subaccount was created.", "success");
     } catch (err) {
       console.error("Submit online giving application error:", err);
-      showToast(err.message || "Unable to submit your application.", "error");
+      showToast(err.message || "Unable to create the Paystack subaccount right now.", "error");
+      try {
+        await updateDoc(doc(db, "churches", userProfile.churchId), {
+          payoutStatus: "FAILED_SUBACCOUNT",
+        });
+      } catch (updateError) {
+        console.error("Failed to record payout failure state:", updateError);
+      }
+      setPayoutStatus((prev) => (prev === "PENDING_SUBACCOUNT" ? "FAILED_SUBACCOUNT" : prev));
     } finally {
       setOnlineGivingActionLoading(false);
     }
@@ -4568,14 +4590,8 @@ function App() {
                   </p>
                   <p style={{ margin: "0 0 6px" }}>
                     Paystack payments will settle to subaccount
-                    <strong> {onlineGivingSubaccount || "(missing code)"}</strong>.
+                    <strong> {paystackSubaccountCode || "(missing code)"}</strong>.
                   </p>
-                  {(onlineGivingReviewedAt || onlineGivingReviewedBy) && (
-                    <p style={{ margin: 0, fontSize: "13px", color: "#065f46" }}>
-                      Approved {onlineGivingReviewedAt ? `on ${new Date(onlineGivingReviewedAt).toLocaleString()}` : ""}
-                      {onlineGivingReviewedBy ? ` by ${onlineGivingReviewedBy}` : ""}.
-                    </p>
-                  )}
                 </div>
               ) : onlineGivingPending ? (
                 <div
@@ -4588,41 +4604,36 @@ function App() {
                   }}
                 >
                   <p style={{ margin: "0 0 6px", fontWeight: 700 }}>
-                    Online giving application submitted.
+                    Creating your Paystack subaccount...
                   </p>
                   <p style={{ margin: "0 0 8px" }}>
-                    Your online giving application has been received. We’ll review and
-                    enable your giving link soon.
+                    We’re sending your payout details to Paystack. This usually takes a few
+                    seconds.
                   </p>
                   {onlineGivingAppliedAt && (
                     <p style={{ margin: 0, fontSize: "13px" }}>
-                      Submitted on {new Date(onlineGivingAppliedAt).toLocaleString()}.
+                      Requested on {new Date(onlineGivingAppliedAt).toLocaleString()}.
                     </p>
                   )}
-                  <p style={{ margin: "12px 0 0", fontSize: "13px" }}>
-                    Permanent giving link (will work after approval): {onlineGivingLink || "--"}
-                  </p>
+                </div>
+              ) : onlineGivingFailed ? (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #fecdd3",
+                    background: "#fef2f2",
+                    color: "#991b1b",
+                    fontSize: "14px",
+                  }}
+                >
+                  We couldn’t create the Paystack subaccount. Double-check the payout details
+                  and try again.
                 </div>
               ) : (
                 <>
-                  {onlineGivingRejected && (
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: "10px",
-                        border: "1px solid #fecdd3",
-                        background: "#fef2f2",
-                        color: "#991b1b",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Previous application was rejected. Update your details below and
-                      apply again.
-                    </div>
-                  )}
-
                   <p style={{ margin: "0 0 4px", color: "#374151" }}>
-                    Submit your settlement details to request Paystack activation.
+                    Add payout details to auto-create a Paystack subaccount.
                   </p>
 
                   <form
@@ -4637,14 +4648,14 @@ function App() {
                     }}
                   >
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ fontSize: "13px", color: "#374151" }}>Bank name</span>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Bank / MoMo type</span>
                       <input
                         type="text"
-                        value={onlineGivingForm.bankName}
+                        value={payoutForm.bankType}
                         onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
+                          setPayoutForm((prev) => ({
                             ...prev,
-                            bankName: e.target.value,
+                            bankType: e.target.value,
                           }))
                         }
                         style={{
@@ -4660,9 +4671,9 @@ function App() {
                       <span style={{ fontSize: "13px", color: "#374151" }}>Account name</span>
                       <input
                         type="text"
-                        value={onlineGivingForm.accountName}
+                        value={payoutForm.accountName}
                         onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
+                          setPayoutForm((prev) => ({
                             ...prev,
                             accountName: e.target.value,
                           }))
@@ -4677,12 +4688,12 @@ function App() {
                     </label>
 
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ fontSize: "13px", color: "#374151" }}>Account number</span>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Account number / phone</span>
                       <input
                         type="text"
-                        value={onlineGivingForm.accountNumber}
+                        value={payoutForm.accountNumber}
                         onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
+                          setPayoutForm((prev) => ({
                             ...prev,
                             accountNumber: e.target.value,
                           }))
@@ -4697,54 +4708,14 @@ function App() {
                     </label>
 
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ fontSize: "13px", color: "#374151" }}>Branch / MoMo details (optional)</span>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>Branch / MoMo network (optional)</span>
                       <input
                         type="text"
-                        value={onlineGivingForm.branchOrMomo}
+                        value={payoutForm.network}
                         onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
+                          setPayoutForm((prev) => ({
                             ...prev,
-                            branchOrMomo: e.target.value,
-                          }))
-                        }
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid #d1d5db",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </label>
-
-                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ fontSize: "13px", color: "#374151" }}>Contact person</span>
-                      <input
-                        type="text"
-                        value={onlineGivingForm.contactName}
-                        onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
-                            ...prev,
-                            contactName: e.target.value,
-                          }))
-                        }
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid #d1d5db",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </label>
-
-                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ fontSize: "13px", color: "#374151" }}>Contact phone</span>
-                      <input
-                        type="text"
-                        value={onlineGivingForm.contactPhone}
-                        onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
-                            ...prev,
-                            contactPhone: e.target.value,
+                            network: e.target.value,
                           }))
                         }
                         style={{
@@ -4768,9 +4739,9 @@ function App() {
                     >
                       <input
                         type="checkbox"
-                        checked={onlineGivingForm.confirmDetails}
+                        checked={payoutForm.confirmDetails}
                         onChange={(e) =>
-                          setOnlineGivingForm((prev) => ({
+                          setPayoutForm((prev) => ({
                             ...prev,
                             confirmDetails: e.target.checked,
                           }))
@@ -4793,21 +4764,12 @@ function App() {
                           cursor: onlineGivingActionLoading ? "not-allowed" : "pointer",
                         }}
                       >
-                        {onlineGivingActionLoading ? "Submitting..." : "Apply for online giving"}
+                        {onlineGivingActionLoading
+                          ? "Submitting..."
+                          : onlineGivingPending
+                            ? "Creating Paystack subaccount..."
+                            : "Save payout details"}
                       </button>
-                      <a
-                        href="https://docs.google.com/forms/d/e/1FAIpQLScK188HUoj7BW8E11Kf42CYrYpJuM4cVi2No577Rt4VmNWJIw/viewform?usp=publish-editor"
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          fontSize: "13px",
-                          color: "#1d4ed8",
-                          textDecoration: "underline",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Prefer Google Forms? Fill it instead
-                      </a>
                     </div>
                   </form>
                 </>
@@ -4858,7 +4820,7 @@ function App() {
                 <p style={{ color: "#6b7280", fontSize: "13px", margin: "0 0 10px" }}>
                   {onlineGivingActive
                     ? "Share this permanent link on WhatsApp, flyers, projector slides, or your website so members can give online."
-                    : "Permanent giving link (will work after approval). You can still share it so members know where to give once it is enabled."}
+                    : "Link activates once the Paystack subaccount is ready. You can still share it ahead of time."}
                 </p>
 
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
