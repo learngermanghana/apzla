@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { db, auth, functions } from "./firebase";
+import {
+  auth,
+  db,
+  firebaseConfigError,
+  functions,
+  isFirebaseConfigured,
+} from "./firebase";
 import {
   collection,
   addDoc,
@@ -34,7 +40,7 @@ import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
 
-function App() {
+function AppContent() {
   const {
     user,
     userProfile,
@@ -5364,4 +5370,23 @@ function App() {
   );
 }
 
-export default App;
+function MissingConfigNotice({ message }) {
+  return (
+    <div className="app">
+      <div className="auth-card">
+        <h1>Apzla</h1>
+        <p className="error-message">
+          {message || "The app configuration is incomplete. Please add the Firebase environment variables to continue."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  if (!isFirebaseConfigured) {
+    return <MissingConfigNotice message={firebaseConfigError} />;
+  }
+
+  return <AppContent />;
+}

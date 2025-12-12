@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
-import { auth, db } from "../firebase";
+import { auth, db, firebaseConfigError, isFirebaseConfigured } from "../firebase";
 
 export function useAuthProfile() {
   const [user, setUser] = useState(null);
@@ -57,6 +57,15 @@ export function useAuthProfile() {
   };
 
   useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setProfileError(
+        firebaseConfigError ||
+          "Firebase is not configured. Please set the required environment variables to continue."
+      );
+      setProfileLoading(false);
+      return () => {};
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
 
