@@ -4518,20 +4518,38 @@ function App() {
                               {checkinTokenQr && (
                                 <div className="checkin-link-qr">
                                   <div className="checkin-link-label">QR code</div>
-                                  <img
-                                    src={checkinTokenQr}
-                                    alt="Check-in QR code"
-                                    style={{
-                                      marginTop: "8px",
-                                      width: "140px",
-                                      height: "140px",
-                                      objectFit: "contain",
-                                      border: "1px solid #e5e7eb",
-                                      borderRadius: "8px",
-                                      background: "#fff",
-                                      padding: "8px",
-                                    }}
-                                  />
+                                  <a
+                                    href={checkinTokenLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ textDecoration: "none" }}
+                                    aria-label="Open issued check-in link"
+                                  >
+                                    <img
+                                      src={checkinTokenQr}
+                                      alt="Check-in QR code"
+                                      style={{
+                                        marginTop: "8px",
+                                        width: "140px",
+                                        height: "140px",
+                                        objectFit: "contain",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: "8px",
+                                        background: "#fff",
+                                        padding: "8px",
+                                        boxShadow: "0 0 0 2px transparent",
+                                        transition: "box-shadow 120ms ease, transform 120ms ease",
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.boxShadow = "0 0 0 2px #11182720";
+                                        e.currentTarget.style.transform = "translateY(-1px)";
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.boxShadow = "0 0 0 2px transparent";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                      }}
+                                    />
+                                  </a>
                                   <div className="checkin-link-qr-actions">
                                     <button type="button" onClick={downloadCheckinQrImage}>
                                       Download QR image
@@ -4983,19 +5001,37 @@ function App() {
                     gap: "6px",
                   }}
                 >
-                  <img
-                    src={onlineGivingQrUrl}
-                    alt="Online giving QR code"
-                    style={{
-                      width: "100%",
-                      height: "200px",
-                      objectFit: "contain",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      background: "#f9fafb",
-                      padding: "8px",
-                    }}
-                  />
+                  <a
+                    href={onlineGivingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open online giving link"
+                    style={{ width: "100%" }}
+                  >
+                    <img
+                      src={onlineGivingQrUrl}
+                      alt="Online giving QR code"
+                      style={{
+                        width: "100%",
+                        height: "200px",
+                        objectFit: "contain",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        background: "#f9fafb",
+                        padding: "8px",
+                        boxShadow: "0 0 0 2px transparent",
+                        transition: "box-shadow 120ms ease, transform 120ms ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.boxShadow = "0 0 0 2px #11182720";
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.boxShadow = "0 0 0 2px transparent";
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }}
+                    />
+                  </a>
                   <p style={{ margin: 0, fontSize: "12px", color: "#6b7280" }}>
                     Members can scan to give online
                   </p>

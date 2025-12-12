@@ -19,8 +19,11 @@
       "dest": "/functions/api/$1.js"
     },
     {
+      "handle": "filesystem"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/web/$1"
+      "dest": "/web/index.html"
     }
   ]
 }
