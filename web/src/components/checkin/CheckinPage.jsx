@@ -152,7 +152,7 @@ export default function CheckinPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phoneNumber: trimmedPhone,
+          phone: phoneNumber,
           serviceCode: trimmedServiceCode,
           token: trimmedToken,
         }),
