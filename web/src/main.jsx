@@ -11,22 +11,39 @@ import "./index.css";
 
 enforcePreferredHost();
 
-const currentPath = window.location.pathname;
-const isCheckinRoute = currentPath.startsWith("/checkin");
-const isStatusRoute = currentPath.startsWith("/status");
-const isGiveRoute = currentPath.startsWith("/give");
-const RootComponent = isCheckinRoute
-  ? CheckinPage
-  : isGiveRoute
-    ? GivePage
-    : isStatusRoute
-      ? StatusPage
-      : App;
+const { pathname } = window.location;
+
+// Accept both /checkin/... and /attendance/...
+const isCheckinRoute =
+  pathname === "/checkin" ||
+  pathname.startsWith("/checkin/") ||
+  pathname === "/attendance" ||
+  pathname.startsWith("/attendance/");
+
+const isStatusRoute = pathname === "/status" || pathname.startsWith("/status/");
+const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
+
+function getSecondSegment(path) {
+  // "/checkin/<token>" => "<token>"
+  const parts = path.split("/").filter(Boolean); // removes empty
+  return parts.length >= 2 ? parts[1] : null;
+}
+
+const checkinToken = isCheckinRoute ? getSecondSegment(pathname) : null;
+const giveId = isGiveRoute ? getSecondSegment(pathname) : null;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <OfflineNotice />
-    <RootComponent />
+    {isCheckinRoute ? (
+      <CheckinPage token={checkinToken} />
+    ) : isGiveRoute ? (
+      <GivePage id={giveId} />
+    ) : isStatusRoute ? (
+      <StatusPage />
+    ) : (
+      <App />
+    )}
   </React.StrictMode>
 );
 
