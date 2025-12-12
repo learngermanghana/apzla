@@ -57,7 +57,7 @@ export function useAuthProfile() {
   };
 
   useEffect(() => {
-    if (!isFirebaseConfigured) {
+    if (isFirebaseConfigured === false) {
       setProfileError(
         firebaseConfigError ||
           "Firebase is not configured. Please set the required environment variables to continue."
