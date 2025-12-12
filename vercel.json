@@ -15,6 +15,6 @@
     },
     { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/(.*)", "dest": "/" }
   ]
 }
