@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "npm install --prefix web && npm run build --prefix web",
+  "outputDirectory": "web/dist",
   "builds": [
     {
       "src": "functions/api/**/*.js",
