@@ -1,4 +1,4 @@
-const CACHE_NAME = "apzla-offline-v4";
+const CACHE_NAME = "apzla-offline-v5"; // bump to force SW update
 const OFFLINE_URL = "/offline.html";
 const ASSETS_TO_CACHE = [
   OFFLINE_URL,
@@ -21,14 +21,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      await Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-          return null;
-        })
-      );
+      await Promise.all(keys.map((key) => (key !== CACHE_NAME ? caches.delete(key) : null)));
     })()
   );
   self.clients.claim();
@@ -37,28 +30,28 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
-  // Skip cross-origin requests (e.g., Firebase streaming endpoints) so they
-  // bypass the service worker entirely and avoid caching errors.
-  const requestURL = new URL(event.request.url);
-  if (requestURL.origin !== self.location.origin) return;
-
-  // Avoid interfering with source map requests so developer tools can fall
-  // back to the network (or show the native 404) instead of receiving the
-  // offline HTML page, which causes JSON parse errors in the console.
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
   if (event.request.url.endsWith(".map")) return;
+
+  // Optional: don't SW-cache Vite build assets at all (very safe)
+  if (url.pathname.startsWith("/assets/")) return;
 
   if (event.request.mode === "navigate") {
     event.respondWith(
       (async () => {
+        const cache = await caches.open(CACHE_NAME);
         try {
-          const networkResponse = await fetch(event.request);
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
-        } catch (error) {
-          const cachedResponse = await caches.match(event.request);
-          if (cachedResponse) return cachedResponse;
-          return caches.match(OFFLINE_URL);
+          const response = await fetch(event.request);
+          if (response && response.status === 200) {
+            try {
+              await cache.put(event.request, response.clone());
+            } catch (_) {}
+          }
+          return response;
+        } catch (_) {
+          const cached = await cache.match(event.request);
+          return cached || (await cache.match(OFFLINE_URL));
         }
       })()
     );
@@ -68,22 +61,18 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await caches.match(event.request);
+      const cached = await cache.match(event.request);
       if (cached) return cached;
 
-      try {
-        const response = await fetch(event.request);
-        cache.put(event.request, response.clone());
-        return response;
-      } catch (error) {
-        // Fall back to any cached response to avoid rejecting the request,
-        // which causes the browser to report an "unexpected error" from the
-        // service worker. If nothing is cached, return a generic error
-        // response instead of throwing so the promise resolves gracefully.
-        const cachedResponse = await caches.match(event.request);
-        if (cachedResponse) return cachedResponse;
-        return Response.error();
+      const response = await fetch(event.request);
+
+      if (response && response.status === 200) {
+        try {
+          await cache.put(event.request, response.clone());
+        } catch (_) {}
       }
+
+      return response;
     })()
   );
 });
