@@ -76,10 +76,13 @@ self.addEventListener("fetch", (event) => {
         cache.put(event.request, response.clone());
         return response;
       } catch (error) {
-        // Propagate the original failure instead of returning the offline
-        // shell for non-navigation requests (e.g., source maps or JSON). This
-        // prevents HTML fallbacks from breaking developer tooling.
-        throw error;
+        // Fall back to any cached response to avoid rejecting the request,
+        // which causes the browser to report an "unexpected error" from the
+        // service worker. If nothing is cached, return a generic error
+        // response instead of throwing so the promise resolves gracefully.
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        return Response.error();
       }
     })()
   );
