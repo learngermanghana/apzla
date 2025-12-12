@@ -1,14 +1,8 @@
 // web/src/components/checkin/CheckinPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./checkin.css";
 import { db } from "../../firebase";
-import {
-  addDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import StatusBanner from "../StatusBanner";
 
 const LOCAL_PHONE_KEY = "apzla_last_phone";
@@ -26,6 +20,27 @@ export default function CheckinPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
+  // ---- NEW: read token from URL (query OR path) ----
+  const tokenFromUrl = useMemo(() => {
+    try {
+      // 1) Query string: /checkin?token=xxxx
+      const params = new URLSearchParams(window.location.search);
+      const qToken = params.get("token");
+      if (qToken && qToken.trim()) return qToken.trim();
+
+      // 2) Path style: /checkin/xxxx (optional support)
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      // parts[0] = "checkin" or "attendance"
+      if (parts.length >= 2 && (parts[0] === "checkin" || parts[0] === "attendance")) {
+        return parts[1].trim();
+      }
+
+      return "";
+    } catch {
+      return "";
+    }
+  }, []);
+
   // Prefill phone from localStorage
   useEffect(() => {
     try {
@@ -35,6 +50,17 @@ export default function CheckinPage() {
       // ignore storage issues
     }
   }, []);
+
+  // ---- NEW: auto-fill token once, without overwriting user edits ----
+  useEffect(() => {
+    if (!tokenFromUrl) return;
+
+    setToken((prev) => {
+      const prevTrim = (prev || "").trim();
+      if (prevTrim) return prev; // user already has something
+      return tokenFromUrl;
+    });
+  }, [tokenFromUrl]);
 
   const formatServiceDate = (isoDate) => {
     if (!isoDate) return "";
@@ -120,7 +146,9 @@ export default function CheckinPage() {
     try {
       setIsSubmitting(true);
 
-      const res = await fetch("/api/self-checkin/verify", {
+      // NOTE: Your resource list shows this is deployed as /functions/api/self-checkin-verify.js
+      // So the correct URL is /api/self-checkin-verify (not /api/self-checkin/verify)
+      const res = await fetch("/api/self-checkin-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -155,7 +183,8 @@ export default function CheckinPage() {
       if (data.alreadyCheckedIn) {
         setFeedback({
           ok: true,
-          message: data.message ||
+          message:
+            data.message ||
             "You have already checked in for this service. Thank you.",
         });
         setStatusTone("info");
@@ -203,21 +232,17 @@ export default function CheckinPage() {
         </p>
 
         <div className="checkin-helper">
-          <div className="checkin-helper-title">
-            Where to enter the service code
-          </div>
+          <div className="checkin-helper-title">Where to enter the service code</div>
           <div className="checkin-helper-body">
             The form has three steps in order: phone number,{" "}
-            <strong>service code</strong>, then the token box. Use the same
-            phone number you shared with the church office.
+            <strong>service code</strong>, then the token box. Use the same phone
+            number you shared with the church office.
           </div>
         </div>
 
         {summary && (
           <div className="checkin-service-meta">
-            <span className="checkin-chip">
-              {summary.churchName || "Your church"}
-            </span>
+            <span className="checkin-chip">{summary.churchName || "Your church"}</span>
             <span className="checkin-chip">
               {summary.serviceType || "Service"} •{" "}
               {formatServiceDate(summary.serviceDate)}
@@ -234,22 +259,16 @@ export default function CheckinPage() {
               <div>
                 <div className="checkin-label">Member</div>
                 <div className="checkin-value">{summary.memberName}</div>
-                <div className="checkin-subvalue">
-                  ID: {summary.memberId}
-                </div>
+                <div className="checkin-subvalue">ID: {summary.memberId}</div>
               </div>
               <div>
                 <div className="checkin-label">Church</div>
                 <div className="checkin-value">{summary.churchName}</div>
-                <div className="checkin-subvalue">
-                  ID: {summary.churchId}
-                </div>
+                <div className="checkin-subvalue">ID: {summary.churchId}</div>
               </div>
               <div>
                 <div className="checkin-label">Service date</div>
-                <div className="checkin-value">
-                  {formatServiceDate(summary.serviceDate)}
-                </div>
+                <div className="checkin-value">{formatServiceDate(summary.serviceDate)}</div>
               </div>
               <div>
                 <div className="checkin-label">Service</div>
@@ -306,14 +325,11 @@ export default function CheckinPage() {
               onChange={(e) => setToken(e.target.value)}
               placeholder="This is usually filled automatically from the link."
               required
+              readOnly={!!tokenFromUrl} // optional: lock when token came from link
             />
           </div>
 
-          <button
-            type="submit"
-            className="checkin-button"
-            disabled={isSubmitting}
-          >
+          <button type="submit" className="checkin-button" disabled={isSubmitting}>
             {isSubmitting ? "Checking in…" : "Confirm attendance"}
           </button>
         </form>
