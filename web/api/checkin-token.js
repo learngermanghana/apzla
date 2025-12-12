@@ -7,7 +7,8 @@ const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonc
 const tokenTtlMinutes = Number(process.env.CHECKIN_TOKEN_TTL_MINUTES) || 30
 const notificationCollection =
   process.env.FIRESTORE_NOTIFICATION_COLLECTION || 'notifications'
-const appBaseUrl = process.env.APP_BASE_URL
+const defaultBaseUrl = 'https://www.apzla.com'
+const appBaseUrl = process.env.APP_BASE_URL || defaultBaseUrl
 
 function generateServiceCode() {
   // Generates a 6-digit string with leading zeros if necessary
