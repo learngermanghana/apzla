@@ -1,12 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm install --prefix web && npm run build --prefix web",
-  "outputDirectory": "web/dist",
   "builds": [
-    {
-      "src": "functions/api/**/*.js",
-      "use": "@vercel/node"
-    },
+    { "src": "functions/api/**/*.js", "use": "@vercel/node" },
     {
       "src": "web/package.json",
       "use": "@vercel/static-build",
@@ -18,14 +13,8 @@
       "src": "/api/transaction/verify/(?<reference>[^/]+)",
       "dest": "/functions/api/transaction/verify/[reference].js?reference=$reference"
     },
-    {
-      "src": "/api/(.*)",
-      "dest": "/functions/api/$1.js"
-    },
+    { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
     { "handle": "filesystem" },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
