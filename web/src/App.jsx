@@ -36,6 +36,7 @@ import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsTab from "./components/tabs/SermonsTab";
 import FollowupTab from "./components/tabs/FollowupTab";
+import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
@@ -2731,115 +2732,7 @@ function AppContent() {
         </div>
 
         {/* Tabs */}
-        <div
-          className="dashboard-tabs"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "8px",
-            marginBottom: "20px",
-            fontSize: "14px",
-          }}
-        >
-          <button
-            onClick={() => setActiveTab("overview")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "overview" ? "#111827" : "#e5e7eb",
-              color: activeTab === "overview" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab("members")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "members" ? "#111827" : "#e5e7eb",
-              color: activeTab === "members" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Members (CRM)
-          </button>
-          <button
-            onClick={() => setActiveTab("attendance")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "attendance" ? "#111827" : "#e5e7eb",
-              color: activeTab === "attendance" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Attendance
-          </button>
-          <button
-            onClick={() => setActiveTab("checkin")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "checkin" ? "#111827" : "#e5e7eb",
-              color: activeTab === "checkin" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Check-in (Per Member)
-          </button>
-          <button
-            onClick={() => setActiveTab("giving")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "giving" ? "#111827" : "#e5e7eb",
-              color: activeTab === "giving" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Giving (Tithes & Offerings)
-          </button>
-          <button
-            onClick={() => setActiveTab("followup")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "followup" ? "#111827" : "#e5e7eb",
-              color: activeTab === "followup" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Follow-up
-          </button>
-          <button
-            onClick={() => setActiveTab("sermons")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background:
-                activeTab === "sermons" ? "#111827" : "#e5e7eb",
-              color: activeTab === "sermons" ? "white" : "#111827",
-              cursor: "pointer",
-            }}
-          >
-            Sermons
-          </button>
-        </div>
+        <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Tab content */}
         {activeTab === "overview" && (
