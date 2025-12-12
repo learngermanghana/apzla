@@ -36,6 +36,21 @@ export default function CheckinPage() {
     }
   }, []);
 
+  // Prefill token (and service code when available) from the URL so QR/link users
+  // don't have to paste it manually.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get("token") || params.get("t");
+      const urlServiceCode = params.get("serviceCode") || params.get("code");
+
+      if (urlToken) setToken(urlToken);
+      if (urlServiceCode) setServiceCode(urlServiceCode);
+    } catch (err) {
+      console.error("Unable to prefill token from URL", err);
+    }
+  }, []);
+
   const formatServiceDate = (isoDate) => {
     if (!isoDate) return "";
     const d = new Date(isoDate);
