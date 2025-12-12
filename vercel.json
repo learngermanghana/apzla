@@ -10,7 +10,7 @@
     {
       "src": "web/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "web/dist" }
+      "config": { "distDir": "dist" }
     }
   ],
   "routes": [
