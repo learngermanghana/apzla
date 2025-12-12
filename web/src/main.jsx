@@ -6,7 +6,10 @@ import GivePage from "./components/giving/GivePage.jsx";
 import StatusPage from "./components/status/StatusPage.jsx";
 import OfflineNotice from "./components/ui/OfflineNotice.jsx";
 import { registerServiceWorker } from "./serviceWorker";
+import { enforcePreferredHost } from "./utils/baseUrl";
 import "./index.css";
+
+enforcePreferredHost();
 
 const currentPath = window.location.pathname;
 const isCheckinRoute = currentPath.startsWith("/checkin");

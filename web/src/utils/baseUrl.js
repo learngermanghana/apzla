@@ -1,4 +1,6 @@
 export const PREFERRED_BASE_URL = "https://www.apzla.com";
+const PREFERRED_HOSTNAME = "www.apzla.com";
+const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
 
 export const normalizeBaseUrl = (rawBaseUrl) => {
   const fallback = PREFERRED_BASE_URL;
@@ -20,4 +22,24 @@ export const normalizeBaseUrl = (rawBaseUrl) => {
   }
 
   return sanitized || fallback;
+};
+
+export const enforcePreferredHost = () => {
+  if (typeof window === "undefined") return;
+
+  const { hostname, pathname, search, hash } = window.location;
+  const lowerHost = (hostname || "").toLowerCase();
+  const isLocalHost = LOCAL_HOSTS.includes(lowerHost) || lowerHost.endsWith(".local");
+
+  if (isLocalHost || lowerHost === PREFERRED_HOSTNAME) return;
+
+  const shouldRedirect =
+    lowerHost.includes("apzla.vercel.app") ||
+    lowerHost.includes("apzla.app") ||
+    (lowerHost.includes("apzla.com") && !lowerHost.includes(PREFERRED_HOSTNAME));
+
+  if (!shouldRedirect) return;
+
+  const destination = `${PREFERRED_BASE_URL}${pathname}${search}${hash}`;
+  window.location.replace(destination);
 };
