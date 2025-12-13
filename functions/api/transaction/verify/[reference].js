@@ -90,29 +90,29 @@ async function handler(request, response) {
       }
     })
 
-    const body = await paystackResponse.json().catch(() => ({}))
+    const body = await paystackResponse.json().catch(() => null)
 
-    if (!paystackResponse.ok) {
-      const message = body?.message || paystackResponse.statusText || 'Verification failed'
-      return response.status(paystackResponse.status || 500).json({
+    if (!body) {
+      return response.status(502).json({
         status: 'error',
-        message
+        message: 'Paystack returned a non-JSON response'
       })
     }
 
-    const verificationData = body?.data
-
-    if (!verificationData) {
-      return response.status(500).json({
-        status: 'error',
-        message: 'Paystack verification did not return data.'
-      })
-    }
-
-    if (verificationData.status !== 'success') {
+    if (body.status !== true || !body.data) {
       return response.status(400).json({
         status: 'error',
-        message: 'Payment is not successful yet.',
+        message: body.message || 'Paystack verification failed',
+        raw: body
+      })
+    }
+
+    const verificationData = body.data
+
+    if (verificationData.status !== 'success') {
+      return response.status(409).json({
+        status: 'error',
+        message: verificationData.gateway_response || 'Payment not successful yet',
         data: verificationData
       })
     }
