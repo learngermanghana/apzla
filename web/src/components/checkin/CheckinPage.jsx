@@ -1,8 +1,6 @@
 // web/src/components/checkin/CheckinPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./checkin.css";
-import { db } from "../../firebase";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import StatusBanner from "../StatusBanner";
 
 const LOCAL_PHONE_KEY = "apzla_last_phone";
@@ -73,40 +71,6 @@ export default function CheckinPage() {
     });
   };
 
-  const recordAttendanceIfNew = async ({
-    churchId,
-    memberId,
-    serviceDate,
-    serviceType,
-  }) => {
-    if (!churchId || !memberId || !serviceDate) return;
-
-    const colRef = collection(db, "attendance");
-    const normalizedService = (serviceType || "").toLowerCase();
-
-    const qExisting = query(
-      colRef,
-      where("churchId", "==", churchId),
-      where("memberId", "==", memberId),
-      where("date", "==", serviceDate),
-      where("serviceType", "==", normalizedService)
-    );
-
-    const existingSnapshot = await getDocs(qExisting);
-    if (!existingSnapshot.empty) {
-      return;
-    }
-
-    await addDoc(colRef, {
-      churchId,
-      memberId,
-      date: serviceDate,
-      serviceType: normalizedService,
-      checkedInAt: new Date().toISOString(),
-      source: "SELF",
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -161,7 +125,7 @@ export default function CheckinPage() {
       const data = await res.json().catch(() => ({}));
       setAttempts((prev) => prev + 1);
 
-      const ok = data.ok ?? res.ok;
+      const ok = data.ok ?? data.status === "success" ?? res.ok;
 
       if (!ok) {
         const msg =
@@ -179,8 +143,11 @@ export default function CheckinPage() {
         // ignore storage issues
       }
 
+      const payload = data?.data || {};
+      const alreadyPresent = payload.alreadyPresent;
+
       // Handle duplicate / already checked in
-      if (data.alreadyCheckedIn) {
+      if (alreadyPresent) {
         setFeedback({
           ok: true,
           message:
@@ -198,18 +165,8 @@ export default function CheckinPage() {
         setStatusTone("success");
       }
 
-      const newSummary = data.summary || null;
+      const newSummary = payload || null;
       setSummary(newSummary);
-
-      // Also persist attendance in Firestore if needed
-      if (newSummary) {
-        await recordAttendanceIfNew({
-          churchId: newSummary.churchId,
-          memberId: newSummary.memberId,
-          serviceDate: newSummary.serviceDate,
-          serviceType: newSummary.serviceType,
-        });
-      }
     } catch (err) {
       console.error(err);
       setFeedback({
