@@ -12,6 +12,8 @@ This app powers the Apzla dashboard experience. It is built with Vite and reads 
    - `VITE_FIREBASE_STORAGE_BUCKET`
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`
    - `VITE_FIREBASE_APP_ID`
+   - Optional: `VITE_EMAIL_VERIFICATION_REDIRECT_URL` (defaults to the current origin) to force verification links to use a
+     specific domain that your email provider delivers reliably.
 
 The Vite `VITE_` prefix ensures these values are exposed to the browser bundle. During local development they come from `.env.local`; in production (e.g. Vercel) set the same keys in the project settings so builds and previews pick them up automatically.
 
