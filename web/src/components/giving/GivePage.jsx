@@ -48,17 +48,31 @@ export default function GivePage() {
     return churchId ? `${normalizedBase}/give/${churchId}` : "";
   }, [churchId]);
 
-  const payoutStatus = church?.payoutStatus || "NOT_CONFIGURED";
+  const payoutStatus = (church?.payoutStatus || "NOT_CONFIGURED").toString().toUpperCase();
   const paystackSubaccountCode = church?.paystackSubaccountCode || null;
+  const payoutLastError = church?.payoutLastError || "";
+  const payoutLastErrorAt = church?.payoutLastErrorAt || null;
+  const payoutLastErrorDisplayTime = useMemo(() => {
+    if (!payoutLastErrorAt) return "";
+    if (typeof payoutLastErrorAt?.toDate === "function") {
+      return payoutLastErrorAt.toDate().toLocaleString();
+    }
+    const parsed = new Date(payoutLastErrorAt);
+    return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleString();
+  }, [payoutLastErrorAt]);
   const onlineGivingReady = payoutStatus === "ACTIVE" && !!paystackSubaccountCode;
   const onlineGivingStatusMessage =
     payoutStatus === "PENDING_SUBACCOUNT"
       ? "Online giving setup is in progress. Please check back soon."
       : payoutStatus === "FAILED_SUBACCOUNT"
-        ? "Online giving setup needs attention. Please contact the church admin."
-        : payoutStatus === "NOT_CONFIGURED"
-          ? "Online giving is not active yet. Please contact the church admin to apply."
-          : "";
+        ? payoutLastError
+          ? `Online giving setup failed: ${payoutLastError}${
+              payoutLastErrorDisplayTime ? ` (recorded ${payoutLastErrorDisplayTime})` : ""
+            }. Please contact the church admin.`
+          : "Online giving setup needs attention. Please contact the church admin."
+      : payoutStatus === "NOT_CONFIGURED"
+        ? "Online giving is not active yet. Please contact the church admin to apply."
+        : "";
   const onlineGivingStatusTone = payoutStatus === "FAILED_SUBACCOUNT" ? "error" : "info";
 
   useEffect(() => {

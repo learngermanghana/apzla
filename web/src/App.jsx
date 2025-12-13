@@ -7,6 +7,7 @@ import {
   getDoc,
   doc,
   updateDoc,
+  serverTimestamp,
   deleteDoc,
   setDoc,
   query,
@@ -209,6 +210,8 @@ function AppContent() {
   const [payoutStatus, setPayoutStatus] = useState("NOT_CONFIGURED");
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState(null);
   const [onlineGivingAppliedAt, setOnlineGivingAppliedAt] = useState(null);
+  const [payoutLastError, setPayoutLastError] = useState("");
+  const [payoutLastErrorAt, setPayoutLastErrorAt] = useState(null);
   const [payoutForm, setPayoutForm] = useState({
     bankType: "",
     accountName: "",
@@ -240,9 +243,23 @@ function AppContent() {
     )}`;
   }, [onlineGivingLink]);
 
+  const payoutLastErrorDisplayTime = useMemo(() => {
+    if (!payoutLastErrorAt) return "";
+    if (typeof payoutLastErrorAt?.toDate === "function") {
+      return payoutLastErrorAt.toDate().toLocaleString();
+    }
+
+    const parsed = new Date(payoutLastErrorAt);
+    return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleString();
+  }, [payoutLastErrorAt]);
+
   const onlineGivingActive = payoutStatus === "ACTIVE";
   const onlineGivingPending = payoutStatus === "PENDING_SUBACCOUNT";
   const onlineGivingFailed = payoutStatus === "FAILED_SUBACCOUNT";
+  const hasSavedPayoutDetails = Boolean(
+    payoutForm.bankType.trim() && payoutForm.accountName.trim() && payoutForm.accountNumber.trim()
+  );
+  const canRetrySubaccountSetup = (onlineGivingFailed || onlineGivingPending) && hasSavedPayoutDetails;
   const onlineGivingStatusLabel = onlineGivingActive
     ? "Active"
     : onlineGivingPending
@@ -365,17 +382,30 @@ function AppContent() {
   }, []);
 
   const syncOnlineGivingState = (data) => {
-    setPayoutStatus(data?.payoutStatus || data?.onlineGivingStatus || "NOT_CONFIGURED");
+    const status = (data?.payoutStatus || data?.onlineGivingStatus || "NOT_CONFIGURED")
+      .toString()
+      .toUpperCase();
+
+    setPayoutStatus(status);
     setPaystackSubaccountCode(
       data?.paystackSubaccountCode || data?.onlineGivingSubaccount || null
     );
     setOnlineGivingAppliedAt(data?.onlineGivingAppliedAt || null);
+    setPayoutLastError(data?.payoutLastError || "");
+    setPayoutLastErrorAt(data?.payoutLastErrorAt || null);
     setPayoutForm((prev) => ({
       ...prev,
       bankType: data?.payoutBankType || prev.bankType,
       accountName: data?.payoutAccountName || prev.accountName,
       accountNumber: data?.payoutAccountNumber || prev.accountNumber,
       network: data?.payoutNetwork || prev.network,
+      confirmDetails:
+        prev.confirmDetails ||
+        Boolean(
+          (data?.payoutBankType || prev.bankType) &&
+            (data?.payoutAccountName || prev.accountName) &&
+            (data?.payoutAccountNumber || prev.accountNumber)
+        ),
     }));
   };
 
@@ -931,6 +961,8 @@ function AppContent() {
         payoutAccountName: "",
         payoutAccountNumber: "",
         payoutNetwork: "",
+        payoutLastError: null,
+        payoutLastErrorAt: null,
         onlineGivingAppliedAt: null,
         onlineGivingEnabled: false,
       });
@@ -966,6 +998,8 @@ function AppContent() {
         payoutAccountName: "",
         payoutAccountNumber: "",
         payoutNetwork: "",
+        payoutLastError: null,
+        payoutLastErrorAt: null,
         onlineGivingAppliedAt: null,
         onlineGivingEnabled: false,
       });
@@ -1650,7 +1684,7 @@ function AppContent() {
   };
 
   // ---------- Online giving application ----------
-  const handleSubmitOnlineGivingApplication = async () => {
+  const handleSubmitOnlineGivingApplication = async ({ skipConfirmCheck = false } = {}) => {
     if (!userProfile?.churchId) {
       showToast("Link a church before applying for online giving.", "error");
       return;
@@ -1662,46 +1696,89 @@ function AppContent() {
       { key: "accountNumber", label: "Account number / phone" },
     ];
 
-    const missing = requiredFields.find((field) => !payoutForm[field.key].trim());
-    if (missing) {
-      showToast(`${missing.label} is required.`, "error");
-      return;
-    }
-
-    if (!payoutForm.confirmDetails) {
-      showToast("Please confirm the settlement details are correct.", "error");
-      return;
-    }
+    let churchRef = null;
 
     try {
       setOnlineGivingActionLoading(true);
+      churchRef = doc(db, "churches", userProfile.churchId);
+
+      const latestSnapshot = await getDoc(churchRef);
+      if (!latestSnapshot.exists()) {
+        showToast("We couldn’t find this church record.", "error");
+        return;
+      }
+
+      const latestData = latestSnapshot.data() || {};
+      syncOnlineGivingState(latestData);
+
+      const normalizedStatus = (latestData.payoutStatus || "NOT_CONFIGURED")
+        .toString()
+        .toUpperCase();
+
+      if (normalizedStatus === "ACTIVE" && latestData.paystackSubaccountCode) {
+        setChurchPlan((prev) => (prev ? { ...prev, ...latestData } : prev));
+        showToast("Online giving is already active for this church.", "info");
+        return;
+      }
+
+      if (normalizedStatus === "PENDING_SUBACCOUNT" && !skipConfirmCheck) {
+        showToast("Processing your Paystack subaccount. You can retry if it seems stuck.", "info");
+        return;
+      }
+
+      const payoutDetails = {
+        bankType: (latestData.payoutBankType || payoutForm.bankType).trim(),
+        accountName: (latestData.payoutAccountName || payoutForm.accountName).trim(),
+        accountNumber: (latestData.payoutAccountNumber || payoutForm.accountNumber).trim(),
+        network: (latestData.payoutNetwork || payoutForm.network || "").trim(),
+      };
+
+      const missing = requiredFields.find((field) => !payoutDetails[field.key]);
+      if (missing) {
+        showToast(`${missing.label} is required.`, "error");
+        return;
+      }
+
+      if (!skipConfirmCheck && !payoutForm.confirmDetails) {
+        showToast("Please confirm the settlement details are correct.", "error");
+        return;
+      }
+
+      setPayoutForm((prev) => ({ ...prev, ...payoutDetails }));
+
       const nowIso = new Date().toISOString();
 
-      await updateDoc(doc(db, "churches", userProfile.churchId), {
-        payoutBankType: payoutForm.bankType.trim(),
-        payoutAccountName: payoutForm.accountName.trim(),
-        payoutAccountNumber: payoutForm.accountNumber.trim(),
-        payoutNetwork: payoutForm.network.trim() || null,
+      await updateDoc(churchRef, {
+        payoutBankType: payoutDetails.bankType,
+        payoutAccountName: payoutDetails.accountName,
+        payoutAccountNumber: payoutDetails.accountNumber,
+        payoutNetwork: payoutDetails.network || null,
         payoutStatus: "PENDING_SUBACCOUNT",
         paystackSubaccountCode: null,
         onlineGivingAppliedAt: nowIso,
         onlineGivingEnabled: false,
+        payoutLastError: null,
+        payoutLastErrorAt: null,
       });
 
       setPayoutStatus("PENDING_SUBACCOUNT");
       setPaystackSubaccountCode(null);
       setOnlineGivingAppliedAt(nowIso);
+      setPayoutLastError("");
+      setPayoutLastErrorAt(null);
       setChurchPlan((prev) =>
         prev
           ? {
               ...prev,
               payoutStatus: "PENDING_SUBACCOUNT",
               paystackSubaccountCode: null,
-              payoutBankType: payoutForm.bankType.trim(),
-              payoutAccountName: payoutForm.accountName.trim(),
-              payoutAccountNumber: payoutForm.accountNumber.trim(),
-              payoutNetwork: payoutForm.network.trim() || "",
+              payoutBankType: payoutDetails.bankType,
+              payoutAccountName: payoutDetails.accountName,
+              payoutAccountNumber: payoutDetails.accountNumber,
+              payoutNetwork: payoutDetails.network || "",
               onlineGivingAppliedAt: nowIso,
+              payoutLastError: null,
+              payoutLastErrorAt: null,
             }
           : prev,
       );
@@ -1735,15 +1812,20 @@ function AppContent() {
       }
 
       if (!response.ok) {
-        throw new Error(
-          payload?.message || payload?.error || `Request failed (${response.status})`,
-        );
+        const baseMessage =
+          payload?.message || payload?.error || `Request failed (${response.status})`;
+        const detailedMessage = payload?.requestId
+          ? `${baseMessage} (requestId: ${payload.requestId})`
+          : baseMessage;
+        throw new Error(detailedMessage);
       }
 
       const subaccountCode = payload?.data?.subaccountCode || null;
 
       setPaystackSubaccountCode(subaccountCode);
       setPayoutStatus("ACTIVE");
+      setPayoutLastError("");
+      setPayoutLastErrorAt(null);
       setChurchPlan((prev) =>
         prev
           ? {
@@ -1751,6 +1833,8 @@ function AppContent() {
               payoutStatus: "ACTIVE",
               paystackSubaccountCode: subaccountCode,
               onlineGivingEnabled: true,
+              payoutLastError: null,
+              payoutLastErrorAt: null,
             }
           : prev,
       );
@@ -1759,14 +1843,34 @@ function AppContent() {
     } catch (err) {
       console.error("Submit online giving application error:", err);
       showToast(err.message || "Unable to create the Paystack subaccount right now.", "error");
+      const failureFields = {
+        payoutStatus: "FAILED_SUBACCOUNT",
+        payoutLastError: err.message || "Unable to create the Paystack subaccount right now.",
+        payoutLastErrorAt: serverTimestamp(),
+      };
+      const localFailureFields = {
+        payoutStatus: "FAILED_SUBACCOUNT",
+        payoutLastError: err.message || "Unable to create the Paystack subaccount right now.",
+        payoutLastErrorAt: new Date().toISOString(),
+      };
       try {
-        await updateDoc(doc(db, "churches", userProfile.churchId), {
-          payoutStatus: "FAILED_SUBACCOUNT",
-        });
+        if (churchRef) {
+          await updateDoc(churchRef, failureFields);
+        }
       } catch (updateError) {
         console.error("Failed to record payout failure state:", updateError);
       }
-      setPayoutStatus((prev) => (prev === "PENDING_SUBACCOUNT" ? "FAILED_SUBACCOUNT" : prev));
+      setPayoutStatus("FAILED_SUBACCOUNT");
+      setPayoutLastError(localFailureFields.payoutLastError);
+      setPayoutLastErrorAt(localFailureFields.payoutLastErrorAt);
+      setChurchPlan((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...localFailureFields,
+            }
+          : prev,
+      );
     } finally {
       setOnlineGivingActionLoading(false);
     }
@@ -4647,6 +4751,26 @@ function AppContent() {
                     We’re sending your payout details to Paystack. This usually takes a few
                     seconds.
                   </p>
+                  {canRetrySubaccountSetup && (
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitOnlineGivingApplication({ skipConfirmCheck: true })}
+                        disabled={onlineGivingActionLoading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          background: "white",
+                          color: "#854d0e",
+                          fontWeight: 700,
+                          cursor: onlineGivingActionLoading ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {onlineGivingActionLoading ? "Retrying..." : "Retry Subaccount Setup"}
+                      </button>
+                    </div>
+                  )}
                   {onlineGivingAppliedAt && (
                     <p style={{ margin: 0, fontSize: "13px" }}>
                       Requested on {new Date(onlineGivingAppliedAt).toLocaleString()}.
@@ -4664,8 +4788,38 @@ function AppContent() {
                     fontSize: "14px",
                   }}
                 >
-                  We couldn’t create the Paystack subaccount. Double-check the payout details
-                  and try again.
+                  <p style={{ margin: "0 0 6px" }}>
+                    We couldn’t create the Paystack subaccount. Double-check the payout
+                    details and try again.
+                  </p>
+                  {payoutLastError && (
+                    <p style={{ margin: "0 0 6px", color: "#7f1d1d", fontWeight: 600 }}>
+                      Error: {payoutLastError}
+                      {payoutLastErrorDisplayTime
+                        ? ` (recorded ${payoutLastErrorDisplayTime})`
+                        : ""}
+                    </p>
+                  )}
+                  {canRetrySubaccountSetup && (
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitOnlineGivingApplication({ skipConfirmCheck: true })}
+                        disabled={onlineGivingActionLoading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          background: "white",
+                          color: "#991b1b",
+                          fontWeight: 700,
+                          cursor: onlineGivingActionLoading ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {onlineGivingActionLoading ? "Retrying..." : "Retry Subaccount Setup"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
