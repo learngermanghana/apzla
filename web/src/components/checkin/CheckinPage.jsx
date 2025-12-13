@@ -17,6 +17,7 @@ export default function CheckinPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [copyStatus, setCopyStatus] = useState("Copy link");
 
   // ---- NEW: read token from URL (query OR path) ----
   const tokenFromUrl = useMemo(() => {
@@ -59,6 +60,39 @@ export default function CheckinPage() {
       return tokenFromUrl;
     });
   }, [tokenFromUrl]);
+
+  useEffect(() => {
+    setCopyStatus("Copy link");
+  }, [token, tokenFromUrl]);
+
+  const inviteLink = useMemo(() => {
+    if (typeof window === "undefined") return "";
+
+    const trimmedToken = (token || tokenFromUrl || "").trim();
+    const origin = window.location.origin;
+
+    if (!trimmedToken) {
+      return window.location.href;
+    }
+
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const basePath = pathParts[0] === "attendance" ? "attendance" : "checkin";
+
+    return `${origin}/${basePath}/${trimmedToken}`;
+  }, [token, tokenFromUrl]);
+
+  const handleCopyInviteLink = async () => {
+    if (!inviteLink) return;
+
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopyStatus("Copied!");
+    } catch {
+      setCopyStatus("Copy failed");
+    } finally {
+      setTimeout(() => setCopyStatus("Copy link"), 2000);
+    }
+  };
 
   const formatServiceDate = (isoDate) => {
     if (!isoDate) return "";
@@ -284,6 +318,33 @@ export default function CheckinPage() {
               required
               readOnly={!!tokenFromUrl} // optional: lock when token came from link
             />
+          </div>
+
+          <div className="checkin-field checkin-invite">
+            <label className="checkin-label" htmlFor="inviteLink">
+              Invite link
+            </label>
+            <div className="checkin-invite-row">
+              <input
+                id="inviteLink"
+                type="text"
+                className="checkin-input checkin-invite-input"
+                value={inviteLink}
+                readOnly
+              />
+              <button
+                type="button"
+                className="checkin-copy-button"
+                onClick={handleCopyInviteLink}
+                aria-label="Copy invite link"
+                disabled={!inviteLink}
+              >
+                {copyStatus}
+              </button>
+            </div>
+            <div className="checkin-invite-hint">
+              Copy the invitation link for anyone who still needs to check in.
+            </div>
           </div>
 
           <button type="submit" className="checkin-button" disabled={isSubmitting}>
