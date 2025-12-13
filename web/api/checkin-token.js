@@ -66,10 +66,28 @@ async function handler(request, response) {
   const { churchId, serviceDate, serviceType, email, baseUrl } =
     request.body || {}
 
-  if (!churchId || !serviceDate) {
+  const trimmedChurchId = (churchId || '').trim()
+
+  if (!trimmedChurchId || !serviceDate) {
     return response.status(400).json({
       status: 'error',
       message: 'churchId and serviceDate are required.',
+    })
+  }
+
+  try {
+    const churchSnap = await db.collection('churches').doc(trimmedChurchId).get()
+
+    if (!churchSnap.exists) {
+      return response.status(400).json({
+        status: 'error',
+        message: 'Invalid churchId — select a church.',
+      })
+    }
+  } catch (error) {
+    return response.status(500).json({
+      status: 'error',
+      message: error.message || 'Unable to validate church.',
     })
   }
 
@@ -87,7 +105,7 @@ async function handler(request, response) {
   const serviceCode = generateServiceCode()
 
   const payload = {
-    churchId,
+    churchId: trimmedChurchId,
     serviceDate,
     serviceType: serviceType || 'Service',
     nonce,
@@ -99,7 +117,7 @@ async function handler(request, response) {
 
   try {
     await writeNonceRecord(nonce, {
-      churchId,
+      churchId: trimmedChurchId,
       serviceDate,
       serviceType: payload.serviceType,
       serviceCode,
@@ -120,7 +138,7 @@ async function handler(request, response) {
       await queueNotification({
         email,
         link: checkinLink,
-        churchId,
+        churchId: trimmedChurchId,
         serviceDate,
       })
     }

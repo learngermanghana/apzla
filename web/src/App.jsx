@@ -414,7 +414,7 @@ function AppContent() {
   useEffect(() => {
     setCheckinTokenForm((prev) => ({
       ...prev,
-      churchId: prev.churchId || userProfile?.churchId || "",
+      churchId: userProfile?.churchId || "",
       baseUrl: normalizeBaseUrlMemo(prev.baseUrl || defaultBaseUrl),
     }));
   }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrlMemo]);
@@ -4309,14 +4309,22 @@ function AppContent() {
                             <input
                               type="text"
                               value={checkinTokenForm.churchId}
+                              disabled={Boolean(userProfile?.churchId)}
+                              readOnly={Boolean(userProfile?.churchId)}
                               onChange={(e) =>
                                 setCheckinTokenForm((prev) => ({
                                   ...prev,
-                                  churchId: e.target.value,
+                                  churchId:
+                                    userProfile?.churchId || e.target.value,
                                 }))
                               }
                               placeholder="e.g. church document ID"
                             />
+                            {userProfile?.churchId && (
+                              <span className="checkin-admin-hint">
+                                Loaded from your linked church.
+                              </span>
+                            )}
                           </label>
 
                           <label className="checkin-admin-field">
