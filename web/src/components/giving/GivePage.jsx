@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import StatusBanner from "../StatusBanner";
 import { db } from "../../firebase";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "../../utils/baseUrl";
@@ -94,23 +94,34 @@ export default function GivePage() {
     return "giver@apzla.com";
   };
 
-  const recordGiving = async (paystackReference) => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    await addDoc(collection(db, "giving"), {
-      churchId,
-      amount: Number(form.amount),
-      type: form.type,
-      serviceType: form.serviceType.trim() || "Online",
-      date: today,
-      memberId: null,
-      memberName: form.name.trim(),
-      phone: form.phone.trim(),
-      notes: "Online giving",
-      source: "ONLINE",
-      paystackReference: paystackReference || `GIVING-${churchId}-${Date.now()}`,
-      createdAt: now.toISOString(),
-    });
+  const verifyGiving = async (paystackReference) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : PREFERRED_BASE_URL;
+    const baseUrl = normalizeBaseUrl(origin);
+    const endpoint = `${baseUrl}/api/transaction/verify/${encodeURIComponent(paystackReference)}`;
+
+    setStatus({ tone: "info", message: "Verifying your payment..." });
+
+    try {
+      const res = await fetch(endpoint);
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok || payload?.status !== "success") {
+        throw new Error(payload?.message || "We could not verify your payment yet.");
+      }
+
+      setStatus({ tone: "success", message: "Thank you! Your payment was verified and recorded." });
+      setForm({ amount: "", type: "Tithe", name: "", phone: "", serviceType: "" });
+    } catch (err) {
+      console.error("Verify giving error:", err);
+      setStatus({
+        tone: "error",
+        message:
+          err.message ||
+          "Payment completed but we could not verify it automatically. Please inform the church admin.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const startPayment = async (event) => {
@@ -173,22 +184,7 @@ export default function GivePage() {
           source: "ONLINE",
         },
         callback: function (response) {
-          recordGiving(response?.reference || reference)
-            .then(() => {
-              setStatus({ tone: "success", message: "Thank you! Your giving was recorded." });
-              setForm({ amount: "", type: "Tithe", name: "", phone: "", serviceType: "" });
-            })
-            .catch((err) => {
-              console.error("Save giving error:", err);
-              setStatus({
-                tone: "error",
-                message:
-                  "Payment completed but we could not record it automatically. Please inform the church admin.",
-              });
-            })
-            .finally(() => {
-              setSubmitting(false);
-            });
+          verifyGiving(response?.reference || reference);
         },
         onClose: function () {
           setSubmitting(false);
