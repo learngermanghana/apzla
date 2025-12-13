@@ -197,8 +197,11 @@ export default function GivePage() {
           serviceType: form.serviceType.trim() || undefined,
           source: "ONLINE",
         },
-        callback: function (response) {
-          verifyGiving(response?.reference || reference);
+        callback: async (resp) => {
+          console.log("Generated ref:", reference);
+          const returnedRef = resp?.reference;
+          console.log("Paystack returned ref:", returnedRef);
+          await verifyGiving(returnedRef || reference);
         },
         onClose: function () {
           setSubmitting(false);
