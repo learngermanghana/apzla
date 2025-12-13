@@ -48,18 +48,18 @@ export default function GivePage() {
     return churchId ? `${normalizedBase}/give/${churchId}` : "";
   }, [churchId]);
 
-  const onlineGivingStatus = church?.onlineGivingStatus || "NOT_CONFIGURED";
-  const onlineGivingReady =
-    onlineGivingStatus === "ACTIVE" && !!church?.onlineGivingSubaccount;
+  const payoutStatus = church?.payoutStatus || "NOT_CONFIGURED";
+  const paystackSubaccountCode = church?.paystackSubaccountCode || null;
+  const onlineGivingReady = payoutStatus === "ACTIVE" && !!paystackSubaccountCode;
   const onlineGivingStatusMessage =
-    onlineGivingStatus === "PENDING_REVIEW"
-      ? "Online giving is pending review. The church admin will enable this link once approved."
-      : onlineGivingStatus === "REJECTED"
-        ? "Online giving was rejected. Please contact the church admin for assistance."
-        : onlineGivingStatus === "NOT_CONFIGURED"
+    payoutStatus === "PENDING_SUBACCOUNT"
+      ? "Online giving setup is in progress. Please check back soon."
+      : payoutStatus === "FAILED_SUBACCOUNT"
+        ? "Online giving setup needs attention. Please contact the church admin."
+        : payoutStatus === "NOT_CONFIGURED"
           ? "Online giving is not active yet. Please contact the church admin to apply."
           : "";
-  const onlineGivingStatusTone = onlineGivingStatus === "REJECTED" ? "error" : "info";
+  const onlineGivingStatusTone = payoutStatus === "FAILED_SUBACCOUNT" ? "error" : "info";
 
   useEffect(() => {
     if (!churchId) {
@@ -161,7 +161,7 @@ export default function GivePage() {
         amount: Math.round(numericAmount * 100),
         currency: "GHS",
         ref: reference,
-        subaccount: church?.onlineGivingSubaccount,
+        subaccount: paystackSubaccountCode,
         bearer: "subaccount",
         metadata: {
           churchId,
