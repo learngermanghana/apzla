@@ -32,8 +32,8 @@ async function fetchNonce(nonce) {
 
 async function recordNonceVerification(nonce, metadata) {
   const updateData = {
-    consumed: false,
-    consumedAt: null,
+    consumed: metadata.consumed || false,
+    consumedAt: metadata.consumedAt || null,
     consumedIp: metadata.ip || '',
     status: metadata.status || 'active',
     lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -46,18 +46,51 @@ async function recordNonceVerification(nonce, metadata) {
   await db.collection(nonceCollection).doc(nonce).set(updateData, { merge: true })
 }
 
-async function findMemberByPhone(churchId, phone) {
-  const normalizedPhone = `${phone || ''}`.trim()
-  if (!normalizedPhone) return null
+function sanitizeServiceType(serviceType = 'Service') {
+  return `${serviceType}`.trim().replace(/[^\w-]+/g, '_')
+}
 
-  const snap = await db
-    .collection('members')
-    .where('churchId', '==', churchId)
-    .where('phone', '==', normalizedPhone)
-    .limit(1)
-    .get()
+function normalizePhone(phoneRaw) {
+  const p = `${phoneRaw || ''}`.trim()
+  if (!p) return ''
 
-  return snap.empty ? null : snap.docs[0]
+  let digits = p.replace(/[^\d+]/g, '')
+
+  if (digits.startsWith('+233')) digits = '0' + digits.slice(4)
+  if (digits.startsWith('233')) digits = '0' + digits.slice(3)
+
+  return digits
+}
+
+async function findMemberByPhone(churchId, phoneRaw) {
+  const trimmed = `${phoneRaw || ''}`.trim()
+  const normalized = normalizePhone(phoneRaw)
+
+  if (!trimmed && !normalized) return null
+
+  if (trimmed) {
+    const snap1 = await db
+      .collection('members')
+      .where('churchId', '==', churchId)
+      .where('phone', '==', trimmed)
+      .limit(1)
+      .get()
+
+    if (!snap1.empty) return snap1.docs[0]
+  }
+
+  if (normalized && normalized !== trimmed) {
+    const snap2 = await db
+      .collection('members')
+      .where('churchId', '==', churchId)
+      .where('phone', '==', normalized)
+      .limit(1)
+      .get()
+
+    if (!snap2.empty) return snap2.docs[0]
+  }
+
+  return null
 }
 
 async function getChurchName(churchId) {
@@ -170,28 +203,57 @@ async function handler(request, response) {
     const memberName = `${memberData.firstName || ''} ${memberData.lastName || ''}`.trim()
     const churchName = await getChurchName(payload.churchId)
 
+    const memberId = memberDoc.id
+    const serviceType = payload.serviceType || nonceRecord.serviceType || 'Service'
+    const serviceDate = payload.serviceDate
+    const safeType = sanitizeServiceType(serviceType)
+    const attendanceKey = `${serviceDate}_${safeType}_${memberId}`
+    const attendanceRef = db.collection('memberAttendance').doc(attendanceKey)
+    const existingAttendance = await attendanceRef.get()
+
+    let alreadyPresent = false
+
+    if (!existingAttendance.exists) {
+      await attendanceRef.set({
+        memberId,
+        churchId: payload.churchId,
+        serviceDate,
+        serviceType,
+        status: 'PRESENT',
+        source: 'qr-verify',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    } else {
+      alreadyPresent = true
+    }
+
     await recordNonceVerification(payload.nonce, {
       ip: request.headers['x-forwarded-for'] || request.socket?.remoteAddress,
       status: 'verified',
-      message: 'Verified and recorded.',
+      message: alreadyPresent ? 'Attendance already recorded.' : 'Verified and recorded.',
       serviceCode: expectedCode,
-      phone,
+      phone: normalizePhone(phone) || phone,
+      consumed: true,
+      consumedAt: admin.firestore.FieldValue.serverTimestamp(),
     })
 
     return response.status(200).json({
       status: 'success',
       data: {
-        memberId: memberDoc.id,
+        memberId,
         memberName: memberName || memberData.displayName || memberData.fullName || '',
         churchId: payload.churchId,
         churchName: churchName || '',
-        serviceDate: payload.serviceDate,
-        serviceType: payload.serviceType || 'Service',
+        serviceDate,
+        serviceType,
         nonce: payload.nonce,
-        phone,
+        phone: normalizePhone(phone) || phone,
         serviceCode: expectedCode,
+        alreadyPresent,
       },
-      message: 'Check-in verified successfully.',
+      message: alreadyPresent
+        ? 'You are already checked in for this service.'
+        : 'Check-in verified and recorded successfully.',
     })
   } catch (error) {
     return response.status(500).json({
