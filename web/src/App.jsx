@@ -78,6 +78,22 @@ function AppContent() {
     city: "",
     phone: "",
   });
+
+  const verificationRedirectUrl = useMemo(() => {
+    const envUrl = import.meta.env.VITE_EMAIL_VERIFICATION_REDIRECT_URL;
+    if (envUrl) return envUrl;
+    if (typeof window !== "undefined") return window.location.origin;
+    return "";
+  }, []);
+
+  const buildVerificationOptions = useCallback(() => {
+    if (!verificationRedirectUrl) return undefined;
+
+    return {
+      url: verificationRedirectUrl,
+      handleCodeInApp: false,
+    };
+  }, [verificationRedirectUrl]);
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [churchPlan, setChurchPlan] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
@@ -505,7 +521,7 @@ function AppContent() {
       await createUserWithEmailAndPassword(auth, email.trim(), password);
       if (auth.currentUser) {
         try {
-          await sendEmailVerification(auth.currentUser);
+          await sendEmailVerification(auth.currentUser, buildVerificationOptions());
           setVerificationMessage(
             `Verification email sent to ${auth.currentUser.email}. Please confirm to continue.`
           );
@@ -596,7 +612,7 @@ function AppContent() {
 
     try {
       setVerificationLoading(true);
-      await sendEmailVerification(auth.currentUser);
+      await sendEmailVerification(auth.currentUser, buildVerificationOptions());
       setVerificationMessage(
         `Verification email sent to ${auth.currentUser.email}. Check your inbox to confirm.`
       );
