@@ -1711,7 +1711,13 @@ function AppContent() {
           ? window.location.origin.replace(/\/$/, "")
           : "https://www.apzla.com";
 
-      const idToken = await auth.currentUser?.getIdToken(true);
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("You must be signed in to apply for online giving.");
+      }
+
+      const idToken = await user.getIdToken(true);
+
       const response = await fetch(`${callableBase}/api/create-church-subaccount`, {
         method: "POST",
         headers: {
@@ -1721,12 +1727,20 @@ function AppContent() {
         body: JSON.stringify({ churchId: userProfile.churchId }),
       });
 
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(json.message || `HTTP ${response.status}`);
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (error) {
+        console.warn("Unable to parse create-church-subaccount response as JSON:", error);
       }
 
-      const subaccountCode = json?.data?.subaccountCode || null;
+      if (!response.ok) {
+        throw new Error(
+          payload?.message || payload?.error || `Request failed (${response.status})`,
+        );
+      }
+
+      const subaccountCode = payload?.data?.subaccountCode || null;
 
       setPaystackSubaccountCode(subaccountCode);
       setPayoutStatus("ACTIVE");
