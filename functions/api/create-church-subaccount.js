@@ -1,6 +1,18 @@
+const { randomUUID } = require('crypto')
 const { admin, db, initError } = require('../lib/firestoreAdmin')
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY
+
+const createRequestId = () => (typeof randomUUID === 'function' ? randomUUID() : `req-${Date.now()}`)
+
+function logAndSendError(response, statusCode, message, requestId, metadata = {}) {
+  console.error('[create-church-subaccount] error', { requestId, statusCode, message, ...metadata })
+  return response.status(statusCode).json({
+    status: 'error',
+    message,
+    requestId,
+  })
+}
 
 async function verifyUser(request) {
   const authHeader = request.headers.authorization || ''
@@ -18,43 +30,40 @@ async function verifyUser(request) {
 }
 
 async function handler(request, response) {
+  const requestId = createRequestId()
+
   if (request.method !== 'POST') {
-    return response.status(405).json({
-      status: 'error',
-      message: 'Method not allowed. Use POST.',
-    })
+    return logAndSendError(response, 405, 'Method not allowed. Use POST.', requestId)
   }
 
   if (initError) {
-    return response.status(500).json({
-      status: 'error',
-      message: initError.message || 'Unable to initialize Firebase.',
-    })
+    return logAndSendError(
+      response,
+      500,
+      initError.message || 'Unable to initialize Firebase.',
+      requestId
+    )
   }
 
   if (!PAYSTACK_SECRET) {
-    return response.status(500).json({
-      status: 'error',
-      message: 'PAYSTACK_SECRET_KEY environment variable is not configured.',
-    })
+    return logAndSendError(
+      response,
+      500,
+      'PAYSTACK_SECRET_KEY environment variable is not configured.',
+      requestId
+    )
   }
 
   const payload = request.body?.data || request.body || {}
   const churchId = payload?.churchId
 
   if (!churchId) {
-    return response.status(400).json({
-      status: 'error',
-      message: 'churchId is required.',
-    })
+    return logAndSendError(response, 400, 'churchId is required.', requestId)
   }
 
   const authResult = await verifyUser(request)
   if (authResult.error) {
-    return response.status(authResult.error.code).json({
-      status: 'error',
-      message: authResult.error.message,
-    })
+    return logAndSendError(response, authResult.error.code, authResult.error.message, requestId)
   }
 
   try {
@@ -62,29 +71,30 @@ async function handler(request, response) {
     const userData = userDoc.exists ? userDoc.data() : null
 
     if (userData?.churchId && userData.churchId !== churchId) {
-      return response.status(403).json({
-        status: 'error',
-        message: 'You are not allowed to manage this church.',
-      })
+      return logAndSendError(
+        response,
+        403,
+        'You are not allowed to manage this church.',
+        requestId
+      )
     }
 
     const churchRef = db.collection('churches').doc(churchId)
     const churchSnap = await churchRef.get()
 
     if (!churchSnap.exists) {
-      return response.status(404).json({
-        status: 'error',
-        message: 'Church not found.',
-      })
+      return logAndSendError(response, 404, 'Church not found.', requestId)
     }
 
     const church = churchSnap.data()
 
     if (church.ownerUserId && church.ownerUserId !== authResult.uid) {
-      return response.status(403).json({
-        status: 'error',
-        message: 'You are not allowed to manage this church.',
-      })
+      return logAndSendError(
+        response,
+        403,
+        'You are not allowed to manage this church.',
+        requestId
+      )
     }
 
     const payoutBankType = (church.payoutBankType || '').trim()
@@ -94,17 +104,21 @@ async function handler(request, response) {
     const bankCode = (church.payoutBankCode || payoutNetwork || payoutBankType).trim()
 
     if (!payoutBankType || !payoutAccountName || !payoutAccountNumber) {
-      return response.status(400).json({
-        status: 'error',
-        message: 'Missing payout details. Please provide bank type, account name, and account number/phone.',
-      })
+      return logAndSendError(
+        response,
+        400,
+        'Missing payout details. Please provide bank type, account name, and account number/phone.',
+        requestId
+      )
     }
 
     if (!bankCode) {
-      return response.status(400).json({
-        status: 'error',
-        message: 'Bank code or network is required to create a Paystack subaccount.',
-      })
+      return logAndSendError(
+        response,
+        400,
+        'Bank code or network is required to create a Paystack subaccount.',
+        requestId
+      )
     }
 
     const body = {
@@ -127,9 +141,9 @@ async function handler(request, response) {
 
     if (!paystackResponse.ok || !result.status) {
       const message = result?.message || paystackResponse.statusText || 'Paystack failed'
-      return response.status(paystackResponse.status || 500).json({
-        status: 'error',
-        message,
+      return logAndSendError(response, paystackResponse.status || 500, message, requestId, {
+        paystackStatus: paystackResponse.status,
+        paystackBody: result,
       })
     }
 
@@ -139,6 +153,8 @@ async function handler(request, response) {
       paystackSubaccountCode: subaccountCode,
       payoutStatus: 'ACTIVE',
       onlineGivingEnabled: true,
+      payoutLastError: null,
+      payoutLastErrorAt: null,
     })
 
     return response.status(200).json({
@@ -147,10 +163,13 @@ async function handler(request, response) {
       message: 'Paystack subaccount created.',
     })
   } catch (error) {
-    return response.status(500).json({
-      status: 'error',
-      message: error.message || 'Unable to create Paystack subaccount.',
-    })
+    return logAndSendError(
+      response,
+      500,
+      error.message || 'Unable to create Paystack subaccount.',
+      requestId,
+      { error }
+    )
   }
 }
 
