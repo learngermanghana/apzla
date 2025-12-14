@@ -5,7 +5,7 @@
     {
       "src": "web/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": { "distDir": "web/dist" }
     }
   ],
   "routes": [
@@ -14,9 +14,7 @@
       "dest": "/functions/api/transaction/verify/[reference].js?reference=$reference"
     },
     { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
-
     { "handle": "filesystem" },
-
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
