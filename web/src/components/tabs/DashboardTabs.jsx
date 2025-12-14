@@ -5,7 +5,7 @@ export const DASHBOARD_TABS = [
   { id: "members", label: "Members (CRM)" },
   { id: "attendance", label: "Attendance" },
   { id: "checkin", label: "Check-in (Per Member)" },
-  { id: "giving", label: "Giving (Tithes & Offerings)" },
+  { id: "giving", label: "Finance (Giving & Expenses)" },
   { id: "followup", label: "Follow-up" },
   { id: "sermons", label: "Sermons" },
 ];
