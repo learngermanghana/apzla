@@ -2892,7 +2892,7 @@ function AppContent() {
     return entries.slice(-8);
   }, [filteredGiving]);
 
-  const givingChartMax = useMemo(
+  const givingMonthlyChartMax = useMemo(
     () => Math.max(...givingMonthlyTrend.map((p) => p.amount || 0), 1),
     [givingMonthlyTrend],
   );
@@ -5343,7 +5343,7 @@ function AppContent() {
                   ) : (
                     givingMonthlyTrend.map((point) => {
                       const height = Math.max(
-                        (Number(point.amount || 0) / givingChartMax) * 100,
+                        (Number(point.amount || 0) / givingMonthlyChartMax) * 100,
                         6,
                       );
                       return (
