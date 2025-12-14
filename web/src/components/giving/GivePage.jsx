@@ -180,6 +180,15 @@ export default function GivePage() {
       }
 
       const reference = `GIVING-${churchId}-${Date.now()}`;
+
+      const handlePaystackCallback = async (resp) => {
+        const returnedRef = resp?.reference || reference;
+        if (!returnedRef) {
+          throw new Error("No Paystack reference returned.");
+        }
+        await verifyGiving(returnedRef);
+      };
+
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: normalizeEmail(),
@@ -197,11 +206,15 @@ export default function GivePage() {
           serviceType: form.serviceType.trim() || undefined,
           source: "ONLINE",
         },
-        callback: async (resp) => {
-          console.log("Generated ref:", reference);
-          const returnedRef = resp?.reference;
-          console.log("Paystack returned ref:", returnedRef);
-          await verifyGiving(returnedRef || reference);
+        callback: (resp) => {
+          handlePaystackCallback(resp).catch((callbackErr) => {
+            console.error("Paystack callback error:", callbackErr);
+            setStatus({
+              tone: "error",
+              message: callbackErr.message || "Could not verify your payment.",
+            });
+            setSubmitting(false);
+          });
         },
         onClose: function () {
           setSubmitting(false);
