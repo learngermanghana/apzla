@@ -33,6 +33,7 @@ import FollowupTab from "./components/tabs/FollowupTab";
 import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
+import MemberInviteShare from "./components/members/MemberInviteShare";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
 import {
   createMember,
@@ -147,6 +148,10 @@ function AppContent() {
     status: "VISITOR",
   });
   const [memberSearch, setMemberSearch] = useState("");
+  const normalizeBaseUrlMemo = useCallback(
+    (rawBaseUrl) => normalizeBaseUrl(rawBaseUrl),
+    []
+  );
   const memberInviteLink = useMemo(() => {
     if (!userProfile?.churchId) return "";
     return `${normalizeBaseUrlMemo(PREFERRED_BASE_URL)}/join/${userProfile.churchId}`;
@@ -176,11 +181,6 @@ function AppContent() {
         memberName: memberLookup.get(entry.memberId) || entry.memberId,
       })),
     [memberAttendanceHistory, memberLookup]
-  );
-
-  const normalizeBaseUrlMemo = useCallback(
-    (rawBaseUrl) => normalizeBaseUrl(rawBaseUrl),
-    []
   );
 
   // Attendance
@@ -3789,63 +3789,14 @@ function AppContent() {
               features.
             </p>
 
-            <div className="member-invite-share">
-              <div className="member-invite-share__header">
-                <div>
-                  <p className="eyebrow">Self-registration</p>
-                  <h3 style={{ margin: 0 }}>Invite link &amp; QR for new members</h3>
-                  <p className="member-invite-share__subtitle">
-                    Share this with visitors so they can fill the form themselves. Submissions are
-                    saved directly to your members list.
-                  </p>
-                </div>
-                <div className="member-invite-share__actions">
-                  <button onClick={copyMemberInviteLink} disabled={!memberInviteLink}>
-                    Copy link
-                  </button>
-                  <button onClick={openMemberInviteLink} disabled={!memberInviteLink}>
-                    Open link
-                  </button>
-                </div>
-              </div>
-
-              <div className="member-invite-share__link-row">
-                <input
-                  type="text"
-                  value={
-                    memberInviteLink ||
-                    "Link a church to generate a sign-up link for members."
-                  }
-                  readOnly
-                />
-                <button onClick={downloadMemberInviteQr} disabled={!memberInviteQrUrl}>
-                  Download QR
-                </button>
-                <button onClick={printMemberInviteQr} disabled={!memberInviteQrUrl}>
-                  Print QR
-                </button>
-              </div>
-
-              {memberInviteQrUrl && (
-                <div className="member-invite-share__qr">
-                  <div className="qr-display" style={{ marginTop: "12px" }}>
-                    <img
-                      src={memberInviteQrUrl}
-                      alt="Member invite QR"
-                      className="qr-image"
-                      style={{ width: "160px", height: "160px" }}
-                    />
-                    <div className="qr-actions">
-                      <button onClick={copyMemberInviteLink}>Copy link</button>
-                      <button onClick={openMemberInviteLink}>Open link</button>
-                    </div>
-                    <p className="qr-caption">
-                      Show or print this QR code during services so visitors can register themselves.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <MemberInviteShare
+              memberInviteLink={memberInviteLink}
+              memberInviteQrUrl={memberInviteQrUrl}
+              copyMemberInviteLink={copyMemberInviteLink}
+              openMemberInviteLink={openMemberInviteLink}
+              downloadMemberInviteQr={downloadMemberInviteQr}
+              printMemberInviteQr={printMemberInviteQr}
+            />
 
             {/* Member form */}
             <div
