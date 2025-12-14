@@ -34,6 +34,20 @@ import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
+import {
+  createMember,
+  deleteMemberById,
+  fetchMembers,
+  updateMember,
+} from "./services/membersService";
+import {
+  createAttendance,
+  createMemberAttendance,
+  fetchAttendance,
+  fetchMemberAttendance,
+  fetchMemberAttendanceHistory,
+} from "./services/attendanceService";
+import { createGivingRecord, fetchGiving } from "./services/givingService";
 
 function AppContent() {
   const {
@@ -1087,29 +1101,14 @@ function AppContent() {
     if (!userProfile?.churchId) return;
     try {
       setMembersLoading(true);
-      const colRef = collection(db, "members");
-      const constraints = [
-        where("churchId", "==", userProfile.churchId),
-        orderBy("createdAt", "desc"),
-      ];
+      const { data, lastDoc, hasMore } = await fetchMembers(db, userProfile.churchId, {
+        cursor: append ? memberPageCursor : null,
+        pageSize: MEMBERS_PAGE_SIZE,
+      });
 
-      if (append && memberPageCursor) {
-        constraints.push(startAfter(memberPageCursor));
-      }
-
-      constraints.push(limit(MEMBERS_PAGE_SIZE));
-
-      const qMembers = query(colRef, ...constraints);
-      const snapshot = await getDocs(qMembers);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
       setMembers((prev) => (append ? [...prev, ...data] : data));
-
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
       setMemberPageCursor(lastDoc);
-      setMembersHasMore(snapshot.docs.length === MEMBERS_PAGE_SIZE);
+      setMembersHasMore(hasMore);
     } catch (err) {
       console.error("Load members error:", err);
       showToast("Error loading members.", "error");
@@ -1128,8 +1127,7 @@ function AppContent() {
 
     try {
       setLoading(true);
-      await addDoc(collection(db, "members"), {
-        churchId: userProfile.churchId,
+      await createMember(db, userProfile.churchId, {
         firstName: memberForm.firstName.trim(),
         lastName: memberForm.lastName.trim(),
         phone: memberForm.phone.trim(),
@@ -1188,7 +1186,6 @@ function AppContent() {
 
     try {
       setMemberActionLoading(true);
-      const docRef = doc(db, "members", editingMemberId);
       const payload = {
         firstName: editingMemberForm.firstName.trim(),
         lastName: editingMemberForm.lastName.trim(),
@@ -1197,7 +1194,7 @@ function AppContent() {
         status: editingMemberForm.status,
         updatedAt: new Date().toISOString(),
       };
-      await updateDoc(docRef, payload);
+      await updateMember(db, editingMemberId, payload);
 
       setMembers((prev) =>
         prev.map((m) => (m.id === editingMemberId ? { ...m, ...payload } : m))
@@ -1220,7 +1217,7 @@ function AppContent() {
 
     try {
       setMemberActionLoading(true);
-      await deleteDoc(doc(db, "members", memberId));
+      await deleteMemberById(db, memberId);
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
       if (editingMemberId === memberId) {
         cancelEditingMember();
@@ -1260,14 +1257,8 @@ function AppContent() {
     if (!userProfile?.churchId) return;
     try {
       setAttendanceLoading(true);
-      const colRef = collection(db, "attendance");
-      const qAtt = query(colRef, where("churchId", "==", userProfile.churchId));
-      const snapshot = await getDocs(qAtt);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAttendance(data);
+      const records = await fetchAttendance(db, userProfile.churchId);
+      setAttendance(records);
     } catch (err) {
       console.error("Load attendance error:", err);
       showToast("Error loading attendance.", "error");
@@ -1286,17 +1277,12 @@ function AppContent() {
 
     try {
       setLoading(true);
-      await addDoc(collection(db, "attendance"), {
-        churchId: userProfile.churchId,
+      await createAttendance(db, userProfile.churchId, {
         date: attendanceForm.date,
         serviceType: attendanceForm.serviceType.trim() || "Service",
         adults: attendanceForm.adults ? Number(attendanceForm.adults) : 0,
-        children: attendanceForm.children
-          ? Number(attendanceForm.children)
-          : 0,
-        visitors: attendanceForm.visitors
-          ? Number(attendanceForm.visitors)
-          : 0,
+        children: attendanceForm.children ? Number(attendanceForm.children) : 0,
+        visitors: attendanceForm.visitors ? Number(attendanceForm.visitors) : 0,
         notes: attendanceForm.notes.trim(),
         createdAt: new Date().toISOString(),
       });
@@ -1336,14 +1322,7 @@ function AppContent() {
 
     try {
       setOverviewMetricsLoading(true);
-      const colRef = collection(db, "memberAttendance");
-      const qMemberAttendance = query(
-        colRef,
-        where("churchId", "==", userProfile.churchId)
-      );
-
-      const snapshot = await getDocs(qMemberAttendance);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const data = await fetchMemberAttendanceHistory(db, userProfile.churchId);
 
       const sortedByDate = data.sort((a, b) => {
         const aDate = a.date || "";
@@ -1367,16 +1346,10 @@ function AppContent() {
       const normalizedServiceType =
         memberAttendanceForm.serviceType.trim() || "Service";
 
-      const colRef = collection(db, "memberAttendance");
-      const qMemberAttendance = query(
-        colRef,
-        where("churchId", "==", userProfile.churchId),
-        where("date", "==", memberAttendanceForm.date),
-        where("serviceType", "==", normalizedServiceType)
-      );
-
-      const snapshot = await getDocs(qMemberAttendance);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const data = await fetchMemberAttendance(db, userProfile.churchId, {
+        date: memberAttendanceForm.date,
+        serviceType: normalizedServiceType,
+      });
       setMemberAttendance(data);
     } catch (err) {
       console.error("Load member attendance error:", err);
@@ -1397,8 +1370,7 @@ function AppContent() {
       const normalizedServiceType =
         memberAttendanceForm.serviceType.trim() || "Service";
 
-      await addDoc(collection(db, "memberAttendance"), {
-        churchId: userProfile.churchId,
+      await createMemberAttendance(db, userProfile.churchId, {
         memberId,
         date: memberAttendanceForm.date,
         serviceType: normalizedServiceType,
@@ -1955,34 +1927,15 @@ function AppContent() {
     if (!userProfile?.churchId) return;
     try {
       setGivingLoading(true);
-      const colRef = collection(db, "giving");
-      const constraints = [
-        where("churchId", "==", userProfile.churchId),
-      ];
-
-      if (memberId) {
-        constraints.push(where("memberId", "==", memberId));
-      }
-
-      constraints.push(orderBy("createdAt", "desc"));
-
-      if (append && givingPageCursor) {
-        constraints.push(startAfter(givingPageCursor));
-      }
-
-      constraints.push(limit(GIVING_PAGE_SIZE));
-
-      const qGiving = query(colRef, ...constraints);
-      const snapshot = await getDocs(qGiving);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const { data, lastDoc, hasMore } = await fetchGiving(db, userProfile.churchId, {
+        memberId,
+        cursor: append ? givingPageCursor : null,
+        pageSize: GIVING_PAGE_SIZE,
+      });
       setGiving((prev) => (append ? [...prev, ...data] : data));
 
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
       setGivingPageCursor(lastDoc);
-      setGivingHasMore(snapshot.docs.length === GIVING_PAGE_SIZE);
+      setGivingHasMore(hasMore);
     } catch (err) {
       console.error("Load giving error:", err);
       showToast("Error loading giving records.", "error");
@@ -2010,8 +1963,7 @@ function AppContent() {
       const memberName = selectedMember
         ? `${selectedMember.firstName || ""} ${selectedMember.lastName || ""}`.trim()
         : "";
-      await addDoc(collection(db, "giving"), {
-        churchId: userProfile.churchId,
+      await createGivingRecord(db, userProfile.churchId, {
         date: givingForm.date,
         serviceType: givingForm.serviceType.trim() || "Service",
         type: givingForm.type,
