@@ -1,44 +1,48 @@
-export const PREFERRED_BASE_URL = "https://www.apzla.com";
-const PREFERRED_HOSTNAME = "www.apzla.com";
 const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
 
-export const normalizeBaseUrl = (rawBaseUrl) => {
-  const fallback = PREFERRED_BASE_URL;
-  const trimmed = (rawBaseUrl || "").trim();
+const rawBaseUrl =
+  import.meta.env.VITE_PUBLIC_BASE_URL ||
+  (typeof window !== "undefined" && window.location?.origin) ||
+  "https://apzla.vercel.app";
+
+export const normalizeBaseUrl = (rawBaseUrlValue) => {
+  const fallback = rawBaseUrl;
+  const trimmed = (rawBaseUrlValue || "").trim();
 
   if (!trimmed) return fallback;
 
-  const sanitized = trimmed.replace(/\/$/, "");
-  const lower = sanitized.toLowerCase();
-
-  if (
-    lower.includes("localhost") ||
-    lower.includes("127.0.0.1") ||
-    lower.includes("apzla.vercel.app") ||
-    lower.includes("apzla.app") ||
-    (lower.includes("apzla.com") && !lower.includes("www.apzla.com"))
-  ) {
+  try {
+    const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    return url.origin.replace(/\/$/, "");
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to parse base URL, using fallback.", error?.message);
     return fallback;
   }
-
-  return sanitized || fallback;
 };
 
+export const PREFERRED_BASE_URL = normalizeBaseUrl(rawBaseUrl);
+
+const PREFERRED_HOSTNAME = (() => {
+  try {
+    return new URL(PREFERRED_BASE_URL).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+})();
+
+const SHOULD_ENFORCE_HOST =
+  (import.meta.env.VITE_ENFORCE_PREFERRED_HOST || "false").toString().toLowerCase() === "true";
+
 export const enforcePreferredHost = () => {
-  if (typeof window === "undefined") return;
+  if (!SHOULD_ENFORCE_HOST) return;
+  if (typeof window === "undefined" || !PREFERRED_HOSTNAME) return;
 
   const { hostname, pathname, search, hash } = window.location;
   const lowerHost = (hostname || "").toLowerCase();
   const isLocalHost = LOCAL_HOSTS.includes(lowerHost) || lowerHost.endsWith(".local");
 
   if (isLocalHost || lowerHost === PREFERRED_HOSTNAME) return;
-
-  const shouldRedirect =
-    lowerHost.includes("apzla.vercel.app") ||
-    lowerHost.includes("apzla.app") ||
-    (lowerHost.includes("apzla.com") && !lowerHost.includes(PREFERRED_HOSTNAME));
-
-  if (!shouldRedirect) return;
 
   const destination = `${PREFERRED_BASE_URL}${pathname}${search}${hash}`;
   window.location.replace(destination);
