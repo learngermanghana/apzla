@@ -240,6 +240,14 @@ function AppContent() {
     notes: "",
     memberId: "",
   });
+  const [givingFilters, setGivingFilters] = useState({
+    startDate: "",
+    endDate: "",
+    type: "",
+    phone: "",
+    reference: "",
+    status: "",
+  });
   const [expenses, setExpenses] = useState([]);
   const [expensesLoading, setExpensesLoading] = useState(false);
   const [expensesPageCursor, setExpensesPageCursor] = useState(null);
@@ -2738,6 +2746,162 @@ function AppContent() {
   );
   const financeBalance = totalGivingAmount - totalExpenseAmount;
 
+  const resolveGivingPhone = useCallback(
+    (record) => {
+      if (!record) return "";
+
+      if (record.phone) return record.phone;
+      if (record.payerPhone) return record.payerPhone;
+      if (record.memberPhone) return record.memberPhone;
+
+      if (record.memberId) {
+        const memberMatch = members.find((m) => m.id === record.memberId);
+        if (memberMatch?.phone) return memberMatch.phone;
+      }
+
+      return "";
+    },
+    [members],
+  );
+
+  const resolveGivingReference = (record) =>
+    record?.reference || record?.paymentReference || record?.paystackReference || "";
+
+  const resolveGivingStatus = (record) =>
+    (record?.status || record?.paystackStatus || record?.paymentStatus || "completed").toLowerCase();
+
+  const givingTypeOptions = useMemo(() => {
+    const defaults = new Set(["Offering", "Tithe", "Special"]);
+    const fromData = new Set(
+      giving
+        .map((g) => g.type)
+        .filter(Boolean)
+        .map((t) => t.trim()),
+    );
+    const merged = new Set([...defaults, ...fromData]);
+    return Array.from(merged);
+  }, [giving]);
+
+  const filteredGiving = useMemo(() => {
+    return giving.filter((record) => {
+      const startDate = givingFilters.startDate ? new Date(givingFilters.startDate) : null;
+      const endDate = givingFilters.endDate ? new Date(givingFilters.endDate) : null;
+      const recordDate = record.date ? new Date(record.date) : null;
+      const normalizedType = (record.type || "").toLowerCase();
+      const normalizedFilterType = givingFilters.type.toLowerCase();
+      const phoneValue = resolveGivingPhone(record).toLowerCase();
+      const referenceValue = resolveGivingReference(record).toLowerCase();
+      const normalizedStatus = resolveGivingStatus(record);
+
+      if (startDate && recordDate && recordDate < startDate) return false;
+      if (endDate && recordDate && recordDate > endDate) return false;
+      if (normalizedFilterType && normalizedType !== normalizedFilterType) return false;
+
+      if (givingFilters.phone.trim()) {
+        const phoneFilter = givingFilters.phone.trim().toLowerCase();
+        if (!phoneValue.includes(phoneFilter)) return false;
+      }
+
+      if (givingFilters.reference.trim()) {
+        const refFilter = givingFilters.reference.trim().toLowerCase();
+        if (!referenceValue.includes(refFilter)) return false;
+      }
+
+      if (givingMemberFilter && record.memberId !== givingMemberFilter) return false;
+
+      if (givingFilters.status) {
+        const desired = givingFilters.status.toLowerCase();
+        if (desired === "reversed") {
+          if (normalizedStatus !== "reversed") return false;
+        } else if (normalizedStatus !== desired) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [giving, givingFilters, givingMemberFilter, resolveGivingPhone]);
+
+  const filteredGivingAmount = filteredGiving.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0,
+  );
+
+  const givingMonthlyTrend = useMemo(() => {
+    const monthMap = new Map();
+
+    filteredGiving.forEach((record) => {
+      if (!record.date) return;
+      const parsedDate = new Date(record.date);
+      if (Number.isNaN(parsedDate)) return;
+
+      const key = `${parsedDate.getFullYear()}-${String(
+        parsedDate.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      const current = monthMap.get(key) || 0;
+      monthMap.set(key, current + Number(record.amount || 0));
+    });
+
+    const entries = Array.from(monthMap.entries()).map(([key, amount]) => {
+      const [year, month] = key.split("-").map((v) => Number(v));
+      const date = new Date(year, month - 1, 1);
+      return {
+        label: date.toLocaleDateString("en-US", { month: "short" }),
+        year,
+        month,
+        amount,
+      };
+    });
+
+    entries.sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year));
+
+    return entries.slice(-6);
+  }, [filteredGiving]);
+
+  const givingWeeklyTrend = useMemo(() => {
+    const weekMap = new Map();
+
+    filteredGiving.forEach((record) => {
+      if (!record.date) return;
+      const parsedDate = new Date(record.date);
+      if (Number.isNaN(parsedDate)) return;
+
+      const day = parsedDate.getDay();
+      const diff = parsedDate.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(parsedDate);
+      monday.setDate(diff);
+      monday.setHours(0, 0, 0, 0);
+
+      const weekKey = monday.toISOString().slice(0, 10);
+      const current = weekMap.get(weekKey) || 0;
+      weekMap.set(weekKey, current + Number(record.amount || 0));
+    });
+
+    const entries = Array.from(weekMap.entries()).map(([key, amount]) => {
+      const labelDate = new Date(key);
+      const label = labelDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
+      return { label: `Week of ${label}`, amount, key };
+    });
+
+    entries.sort((a, b) => (a.key < b.key ? -1 : 1));
+
+    return entries.slice(-8);
+  }, [filteredGiving]);
+
+  const givingChartMax = useMemo(
+    () => Math.max(...givingMonthlyTrend.map((p) => p.amount || 0), 1),
+    [givingMonthlyTrend],
+  );
+
+  const givingWeeklyChartMax = useMemo(
+    () => Math.max(...givingWeeklyTrend.map((p) => p.amount || 0), 1),
+    [givingWeeklyTrend],
+  );
+
   const normalizeSearchValue = (value = "") => value.toLowerCase().trim();
   const memberMatchesSearch = (member, searchValue) => {
     const normalized = normalizeSearchValue(searchValue);
@@ -2783,6 +2947,132 @@ function AppContent() {
       return "Linked member";
     }
     return "—";
+  };
+
+  const resolveGivingStatusBadge = (status) => {
+    const normalized = (status || "").toLowerCase();
+
+    if (normalized === "reversed") {
+      return { label: "Reversed", bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" };
+    }
+    if (normalized === "pending") {
+      return { label: "Pending", bg: "#fef9c3", color: "#854d0e", border: "#fef08a" };
+    }
+    if (normalized === "failed") {
+      return { label: "Failed", bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" };
+    }
+
+    return { label: "Completed", bg: "#ecfdf3", color: "#166534", border: "#bbf7d0" };
+  };
+
+  const exportGivingCsv = () => {
+    const headers = [
+      "Date",
+      "Service",
+      "Type",
+      "Member",
+      "Phone",
+      "Reference",
+      "Amount",
+      "Status",
+      "Notes",
+    ];
+
+    const rows = filteredGiving.map((record) => [
+      record.date || "",
+      record.serviceType || "",
+      record.type || "",
+      resolveGivingMember(record),
+      resolveGivingPhone(record),
+      resolveGivingReference(record),
+      Number(record.amount || 0),
+      resolveGivingStatus(record),
+      record.notes || "",
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => {
+            const safeCell = String(cell ?? "");
+            if (safeCell.includes(",") || safeCell.includes("\n")) {
+              return `"${safeCell.replace(/"/g, '""')}"`;
+            }
+            return safeCell;
+          })
+          .join(","),
+      )
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `giving-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportGivingPdf = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const rows = filteredGiving
+      .map(
+        (record) => `
+          <tr>
+            <td>${record.date || ""}</td>
+            <td>${record.serviceType || ""}</td>
+            <td>${record.type || ""}</td>
+            <td>${resolveGivingMember(record)}</td>
+            <td>${resolveGivingPhone(record)}</td>
+            <td>${resolveGivingReference(record)}</td>
+            <td>${Number(record.amount || 0).toLocaleString()}</td>
+            <td>${resolveGivingStatus(record)}</td>
+            <td>${record.notes || ""}</td>
+          </tr>
+        `,
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Giving report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 6px; text-align: left; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h2>Giving report</h2>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Service</th>
+                <th>Type</th>
+                <th>Member</th>
+                <th>Phone</th>
+                <th>Reference</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const normalizedSermonSearch = normalizeSearchValue(sermonSearch);
@@ -4998,6 +5288,150 @@ function AppContent() {
 
             <div
               style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  background: "white",
+                }}
+              >
+                <p className="eyebrow" style={{ margin: 0 }}>
+                  Filtered giving total
+                </p>
+                <div className="stat-value" style={{ margin: "4px 0" }}>
+                  {filteredGivingAmount.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper" style={{ margin: 0 }}>
+                  Matches filters below
+                </p>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  background: "white",
+                }}
+              >
+                <p className="eyebrow" style={{ margin: 0 }}>
+                  Monthly giving trend
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-end",
+                    height: "120px",
+                    marginTop: "8px",
+                  }}
+                >
+                  {givingMonthlyTrend.length === 0 ? (
+                    <p style={{ color: "#6b7280", fontSize: "13px" }}>
+                      Add giving to see the monthly chart.
+                    </p>
+                  ) : (
+                    givingMonthlyTrend.map((point) => {
+                      const height = Math.max(
+                        (Number(point.amount || 0) / givingChartMax) * 100,
+                        6,
+                      );
+                      return (
+                        <div
+                          key={`${point.year}-${point.month}`}
+                          style={{
+                            flex: 1,
+                            background: "linear-gradient(180deg, #4f46e5, #a5b4fc)",
+                            height: `${height}%`,
+                            borderRadius: "6px",
+                            minWidth: "20px",
+                            display: "flex",
+                            alignItems: "flex-end",
+                            justifyContent: "center",
+                            color: "white",
+                            fontSize: "11px",
+                            paddingBottom: "4px",
+                          }}
+                          title={`${point.label}: ${point.amount.toLocaleString()}`}
+                        >
+                          {point.label}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  background: "white",
+                }}
+              >
+                <p className="eyebrow" style={{ margin: 0 }}>
+                  Weekly giving trend
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-end",
+                    height: "120px",
+                    marginTop: "8px",
+                  }}
+                >
+                  {givingWeeklyTrend.length === 0 ? (
+                    <p style={{ color: "#6b7280", fontSize: "13px" }}>
+                      Add giving to see the weekly chart.
+                    </p>
+                  ) : (
+                    givingWeeklyTrend.map((point) => {
+                      const height = Math.max(
+                        (Number(point.amount || 0) / givingWeeklyChartMax) * 100,
+                        6,
+                      );
+                      return (
+                        <div
+                          key={point.key}
+                          style={{
+                            flex: 1,
+                            background: "linear-gradient(180deg, #10b981, #6ee7b7)",
+                            height: `${height}%`,
+                            borderRadius: "6px",
+                            minWidth: "24px",
+                            display: "flex",
+                            alignItems: "flex-end",
+                            justifyContent: "center",
+                            color: "#064e3b",
+                            fontSize: "10px",
+                            paddingBottom: "4px",
+                            textAlign: "center",
+                          }}
+                          title={`${point.label}: ${point.amount.toLocaleString()}`}
+                        >
+                          {point.label.replace("Week of ", "W: ")}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
                 background: "white",
                 border: "1px solid #e5e7eb",
                 borderRadius: "12px",
@@ -5595,37 +6029,176 @@ function AppContent() {
                   justifyContent: "space-between",
                   gap: "12px",
                   flexWrap: "wrap",
-                  marginBottom: "8px",
+                  marginBottom: "12px",
                 }}
               >
-                <h2
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 500,
-                    margin: 0,
-                  }}
-                >
-                  Giving records
-                </h2>
+                <div>
+                  <h2
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 500,
+                      margin: 0,
+                    }}
+                  >
+                    Giving records
+                  </h2>
+                  <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>
+                    Use the filters to view, export, and report giving trends.
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={exportGivingCsv}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportGivingPdf}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Export PDF
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "12px",
+                  marginBottom: "10px",
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="giving-start-date" className="form-label">
+                    From date
+                  </label>
+                  <input
+                    id="giving-start-date"
+                    type="date"
+                    value={givingFilters.startDate}
+                    onChange={(e) =>
+                      setGivingFilters((prev) => ({ ...prev, startDate: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <label
-                    htmlFor="giving-member-filter"
-                    style={{ fontSize: "12px", color: "#6b7280" }}
+                  <label htmlFor="giving-end-date" className="form-label">
+                    To date
+                  </label>
+                  <input
+                    id="giving-end-date"
+                    type="date"
+                    value={givingFilters.endDate}
+                    onChange={(e) =>
+                      setGivingFilters((prev) => ({ ...prev, endDate: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="giving-type" className="form-label">
+                    Gift type
+                  </label>
+                  <select
+                    id="giving-type"
+                    value={givingFilters.type}
+                    onChange={(e) =>
+                      setGivingFilters((prev) => ({ ...prev, type: e.target.value }))
+                    }
+                    className="form-input"
                   >
+                    <option value="">All</option>
+                    {givingTypeOptions.map((type) => (
+                      <option key={type} value={type.toLowerCase()}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="giving-status" className="form-label">
+                    Status
+                  </label>
+                  <select
+                    id="giving-status"
+                    value={givingFilters.status}
+                    onChange={(e) =>
+                      setGivingFilters((prev) => ({ ...prev, status: e.target.value }))
+                    }
+                    className="form-input"
+                  >
+                    <option value="">Any status</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="reversed">Reversed</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="giving-phone" className="form-label">
+                    Phone contains
+                  </label>
+                  <input
+                    id="giving-phone"
+                    type="text"
+                    placeholder="Search phone"
+                    value={givingFilters.phone}
+                    onChange={(e) =>
+                      setGivingFilters((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="giving-reference" className="form-label">
+                    Reference contains
+                  </label>
+                  <input
+                    id="giving-reference"
+                    type="text"
+                    placeholder="e.g. Paystack ref"
+                    value={givingFilters.reference}
+                    onChange={(e) =>
+                      setGivingFilters((prev) => ({ ...prev, reference: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="giving-member-filter" className="form-label">
                     Filter by member
                   </label>
                   <select
                     id="giving-member-filter"
                     value={givingMemberFilter}
                     onChange={(e) => setGivingMemberFilter(e.target.value)}
-                    style={{
-                      minWidth: "240px",
-                      padding: "8px 10px",
-                      borderRadius: "8px",
-                      border: "1px solid #d1d5db",
-                      fontSize: "13px",
-                    }}
+                    className="form-input"
                   >
                     <option value="">All giving records</option>
                     {members.map((m) => {
@@ -5646,7 +6219,7 @@ function AppContent() {
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
                   Loading giving records…
                 </p>
-              ) : giving.length === 0 ? (
+              ) : filteredGiving.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
                   No giving records yet. Save your first one above.
                 </p>
@@ -5670,12 +6243,17 @@ function AppContent() {
                         <th style={{ padding: "6px 4px" }}>Service</th>
                         <th style={{ padding: "6px 4px" }}>Type</th>
                         <th style={{ padding: "6px 4px" }}>Member</th>
+                        <th style={{ padding: "6px 4px" }}>Phone</th>
+                        <th style={{ padding: "6px 4px" }}>Reference</th>
                         <th style={{ padding: "6px 4px" }}>Amount</th>
+                        <th style={{ padding: "6px 4px" }}>Status</th>
                         <th style={{ padding: "6px 4px" }}>Notes</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {giving.map((g) => (
+                      {filteredGiving.map((g) => {
+                        const badge = resolveGivingStatusBadge(resolveGivingStatus(g));
+                        return (
                         <tr
                           key={g.id}
                           style={{
@@ -5695,13 +6273,42 @@ function AppContent() {
                             {resolveGivingMember(g)}
                           </td>
                           <td style={{ padding: "6px 4px" }}>
+                            {resolveGivingPhone(g) || "—"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {resolveGivingReference(g) || "—"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
                             {g.amount?.toLocaleString?.() ?? g.amount}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                background: badge.bg,
+                                color: badge.color,
+                                border: `1px solid ${badge.border}`,
+                                borderRadius: "999px",
+                                padding: "4px 10px",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {badge.label}
+                              {resolveGivingStatus(g) === "reversed" && (
+                                <span style={{ fontWeight: 500 }}>(Paystack reversed)</span>
+                              )}
+                            </span>
                           </td>
                           <td style={{ padding: "6px 4px" }}>
                             {g.notes || "-"}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
