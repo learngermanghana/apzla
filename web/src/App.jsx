@@ -162,10 +162,10 @@ function AppContent() {
   const [attendance, setAttendance] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
-  const defaultBaseUrl = useMemo(() => {
-    if (typeof window === "undefined") return PREFERRED_BASE_URL;
-    return normalizeBaseUrlMemo(window.location.origin || PREFERRED_BASE_URL);
-  }, [normalizeBaseUrlMemo]);
+  const defaultBaseUrl = useMemo(
+    () => normalizeBaseUrlMemo(PREFERRED_BASE_URL),
+    [normalizeBaseUrlMemo]
+  );
   const [attendanceForm, setAttendanceForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -1403,7 +1403,7 @@ function AppContent() {
       churchId: payload.churchId?.trim(),
       serviceDate: payload.serviceDate,
       serviceType: payload.serviceType?.trim(),
-      baseUrl: normalizeBaseUrlMemo(payload.baseUrl || defaultBaseUrl),
+      baseUrl: normalizeBaseUrlMemo(PREFERRED_BASE_URL),
     };
 
     if (!normalizedPayload.churchId || !normalizedPayload.serviceDate) {
@@ -1424,10 +1424,14 @@ function AppContent() {
     }
 
     const token = data?.token || data?.id;
-    const linkBase = normalizedPayload.baseUrl?.replace(/\/$/, "") || "";
-    const generatedLink =
-      data?.link ||
-      (token ? `${linkBase}/checkin?token=${encodeURIComponent(token)}` : "");
+    const generatedLink = (() => {
+      if (data?.link) return data.link;
+      if (!token) return "";
+
+      const url = new URL("/checkin", PREFERRED_BASE_URL);
+      url.searchParams.set("token", token);
+      return url.toString();
+    })();
     const qrImageUrl =
       data?.qrImageUrl ||
       (generatedLink

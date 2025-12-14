@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./checkin.css";
 import StatusBanner from "../StatusBanner";
+import { PREFERRED_BASE_URL } from "../../utils/baseUrl";
 
 const LOCAL_PHONE_KEY = "apzla_last_phone";
 const MAX_ATTEMPTS = 5;
@@ -69,16 +70,13 @@ export default function CheckinPage() {
     if (typeof window === "undefined") return "";
 
     const trimmedToken = (token || tokenFromUrl || "").trim();
-    const origin = window.location.origin;
+    const url = new URL("/checkin", PREFERRED_BASE_URL);
 
-    if (!trimmedToken) {
-      return window.location.href;
+    if (trimmedToken) {
+      url.searchParams.set("token", trimmedToken);
     }
 
-    const pathParts = window.location.pathname.split("/").filter(Boolean);
-    const basePath = pathParts[0] === "attendance" ? "attendance" : "checkin";
-
-    return `${origin}/${basePath}/${trimmedToken}`;
+    return url.toString();
   }, [token, tokenFromUrl]);
 
   const handleCopyInviteLink = async () => {
