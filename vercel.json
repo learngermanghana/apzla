@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "functions/api/**/*.js", "use": "@vercel/node" },
+    {
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/transaction/verify/(?<reference>[^/]+)",
+      "dest": "/functions/api/transaction/verify/[reference].js?reference=$reference"
+    },
+    { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
+
+    { "src": "/assets/(.*)", "dest": "/web/assets/$1" },
+    { "src": "/icons/(.*)", "dest": "/web/icons/$1" },
+    { "src": "/manifest\\.webmanifest", "dest": "/web/manifest.webmanifest" },
+
+    { "handle": "filesystem" },
+
+    { "src": "/(.*)", "dest": "/web/index.html" }
+  ]
+}
