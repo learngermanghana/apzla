@@ -103,6 +103,20 @@ export default function CheckinPage() {
     });
   };
 
+  const formatDateTime = (isoDateTime) => {
+    if (!isoDateTime) return "";
+    const d = new Date(isoDateTime);
+    if (Number.isNaN(d.getTime())) return isoDateTime;
+
+    return d.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -233,8 +247,11 @@ export default function CheckinPage() {
           <div className="checkin-service-meta">
             <span className="checkin-chip">{summary.churchName || "Your church"}</span>
             <span className="checkin-chip">
-              {summary.serviceType || "Service"} •{" "}
+              {summary.serviceType || "Service"} • {" "}
               {formatServiceDate(summary.serviceDate)}
+            </span>
+            <span className="checkin-chip">
+              Checked in at {formatDateTime(summary.checkinAt)}
             </span>
           </div>
         )}
@@ -262,6 +279,14 @@ export default function CheckinPage() {
               <div>
                 <div className="checkin-label">Service</div>
                 <div className="checkin-value">{summary.serviceType}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Service code</div>
+                <div className="checkin-value">{summary.serviceCode}</div>
+              </div>
+              <div>
+                <div className="checkin-label">Check-in time</div>
+                <div className="checkin-value">{formatDateTime(summary.checkinAt)}</div>
               </div>
             </div>
           </div>

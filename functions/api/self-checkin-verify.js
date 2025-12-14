@@ -60,9 +60,18 @@ async function upsertAttendance({ memberId, churchId, serviceDate, serviceType }
   const safeType = sanitizeServiceType(serviceType);
   const key = `${serviceDate}_${safeType}_${memberId}`;
   const ref = db.collection("memberAttendance").doc(key);
+  const now = admin.firestore.Timestamp.now();
 
   const existing = await ref.get();
-  if (existing.exists) return { alreadyPresent: true };
+  if (existing.exists) {
+    const existingData = existing.data() || {};
+    const createdAt = existingData.createdAt || existingData.checkinAt;
+
+    return {
+      alreadyPresent: true,
+      checkinAt: createdAt || now,
+    };
+  }
 
   await ref.set({
     memberId,
@@ -71,10 +80,11 @@ async function upsertAttendance({ memberId, churchId, serviceDate, serviceType }
     serviceType,
     status: "PRESENT",
     source: "self-qr",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: now,
+    checkinAt: now,
   });
 
-  return { alreadyPresent: false };
+  return { alreadyPresent: false, checkinAt: now };
 }
 
 async function getNonceDoc(nonce) {
@@ -219,6 +229,10 @@ async function handler(req, res) {
     }
 
     const memberId = memberDoc.id;
+    const memberData = memberDoc.data() || {};
+
+    const churchDoc = await db.collection("churches").doc(churchId).get();
+    const churchData = churchDoc.exists ? churchDoc.data() || {} : {};
 
     const attendanceResult = await upsertAttendance({
       memberId,
@@ -227,9 +241,33 @@ async function handler(req, res) {
       serviceType,
     });
 
+    const checkinAtIso = attendanceResult.checkinAt?.toDate
+      ? attendanceResult.checkinAt.toDate().toISOString()
+      : null;
+
+    const memberName =
+      `${memberData.firstName || ""} ${memberData.lastName || ""}`.trim() ||
+      memberData.fullName ||
+      memberData.displayName ||
+      "Member";
+
+    const churchName =
+      churchData.name || churchData.churchName || churchData.displayName || "Church";
+
     return res.status(200).json({
       status: "success",
-      data: { memberId, churchId, serviceDate, serviceType, ...attendanceResult },
+      data: {
+        memberId,
+        memberName,
+        memberPhone: phoneValue,
+        churchId,
+        churchName,
+        serviceDate,
+        serviceType,
+        serviceCode: codeValue,
+        checkinAt: checkinAtIso,
+        ...attendanceResult,
+      },
       message: attendanceResult.alreadyPresent
         ? "You are already checked in for this service."
         : "Check-in recorded successfully.",
