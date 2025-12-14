@@ -31,18 +31,8 @@ const PREFERRED_HOSTNAME = (() => {
   }
 })();
 
-const SHOULD_ENFORCE_HOST = (() => {
-  const explicitSetting = import.meta.env.VITE_ENFORCE_PREFERRED_HOST;
-
-  if (explicitSetting !== undefined) {
-    return explicitSetting.toString().toLowerCase() === "true";
-  }
-
-  // If a public base URL is configured, favor enforcing it by default so that
-  // requests land on the canonical host (e.g., www.apzla.com) unless explicitly
-  // disabled via VITE_ENFORCE_PREFERRED_HOST.
-  return Boolean(import.meta.env.VITE_PUBLIC_BASE_URL);
-})();
+const SHOULD_ENFORCE_HOST =
+  (import.meta.env.VITE_ENFORCE_PREFERRED_HOST || "false").toString().toLowerCase() === "true";
 
 export const enforcePreferredHost = () => {
   if (!SHOULD_ENFORCE_HOST) return;
