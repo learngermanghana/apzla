@@ -133,6 +133,17 @@ function AppContent() {
     status: "VISITOR",
   });
   const [memberSearch, setMemberSearch] = useState("");
+  const memberInviteLink = useMemo(() => {
+    if (!userProfile?.churchId) return "";
+    return `${normalizeBaseUrlMemo(PREFERRED_BASE_URL)}/join/${userProfile.churchId}`;
+  }, [userProfile?.churchId, normalizeBaseUrlMemo]);
+  const memberInviteQrUrl = useMemo(
+    () =>
+      memberInviteLink
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(memberInviteLink)}`
+        : "",
+    [memberInviteLink]
+  );
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -1547,6 +1558,22 @@ function AppContent() {
     }
   };
 
+  const copyMemberInviteLink = async () => {
+    if (!memberInviteLink) return;
+    try {
+      await navigator.clipboard.writeText(memberInviteLink);
+      showToast("Invite link copied.", "success");
+    } catch (err) {
+      console.error("Copy member invite link error:", err);
+      showToast("Unable to copy invite link.", "error");
+    }
+  };
+
+  const openMemberInviteLink = () => {
+    if (!memberInviteLink) return;
+    window.open(memberInviteLink, "_blank", "noopener,noreferrer");
+  };
+
   const fetchQrBlobUrl = async (qrUrl) => {
     const response = await fetch(qrUrl, { cache: "no-store" });
     if (!response.ok) {
@@ -1616,6 +1643,14 @@ function AppContent() {
 
   const printCheckinQrImage = async () => {
     await printQrImage(checkinTokenQr, "Print Check-in QR");
+  };
+
+  const downloadMemberInviteQr = async () => {
+    await downloadQrImage(memberInviteQrUrl, "member-invite-qr.png");
+  };
+
+  const printMemberInviteQr = async () => {
+    await printQrImage(memberInviteQrUrl, "Print Member Invite QR");
   };
 
   const copyOnlineGivingLink = async () => {
@@ -3511,6 +3546,64 @@ function AppContent() {
               is the start of Apzla&apos;s customer management (CRM)
               features.
             </p>
+
+            <div className="member-invite-share">
+              <div className="member-invite-share__header">
+                <div>
+                  <p className="eyebrow">Self-registration</p>
+                  <h3 style={{ margin: 0 }}>Invite link &amp; QR for new members</h3>
+                  <p className="member-invite-share__subtitle">
+                    Share this with visitors so they can fill the form themselves. Submissions are
+                    saved directly to your members list.
+                  </p>
+                </div>
+                <div className="member-invite-share__actions">
+                  <button onClick={copyMemberInviteLink} disabled={!memberInviteLink}>
+                    Copy link
+                  </button>
+                  <button onClick={openMemberInviteLink} disabled={!memberInviteLink}>
+                    Open link
+                  </button>
+                </div>
+              </div>
+
+              <div className="member-invite-share__link-row">
+                <input
+                  type="text"
+                  value={
+                    memberInviteLink ||
+                    "Link a church to generate a sign-up link for members."
+                  }
+                  readOnly
+                />
+                <button onClick={downloadMemberInviteQr} disabled={!memberInviteQrUrl}>
+                  Download QR
+                </button>
+                <button onClick={printMemberInviteQr} disabled={!memberInviteQrUrl}>
+                  Print QR
+                </button>
+              </div>
+
+              {memberInviteQrUrl && (
+                <div className="member-invite-share__qr">
+                  <div className="qr-display" style={{ marginTop: "12px" }}>
+                    <img
+                      src={memberInviteQrUrl}
+                      alt="Member invite QR"
+                      className="qr-image"
+                      style={{ width: "160px", height: "160px" }}
+                    />
+                    <div className="qr-actions">
+                      <button onClick={copyMemberInviteLink}>Copy link</button>
+                      <button onClick={openMemberInviteLink}>Open link</button>
+                    </div>
+                    <p className="qr-caption">
+                      Show or print this QR code during services so visitors can register themselves.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Member form */}
             <div

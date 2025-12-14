@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import CheckinPage from "./components/checkin/CheckinPage.jsx";
 import GivePage from "./components/giving/GivePage.jsx";
+import MemberInvitePage from "./components/members/MemberInvitePage.jsx";
 import StatusPage from "./components/status/StatusPage.jsx";
 import OfflineNotice from "./components/ui/OfflineNotice.jsx";
 import { registerServiceWorker } from "./serviceWorker";
@@ -22,6 +23,7 @@ const isCheckinRoute =
 
 const isStatusRoute = pathname === "/status" || pathname.startsWith("/status/");
 const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
+const isMemberInviteRoute = pathname === "/join" || pathname.startsWith("/join/");
 
 function getSecondSegment(path) {
   // "/checkin/<token>" => "<token>"
@@ -31,6 +33,7 @@ function getSecondSegment(path) {
 
 const checkinToken = isCheckinRoute ? getSecondSegment(pathname) : null;
 const giveId = isGiveRoute ? getSecondSegment(pathname) : null;
+const memberInviteId = isMemberInviteRoute ? getSecondSegment(pathname) : null;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -39,6 +42,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <CheckinPage token={checkinToken} />
     ) : isGiveRoute ? (
       <GivePage id={giveId} />
+    ) : isMemberInviteRoute ? (
+      <MemberInvitePage churchId={memberInviteId} />
     ) : isStatusRoute ? (
       <StatusPage />
     ) : (

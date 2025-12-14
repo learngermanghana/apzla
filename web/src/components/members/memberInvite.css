@@ -1,0 +1,126 @@
+.member-invite-shell {
+  min-height: 100vh;
+  background: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.member-invite-card {
+  background: white;
+  max-width: 720px;
+  width: 100%;
+  border-radius: 18px;
+  box-shadow: 0 15px 50px rgba(15, 23, 42, 0.12);
+  padding: 28px;
+  border: 1px solid #e5e7eb;
+}
+
+.member-invite-heading h1 {
+  margin: 4px 0 6px;
+  font-size: 24px;
+}
+
+.member-invite-subtitle {
+  color: #4b5563;
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.member-invite-link-box {
+  margin: 12px 0 20px;
+}
+
+.member-invite-link-label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.member-invite-link-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+}
+
+.member-invite-link-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: #f9fafb;
+}
+
+.member-invite-link-row button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.member-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-invite-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.member-invite-row label,
+.member-invite-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.member-invite-row input,
+.member-invite-status select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: #f9fafb;
+}
+
+.member-invite-submit {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  background: #111827;
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .member-invite-shell {
+    padding: 18px 10px;
+  }
+
+  .member-invite-card {
+    padding: 22px;
+  }
+
+  .member-invite-link-row {
+    grid-template-columns: 1fr;
+  }
+
+  .member-invite-link-row button {
+    width: 100%;
+  }
+}
