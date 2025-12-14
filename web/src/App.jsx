@@ -98,6 +98,7 @@ function AppContent() {
 
   const MEMBERS_PAGE_SIZE = 25;
   const GIVING_PAGE_SIZE = 25;
+  const EXPENSES_PAGE_SIZE = 25;
 
   // Overview tab state
   const [memberAttendanceHistory, setMemberAttendanceHistory] = useState([]);
@@ -228,6 +229,30 @@ function AppContent() {
     notes: "",
     memberId: "",
   });
+  const [expenses, setExpenses] = useState([]);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+  const [expensesPageCursor, setExpensesPageCursor] = useState(null);
+  const [expensesHasMore, setExpensesHasMore] = useState(true);
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("");
+  const [expenseForm, setExpenseForm] = useState({
+    date: todayStr,
+    category: "Operations",
+    payee: "",
+    amount: "",
+    notes: "",
+  });
+  const expenseCategories = useMemo(
+    () => [
+      "Operations",
+      "Rent / Facilities",
+      "Outreach",
+      "Staff",
+      "Maintenance",
+      "Supplies",
+      "Other",
+    ],
+    []
+  );
   const onlineGivingLink = useMemo(() => {
     if (!userProfile?.churchId) return "";
     const origin =
@@ -1673,6 +1698,8 @@ function AppContent() {
         loadAttendance(),
         loadMembers(),
         loadMemberAttendanceHistory(),
+        loadGiving({ memberId: givingMemberFilter }),
+        loadExpenses({ category: expenseCategoryFilter }),
       ]);
       showToast("Dashboard data refreshed.", "success");
     } catch (err) {
@@ -1986,6 +2013,109 @@ function AppContent() {
     return loadGiving({ append: true });
   };
 
+  // ---------- Expenses ----------
+  const loadExpenses = async ({ append = false, category = expenseCategoryFilter } = {}) => {
+    if (!userProfile?.churchId) return;
+    try {
+      setExpensesLoading(true);
+      const colRef = collection(db, "expenses");
+      const constraints = [where("churchId", "==", userProfile.churchId)];
+
+      if (category) {
+        constraints.push(where("category", "==", category));
+      }
+
+      constraints.push(orderBy("createdAt", "desc"));
+
+      if (append && expensesPageCursor) {
+        constraints.push(startAfter(expensesPageCursor));
+      }
+
+      constraints.push(limit(EXPENSES_PAGE_SIZE));
+
+      const qExpenses = query(colRef, ...constraints);
+      const snapshot = await getDocs(qExpenses);
+      const data = snapshot.docs.map((docSnapshot) => ({
+        id: docSnapshot.id,
+        ...docSnapshot.data(),
+      }));
+
+      setExpenses((prev) => (append ? [...prev, ...data] : data));
+
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+      setExpensesPageCursor(lastDoc);
+      setExpensesHasMore(snapshot.docs.length === EXPENSES_PAGE_SIZE);
+    } catch (err) {
+      console.error("Load expenses error:", err);
+      showToast("Error loading expenses.", "error");
+    } finally {
+      setExpensesLoading(false);
+    }
+  };
+
+  const handleCreateExpense = async () => {
+    if (!userProfile?.churchId) return;
+
+    if (!expenseForm.date || !expenseForm.amount) {
+      showToast("Please provide a date and amount for the expense.", "error");
+      return;
+    }
+
+    const amountNumber = Number(expenseForm.amount);
+    if (Number.isNaN(amountNumber) || amountNumber <= 0) {
+      showToast("Expense amount must be greater than zero.", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addDoc(collection(db, "expenses"), {
+        churchId: userProfile.churchId,
+        date: expenseForm.date,
+        category: expenseForm.category.trim() || "General",
+        payee: expenseForm.payee.trim(),
+        amount: amountNumber,
+        notes: expenseForm.notes.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setExpenseForm({
+        date: todayStr,
+        category: "Operations",
+        payee: "",
+        amount: "",
+        notes: "",
+      });
+
+      await loadExpenses();
+      showToast("Expense recorded.", "success");
+    } catch (err) {
+      console.error("Create expense error:", err);
+      showToast(err.message || "Unable to save expense.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setExpensesPageCursor(null);
+    setExpensesHasMore(true);
+    setExpenses([]);
+    if (
+      (activeTab === "giving" || activeTab === "overview") &&
+      userProfile?.churchId
+    ) {
+      const category = activeTab === "overview" ? "" : expenseCategoryFilter;
+      loadExpenses({ category });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId, expenseCategoryFilter]);
+
+  const loadMoreExpenses = () => {
+    if (!expensesHasMore || expensesLoading) return;
+    return loadExpenses({ append: true });
+  };
+
   // ---------- Sermons ----------
   const loadSermons = async () => {
     if (!userProfile?.churchId) return;
@@ -2069,6 +2199,16 @@ function AppContent() {
     if (Number.isNaN(d.getTime())) return;
     if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
       givingThisMonth += Number(g.amount || 0);
+    }
+  });
+
+  let expensesThisMonth = 0;
+  expenses.forEach((exp) => {
+    if (!exp.date) return;
+    const parsed = new Date(exp.date);
+    if (Number.isNaN(parsed.getTime())) return;
+    if (parsed.getFullYear() === currentYear && parsed.getMonth() === currentMonth) {
+      expensesThisMonth += Number(exp.amount || 0);
     }
   });
 
@@ -2549,6 +2689,16 @@ function AppContent() {
     lastAttendanceDate = last.date || "";
   }
 
+  const totalGivingAmount = giving.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0
+  );
+  const totalExpenseAmount = expenses.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0
+  );
+  const financeBalance = totalGivingAmount - totalExpenseAmount;
+
   const normalizeSearchValue = (value = "") => value.toLowerCase().trim();
   const memberMatchesSearch = (member, searchValue) => {
     const normalized = normalizeSearchValue(searchValue);
@@ -2926,6 +3076,36 @@ function AppContent() {
                   {givingThisMonth > 0
                     ? "Current month total"
                     : "No giving records this month"}
+                </p>
+              </div>
+
+              <div className="stat-card">
+                <p className="eyebrow">Expenses this month</p>
+                <div className="stat-value">
+                  {expensesThisMonth.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper">
+                  {expensesThisMonth > 0
+                    ? "Current month spending"
+                    : "No expenses recorded this month"}
+                </p>
+              </div>
+
+              <div className="stat-card stat-card--accent">
+                <p className="eyebrow">Net balance</p>
+                <div className="stat-value">
+                  {financeBalance.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper">
+                  {financeBalance >= 0
+                    ? "Total received minus spending"
+                    : "Spending exceeds recorded income"}
                 </p>
               </div>
             </div>
@@ -4638,9 +4818,86 @@ function AppContent() {
                 fontSize: "14px",
               }}
             >
-              Track collections, tithes, and special offerings for{" "}
-              <strong>{userProfile.churchName}</strong>.
+              Track collections, tithes, special offerings, and expenses for{" "}
+              <strong>{userProfile.churchName}</strong>. Keep an audit trail of
+              money received and spent.
             </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  background: "#f9fafb",
+                }}
+              >
+                <p className="eyebrow" style={{ margin: 0 }}>
+                  Total received (loaded)
+                </p>
+                <div className="stat-value" style={{ margin: "4px 0" }}>
+                  {totalGivingAmount.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper" style={{ margin: 0 }}>
+                  From saved giving records
+                </p>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  background: "#f9fafb",
+                }}
+              >
+                <p className="eyebrow" style={{ margin: 0 }}>
+                  Total spent (loaded)
+                </p>
+                <div className="stat-value" style={{ margin: "4px 0" }}>
+                  {totalExpenseAmount.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper" style={{ margin: 0 }}>
+                  From recorded expenses
+                </p>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  background: "#ecfdf3",
+                  color: "#166534",
+                }}
+              >
+                <p className="eyebrow" style={{ margin: 0, color: "#166534" }}>
+                  Running balance
+                </p>
+                <div className="stat-value" style={{ margin: "4px 0", color: "#166534" }}>
+                  {financeBalance.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper" style={{ margin: 0, color: "#166534" }}>
+                  Received minus spent
+                </p>
+              </div>
+            </div>
 
             <div
               style={{
@@ -5369,6 +5626,239 @@ function AppContent() {
                   }}
                 >
                   {givingLoading ? "Loading..." : "Load more giving records"}
+                </button>
+              )}
+            </div>
+
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "16px",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <p className="eyebrow" style={{ margin: 0 }}>
+                    Record expense
+                  </p>
+                  <p style={{ margin: 0, color: "#111827", fontWeight: 600 }}>
+                    Keep track of spending for audits and reporting.
+                  </p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="expense-category-filter"
+                    style={{ display: "block", fontSize: "12px", color: "#6b7280" }}
+                  >
+                    Filter by category
+                  </label>
+                  <select
+                    id="expense-category-filter"
+                    value={expenseCategoryFilter}
+                    onChange={(e) => setExpenseCategoryFilter(e.target.value)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <option value="">All expenses</option>
+                    {expenseCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="expense-date" className="form-label">
+                    Date
+                  </label>
+                  <input
+                    id="expense-date"
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={(e) =>
+                      setExpenseForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="expense-category" className="form-label">
+                    Category / purpose
+                  </label>
+                  <select
+                    id="expense-category"
+                    value={expenseForm.category}
+                    onChange={(e) =>
+                      setExpenseForm((prev) => ({ ...prev, category: e.target.value }))
+                    }
+                    className="form-input"
+                  >
+                    {expenseCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="expense-payee" className="form-label">
+                    Payee / vendor
+                  </label>
+                  <input
+                    id="expense-payee"
+                    type="text"
+                    placeholder="Who was paid?"
+                    value={expenseForm.payee}
+                    onChange={(e) =>
+                      setExpenseForm((prev) => ({ ...prev, payee: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="expense-amount" className="form-label">
+                    Amount
+                  </label>
+                  <input
+                    id="expense-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={expenseForm.amount}
+                    onChange={(e) =>
+                      setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label htmlFor="expense-notes" className="form-label">
+                  Notes (optional)
+                </label>
+                <textarea
+                  id="expense-notes"
+                  rows="2"
+                  placeholder="Notes (e.g. invoice number, payment method, currency)"
+                  value={expenseForm.notes}
+                  onChange={(e) =>
+                    setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  className="form-input"
+                  style={{ resize: "vertical" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <button
+                  type="button"
+                  onClick={handleCreateExpense}
+                  disabled={loading}
+                  className="primary-button"
+                  style={{ minWidth: "200px" }}
+                >
+                  {loading ? "Saving..." : "Save expense"}
+                </button>
+              </div>
+
+              {expensesLoading ? (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  Loading expenses…
+                </p>
+              ) : expenses.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No expenses recorded yet. Save your first one above.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          textAlign: "left",
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <th style={{ padding: "6px 4px" }}>Date</th>
+                        <th style={{ padding: "6px 4px" }}>Category</th>
+                        <th style={{ padding: "6px 4px" }}>Payee</th>
+                        <th style={{ padding: "6px 4px" }}>Amount</th>
+                        <th style={{ padding: "6px 4px" }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenses.map((exp) => (
+                        <tr
+                          key={exp.id}
+                          style={{
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>{exp.date}</td>
+                          <td style={{ padding: "6px 4px" }}>{exp.category}</td>
+                          <td style={{ padding: "6px 4px" }}>{exp.payee || "—"}</td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {exp.amount?.toLocaleString?.() ?? exp.amount}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>{exp.notes || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {expensesHasMore && expenses.length > 0 && (
+                <button
+                  onClick={loadMoreExpenses}
+                  disabled={expensesLoading}
+                  style={{
+                    marginTop: "12px",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                    background: expensesLoading ? "#f3f4f6" : "white",
+                    color: "#111827",
+                    cursor: expensesLoading ? "default" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                  }}
+                >
+                  {expensesLoading ? "Loading..." : "Load more expenses"}
                 </button>
               )}
             </div>
