@@ -15,12 +15,12 @@
     },
     { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
 
-    { "src": "/assets/(.*)", "dest": "/web/dist/assets/$1" },
-    { "src": "/icons/(.*)", "dest": "/web/dist/icons/$1" },
-    { "src": "/manifest\\.webmanifest", "dest": "/web/dist/manifest.webmanifest" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/icons/(.*)", "dest": "/icons/$1" },
+    { "src": "/manifest\\.webmanifest", "dest": "/manifest.webmanifest" },
 
     { "handle": "filesystem" },
 
-    { "src": "/(.*)", "dest": "/web/dist/index.html" }
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
