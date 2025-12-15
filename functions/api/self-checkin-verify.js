@@ -1,6 +1,6 @@
 // functions/api/self-checkin-verify.js
-const { admin, db, initError } = require("./lib/firestoreAdmin");
-const { verifyJwt } = require("./lib/jwtHelpers");
+const { admin, db, initError } = require("../lib/firestoreAdmin");
+const { verifyJwt } = require("../lib/jwtHelpers");
 
 const jwtSecret = process.env.CHECKIN_JWT_SECRET;
 
