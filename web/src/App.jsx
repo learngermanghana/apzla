@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { auth, db, firebaseConfigError, isFirebaseConfigured } from "./firebase";
 import {
   collection,
@@ -156,13 +156,8 @@ function AppContent() {
     if (!userProfile?.churchId) return "";
     return `${normalizeBaseUrlMemo(PREFERRED_BASE_URL)}/join/${userProfile.churchId}`;
   }, [userProfile?.churchId, normalizeBaseUrlMemo]);
-  const memberInviteQrUrl = useMemo(
-    () =>
-      memberInviteLink
-        ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(memberInviteLink)}`
-        : "",
-    [memberInviteLink]
-  );
+  const [memberInviteQrUrl, setMemberInviteQrUrl] = useState("");
+  const memberInviteQrObjectUrlRef = useRef(null);
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -427,13 +422,70 @@ function AppContent() {
     };
   };
 
-  const showToast = (message, variant = "info") => {
+  const showToast = useCallback((message, variant = "info") => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
     setToasts((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 4200);
-  };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const generateMemberInviteQr = async () => {
+      if (!memberInviteLink) {
+        if (memberInviteQrObjectUrlRef.current) {
+          URL.revokeObjectURL(memberInviteQrObjectUrlRef.current);
+          memberInviteQrObjectUrlRef.current = null;
+        }
+        setMemberInviteQrUrl("");
+        return;
+      }
+
+      try {
+        const qrResponse = await fetch(
+          `https://quickchart.io/qr?size=400&margin=1&text=${encodeURIComponent(memberInviteLink)}`,
+          { cache: "no-store" }
+        );
+
+        if (!qrResponse.ok) {
+          throw new Error("Unable to generate invite QR.");
+        }
+
+        const qrBlob = await qrResponse.blob();
+        const objectUrl = URL.createObjectURL(qrBlob);
+
+        if (memberInviteQrObjectUrlRef.current) {
+          URL.revokeObjectURL(memberInviteQrObjectUrlRef.current);
+        }
+
+        memberInviteQrObjectUrlRef.current = objectUrl;
+
+        if (!cancelled) {
+          setMemberInviteQrUrl(objectUrl);
+        } else {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } catch (err) {
+        console.error("Generate member invite QR error:", err);
+        if (!cancelled) {
+          setMemberInviteQrUrl("");
+          showToast(err.message || "Unable to generate member invite QR.", "error");
+        }
+      }
+    };
+
+    generateMemberInviteQr();
+
+    return () => {
+      cancelled = true;
+      if (memberInviteQrObjectUrlRef.current) {
+        URL.revokeObjectURL(memberInviteQrObjectUrlRef.current);
+        memberInviteQrObjectUrlRef.current = null;
+      }
+    };
+  }, [memberInviteLink, showToast]);
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
