@@ -7,6 +7,11 @@ const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonc
 const tokenTtlMinutes = Number(process.env.CHECKIN_TOKEN_TTL_MINUTES) || 30
 const appBaseUrl = process.env.APP_BASE_URL
 
+function generateServiceCode() {
+  // Generates a 6-digit string with leading zeros if necessary
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+}
+
 async function writeNonceRecord(nonce, payload) {
   const data = {
     nonce,
@@ -23,7 +28,7 @@ function buildCheckinLink(token, baseUrl) {
   const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
   if (!normalizedBase) return null
 
-  return `${normalizedBase}/self-checkin?token=${encodeURIComponent(token)}`
+  return `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
 }
 
 async function handler(request, response) {
@@ -60,6 +65,7 @@ async function handler(request, response) {
   const issuedAt = Math.floor(Date.now() / 1000)
   const expiresAt = issuedAt + tokenTtlMinutes * 60
   const nonce = crypto.randomUUID()
+  const serviceCode = generateServiceCode()
 
   const payload = {
     mode: 'SELF',
@@ -79,6 +85,7 @@ async function handler(request, response) {
       churchId,
       serviceDate,
       serviceType: payload.serviceType,
+      serviceCode,
       expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt * 1000),
     })
 
@@ -96,6 +103,7 @@ async function handler(request, response) {
       link: checkinLink,
       qrImageUrl,
       expiresAt,
+      serviceCode,
       message: 'Self check-in token issued successfully.',
     })
   } catch (error) {

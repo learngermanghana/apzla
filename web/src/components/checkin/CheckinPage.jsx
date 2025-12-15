@@ -128,7 +128,7 @@ export default function CheckinPage() {
 
     const trimmedPhone = phone.trim();
     const trimmedServiceCode = serviceCode.trim();
-    const trimmedToken = token.trim();
+    const trimmedToken = (token || tokenFromUrl || "").trim();
 
     if (!trimmedPhone || !trimmedToken) {
       setFeedback({
@@ -337,15 +337,14 @@ export default function CheckinPage() {
             <label className="checkin-label" htmlFor="token">
               Check-in token
             </label>
-            <textarea
-              id="token"
-              className="checkin-textarea"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="This is usually filled automatically from the link."
-              required
-              readOnly={!!tokenFromUrl} // optional: lock when token came from link
-            />
+          <textarea
+            id="token"
+            className="checkin-textarea"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="This is usually filled automatically from the link."
+            required
+          />
           </div>
 
           <div className="checkin-field checkin-invite">
