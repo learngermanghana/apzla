@@ -1,41 +1,77 @@
+// functions/api/self-checkin-verify.js
 const { admin, db, initError } = require("../lib/firestoreAdmin");
 const { verifyJwt } = require("../lib/jwtHelpers");
 
 const jwtSecret = process.env.CHECKIN_JWT_SECRET;
 
-function normalizePhone(phone) {
-  return `${phone || ""}`.trim();
+function sanitizeServiceType(serviceType = "Service") {
+  return `${serviceType}`.trim().replace(/[^\w-]+/g, "_");
 }
 
-function getTimestampMillis(ts) {
-  if (!ts) return 0;
-  // Firestore Timestamp
-  if (typeof ts.toMillis === "function") return ts.toMillis();
-  // Date string fallback
-  const d = new Date(ts);
-  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+// Basic Ghana-friendly normalization (keeps it simple)
+function normalizePhone(phoneRaw) {
+  const p = `${phoneRaw || ""}`.trim();
+  if (!p) return "";
+
+  // remove spaces, dashes, parentheses, etc.
+  let digits = p.replace(/[^\d+]/g, "");
+
+  // allow +233XXXXXXXXX -> 0XXXXXXXXX
+  if (digits.startsWith("+233")) digits = "0" + digits.slice(4);
+  if (digits.startsWith("233")) digits = "0" + digits.slice(3);
+
+  return digits;
 }
 
-async function findMemberByPhone(churchId, phone) {
-  const normalizedPhone = normalizePhone(phone);
-  if (!normalizedPhone) return null;
+async function findMemberByPhone(churchId, phoneRaw) {
+  const trimmed = `${phoneRaw || ""}`.trim();
+  const normalized = normalizePhone(phoneRaw);
 
-  const snap = await db
-    .collection("members")
-    .where("churchId", "==", churchId)
-    .where("phone", "==", normalizedPhone)
-    .limit(1)
-    .get();
+  if (!trimmed && !normalized) return null;
 
-  return snap.empty ? null : snap.docs[0];
+  // Try exact match first
+  if (trimmed) {
+    const snap1 = await db
+      .collection("members")
+      .where("churchId", "==", churchId)
+      .where("phone", "==", trimmed)
+      .limit(1)
+      .get();
+
+    if (!snap1.empty) return snap1.docs[0];
+  }
+
+  // Fallback to normalized match
+  if (normalized && normalized !== trimmed) {
+    const snap2 = await db
+      .collection("members")
+      .where("churchId", "==", churchId)
+      .where("phone", "==", normalized)
+      .limit(1)
+      .get();
+
+    if (!snap2.empty) return snap2.docs[0];
+  }
+
+  return null;
 }
 
 async function upsertAttendance({ memberId, churchId, serviceDate, serviceType }) {
-  const key = `${serviceDate}_${serviceType}_${memberId}`;
+  const safeType = sanitizeServiceType(serviceType);
+  const key = `${serviceDate}_${safeType}_${memberId}`;
   const ref = db.collection("memberAttendance").doc(key);
+  const now = admin.firestore.Timestamp.now();
 
   const existing = await ref.get();
-  if (existing.exists) return { alreadyPresent: true };
+  if (existing.exists) {
+    const existingData = existing.data() || {};
+    const createdAt = existingData.createdAt || existingData.checkinAt;
+
+    return {
+      alreadyPresent: true,
+      checkinAt: createdAt || now,
+    };
+  }
 
   await ref.set({
     memberId,
@@ -44,18 +80,29 @@ async function upsertAttendance({ memberId, churchId, serviceDate, serviceType }
     serviceType,
     status: "PRESENT",
     source: "self-qr",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: now,
+    checkinAt: now,
   });
 
-  return { alreadyPresent: false };
+  return { alreadyPresent: false, checkinAt: now };
 }
 
-async function loadNonce(nonce) {
+async function getNonceDoc(nonce) {
   if (!nonce) return null;
-  const docRef = db.collection("checkinNonces").doc(nonce);
-  const snap = await docRef.get();
-  if (!snap.exists) return null;
-  return { id: snap.id, ...snap.data() };
+
+  // Most likely: docId === nonce
+  const ref = db.collection("checkinNonces").doc(nonce);
+  const docSnap = await ref.get();
+  if (docSnap.exists) return docSnap;
+
+  // Fallback: query by field (in case docId differs)
+  const qs = await db
+    .collection("checkinNonces")
+    .where("nonce", "==", nonce)
+    .limit(1)
+    .get();
+
+  return qs.empty ? null : qs.docs[0];
 }
 
 async function handler(req, res) {
@@ -73,12 +120,12 @@ async function handler(req, res) {
     });
   }
 
-  // Accept both keys so old frontend builds still work
+  // Accept both phone and phoneNumber (so your old frontend won’t break)
   const { token, phone, phoneNumber, serviceCode } = req.body || {};
-  const normalizedPhone = normalizePhone(phone || phoneNumber);
-  const normalizedServiceCode = `${serviceCode || ""}`.trim();
+  const phoneValue = `${phone || phoneNumber || ""}`.trim();
+  const codeValue = `${serviceCode || ""}`.trim();
 
-  if (!token || !normalizedPhone || !normalizedServiceCode) {
+  if (!token || !phoneValue || !codeValue) {
     return res.status(400).json({
       status: "error",
       message: "token, phone, and serviceCode are required.",
@@ -107,11 +154,10 @@ async function handler(req, res) {
   if (!churchId || !serviceDate || !nonce) {
     return res.status(400).json({
       status: "error",
-      message: "Token payload missing required fields.",
+      message: "Token payload missing required fields (churchId, serviceDate, nonce).",
     });
   }
 
-  // Optional: enforce SELF mode if you set it
   if (mode && mode !== "SELF") {
     return res.status(400).json({
       status: "error",
@@ -119,53 +165,61 @@ async function handler(req, res) {
     });
   }
 
-  // Validate nonce record + serviceCode
-  const nonceRecord = await loadNonce(nonce);
-  if (!nonceRecord) {
+  // ✅ Make service code matter: validate it against checkinNonces for this nonce
+  const nonceDoc = await getNonceDoc(nonce);
+  if (!nonceDoc) {
     return res.status(401).json({
       status: "error",
-      message: "Invalid or unknown check-in session (nonce).",
+      message: "This check-in token is not recognized (nonce not found).",
     });
   }
 
-  if (nonceRecord.churchId !== churchId) {
+  const nonceData = nonceDoc.data() || {};
+
+  // Ensure the nonce belongs to the same service/church as the token claims
+  if (nonceData.churchId && nonceData.churchId !== churchId) {
     return res.status(401).json({
       status: "error",
-      message: "Check-in session does not match this church.",
+      message: "Token does not match this church.",
     });
   }
 
-  if (`${nonceRecord.serviceDate || ""}` !== `${serviceDate}`) {
+  if (nonceData.serviceDate && `${nonceData.serviceDate}` !== `${serviceDate}`) {
     return res.status(401).json({
       status: "error",
-      message: "Check-in session does not match this service date.",
+      message: "Token does not match this service date.",
     });
   }
 
-  if (nonceRecord.serviceType && `${nonceRecord.serviceType}` !== `${serviceType}`) {
+  if (nonceData.serviceType && `${nonceData.serviceType}` !== `${serviceType}`) {
     return res.status(401).json({
       status: "error",
-      message: "Check-in session does not match this service type.",
+      message: "Token does not match this service type.",
     });
   }
 
-  if (`${nonceRecord.serviceCode || ""}`.trim() !== normalizedServiceCode) {
-    return res.status(401).json({
-      status: "error",
-      message: "Invalid service code.",
-    });
+  // Expiry check (if expiresAt stored as Firestore Timestamp)
+  if (nonceData.expiresAt && typeof nonceData.expiresAt.toDate === "function") {
+    const expiresAt = nonceData.expiresAt.toDate();
+    if (expiresAt.getTime() < Date.now()) {
+      return res.status(401).json({
+        status: "error",
+        message: "This check-in token has expired.",
+      });
+    }
   }
 
-  const expiresAtMs = getTimestampMillis(nonceRecord.expiresAt);
-  if (expiresAtMs && Date.now() > expiresAtMs) {
+  const expectedCode = `${nonceData.serviceCode || ""}`.trim();
+  if (!expectedCode || expectedCode !== codeValue) {
     return res.status(401).json({
       status: "error",
-      message: "This check-in link has expired.",
+      message: "Invalid service code for this check-in token.",
     });
   }
 
   try {
-    const memberDoc = await findMemberByPhone(churchId, normalizedPhone);
+    // ✅ Make phone matter: must match a member in this church
+    const memberDoc = await findMemberByPhone(churchId, phoneValue);
 
     if (!memberDoc) {
       return res.status(404).json({
@@ -175,6 +229,11 @@ async function handler(req, res) {
     }
 
     const memberId = memberDoc.id;
+    const memberData = memberDoc.data() || {};
+
+    const churchDoc = await db.collection("churches").doc(churchId).get();
+    const churchData = churchDoc.exists ? churchDoc.data() || {} : {};
+
     const attendanceResult = await upsertAttendance({
       memberId,
       churchId,
@@ -182,12 +241,33 @@ async function handler(req, res) {
       serviceType,
     });
 
-    // IMPORTANT: don’t “consume” the nonce for shared QR codes.
-    // (Many members must use the same token + serviceCode.)
+    const checkinAtIso = attendanceResult.checkinAt?.toDate
+      ? attendanceResult.checkinAt.toDate().toISOString()
+      : null;
+
+    const memberName =
+      `${memberData.firstName || ""} ${memberData.lastName || ""}`.trim() ||
+      memberData.fullName ||
+      memberData.displayName ||
+      "Member";
+
+    const churchName =
+      churchData.name || churchData.churchName || churchData.displayName || "Church";
 
     return res.status(200).json({
       status: "success",
-      data: { memberId, churchId, serviceDate, serviceType, ...attendanceResult },
+      data: {
+        memberId,
+        memberName,
+        memberPhone: phoneValue,
+        churchId,
+        churchName,
+        serviceDate,
+        serviceType,
+        serviceCode: codeValue,
+        checkinAt: checkinAtIso,
+        ...attendanceResult,
+      },
       message: attendanceResult.alreadyPresent
         ? "You are already checked in for this service."
         : "Check-in recorded successfully.",
