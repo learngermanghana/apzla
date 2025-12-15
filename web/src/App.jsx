@@ -34,7 +34,7 @@ import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import MemberInviteShare from "./components/members/MemberInviteShare";
-import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
+import { PREFERRED_BASE_URL, buildApiUrl, normalizeBaseUrl } from "./utils/baseUrl";
 import {
   createMember,
   deleteMemberById,
@@ -1401,7 +1401,7 @@ function AppContent() {
       throw new Error("Church ID and service date are required.");
     }
 
-    const res = await fetch("/api/checkin-token", {
+    const res = await fetch(buildApiUrl("/api/checkin-token"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(normalizedPayload),
