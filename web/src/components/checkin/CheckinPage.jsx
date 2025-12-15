@@ -30,8 +30,13 @@ export default function CheckinPage() {
 
       // 2) Path style: /checkin/xxxx (optional support)
       const parts = window.location.pathname.split("/").filter(Boolean);
-      // parts[0] = "checkin" or "attendance"
-      if (parts.length >= 2 && (parts[0] === "checkin" || parts[0] === "attendance")) {
+      const firstSegment = parts[0];
+      if (
+        parts.length >= 2 &&
+        (firstSegment === "checkin" ||
+          firstSegment === "attendance" ||
+          firstSegment === "self-checkin")
+      ) {
         return parts[1].trim();
       }
 
