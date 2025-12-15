@@ -10,6 +10,10 @@
   ],
   "routes": [
     {
+      "src": "/(checkin|attendance|self-checkin|give|join|status)(.*)",
+      "dest": "/web/dist/index.html"
+    },
+    {
       "src": "/api/transaction/verify/(?<reference>[^/]+)",
       "dest": "/functions/api/transaction/verify/[reference].js?reference=$reference"
     },
