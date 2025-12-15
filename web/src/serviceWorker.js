@@ -1,7 +1,13 @@
 const SERVICE_WORKER_PATH = "/service-worker.js";
 const CACHE_PREFIX = "apzla-offline-";
 const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
-const TRUSTED_HOSTS = ["www.apzla.com", "apzla.com", "apzla.vercel.app", "apzla.app"];
+const TRUSTED_HOSTS = [
+  "www.apzla.com",
+  "apzla.com",
+  "apzla.vercel.app",
+  "apzla.app",
+  "apzachurch.vercel.app",
+];
 
 async function cleanupStaleServiceWorkers() {
   try {
