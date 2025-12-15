@@ -6526,7 +6526,7 @@ function MissingConfigNotice({ message }) {
 }
 
 export default function App() {
-  if (!isFirebaseConfigured()) {
+  if (!isFirebaseConfigured) {
     return <MissingConfigNotice message={firebaseConfigError} />;
   }
 
