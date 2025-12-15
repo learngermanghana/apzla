@@ -23,6 +23,18 @@ export const normalizeBaseUrl = (rawBaseUrlValue) => {
 
 export const PREFERRED_BASE_URL = normalizeBaseUrl(rawBaseUrl);
 
+const rawApiBaseUrl =
+  import.meta.env.VITE_PUBLIC_API_BASE_URL || import.meta.env.VITE_PUBLIC_BASE_URL;
+
+const apiBaseUrl = normalizeBaseUrl(rawApiBaseUrl || rawBaseUrl);
+
+export const buildApiUrl = (path) => {
+  if (!path) return path;
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${apiBaseUrl}${normalizedPath}`;
+};
+
 const PREFERRED_HOSTNAME = (() => {
   try {
     return new URL(PREFERRED_BASE_URL).hostname.toLowerCase();

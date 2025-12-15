@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { buildApiUrl } from "../../utils/baseUrl";
+
 const STATUS_COLORS = {
   ok: { text: "#166534", background: "#dcfce7", border: "#bbf7d0" },
   error: { text: "#991b1b", background: "#fee2e2", border: "#fecdd3" },
@@ -65,7 +67,7 @@ function StatusPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/health");
+      const response = await fetch(buildApiUrl("/api/health"));
 
       if (!response.ok) {
         const body = await response.text();

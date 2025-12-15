@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./checkin.css";
 import StatusBanner from "../StatusBanner";
-import { PREFERRED_BASE_URL } from "../../utils/baseUrl";
+import { PREFERRED_BASE_URL, buildApiUrl } from "../../utils/baseUrl";
 
 const LOCAL_PHONE_KEY = "apzla_last_phone";
 const MAX_ATTEMPTS = 5;
@@ -158,7 +158,7 @@ export default function CheckinPage() {
 
       // NOTE: Your resource list shows this is deployed as /functions/api/self-checkin-verify.js
       // So the correct URL is /api/self-checkin-verify (not /api/self-checkin/verify)
-      const res = await fetch("/api/self-checkin-verify", {
+      const res = await fetch(buildApiUrl("/api/self-checkin-verify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
