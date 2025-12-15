@@ -15,7 +15,7 @@
     },
     {
       "src": "/api/transaction/verify/(?<reference>[^/]+)",
-      "dest": "/functions/api/transaction/verify/[reference].js?reference=$reference"
+      "dest": "/functions/api/transaction/verify.js?reference=$reference"
     },
     { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
     { "handle": "filesystem" },
