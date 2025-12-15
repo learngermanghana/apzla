@@ -150,6 +150,7 @@ function AppContent() {
   // Attendance
   const [attendance, setAttendance] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const todayStr = new Date().toISOString().slice(0, 10);
   const defaultBaseUrl = useMemo(() => {
     if (typeof window === "undefined") return PREFERRED_BASE_URL;
@@ -206,6 +207,7 @@ function AppContent() {
   const [givingMemberFilter, setGivingMemberFilter] = useState("");
   const [givingTypeFilter, setGivingTypeFilter] = useState("all");
   const [givingDateFilter, setGivingDateFilter] = useState("all");
+  const [givingSearch, setGivingSearch] = useState("");
   const [payoutStatus, setPayoutStatus] = useState("NOT_CONFIGURED");
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState(null);
   const [onlineGivingAppliedAt, setOnlineGivingAppliedAt] = useState(null);
@@ -318,6 +320,7 @@ function AppContent() {
   }, [giving, parseGivingDate]);
 
   const filteredGiving = useMemo(() => {
+    const searchTerm = givingSearch.trim().toLowerCase();
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -327,6 +330,20 @@ function AppContent() {
       const matchesType =
         givingTypeFilter === "all" || entry.type === givingTypeFilter;
       if (!matchesType) return false;
+
+      if (searchTerm) {
+        const memberName = resolveGivingMember(entry).toLowerCase();
+        const matchesSearch = [
+          entry.date,
+          entry.serviceType,
+          entry.type,
+          entry.notes,
+          memberName,
+        ]
+          .filter(Boolean)
+          .some((value) => value.toString().toLowerCase().includes(searchTerm));
+        if (!matchesSearch) return false;
+      }
 
       if (givingDateFilter === "all") return true;
 
@@ -345,7 +362,7 @@ function AppContent() {
 
       return true;
     });
-  }, [giving, givingDateFilter, givingTypeFilter, parseGivingDate]);
+  }, [giving, givingDateFilter, givingSearch, givingTypeFilter, parseGivingDate]);
 
   // Sermons
   const [sermons, setSermons] = useState([]);
@@ -2620,6 +2637,17 @@ function AppContent() {
     return "—";
   };
 
+  const filteredAttendance = useMemo(() => {
+    const term = attendanceSearch.trim().toLowerCase();
+    if (!term) return attendance;
+
+    return attendance.filter((entry) =>
+      [entry.date, entry.serviceType, entry.notes]
+        .filter(Boolean)
+        .some((value) => value.toString().toLowerCase().includes(term))
+    );
+  }, [attendance, attendanceSearch]);
+
   const normalizedSermonSearch = normalizeSearchValue(sermonSearch);
   const filteredSermons = sermons.filter((s) => {
     if (!normalizedSermonSearch) return true;
@@ -4166,6 +4194,30 @@ function AppContent() {
                 Attendance records
               </h2>
 
+              <div style={{ marginBottom: "12px", maxWidth: "320px" }}>
+                <label
+                  htmlFor="attendance-search"
+                  style={{ display: "block", fontSize: "12px", color: "#6b7280" }}
+                >
+                  Search attendance
+                </label>
+                <input
+                  id="attendance-search"
+                  type="text"
+                  placeholder="Search by date, service, or notes"
+                  value={attendanceSearch}
+                  onChange={(e) => setAttendanceSearch(e.target.value)}
+                  style={{
+                    marginTop: "6px",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "13px",
+                    width: "100%",
+                  }}
+                />
+              </div>
+
               {attendanceLoading ? (
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
                   Loading attendance…
@@ -4173,6 +4225,10 @@ function AppContent() {
               ) : attendance.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
                   No attendance records yet. Save your first one above.
+                </p>
+              ) : filteredAttendance.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No attendance records match your search.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -4204,7 +4260,7 @@ function AppContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {attendance.map((a) => {
+                      {filteredAttendance.map((a) => {
                         const total =
                           (a.adults || 0) +
                           (a.children || 0) +
@@ -5567,19 +5623,42 @@ function AppContent() {
                   Giving records
                 </h2>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    alignItems: "flex-end",
-                  }}
-                >
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <label
-                      htmlFor="giving-member-filter"
-                      style={{ fontSize: "12px", color: "#6b7280" }}
-                    >
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                  alignItems: "flex-end",
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label
+                    htmlFor="giving-search"
+                    style={{ fontSize: "12px", color: "#6b7280" }}
+                  >
+                    Search giving
+                  </label>
+                  <input
+                    id="giving-search"
+                    type="text"
+                    placeholder="Search by date, service, notes, or member"
+                    value={givingSearch}
+                    onChange={(e) => setGivingSearch(e.target.value)}
+                    style={{
+                      minWidth: "240px",
+                      padding: "8px 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "13px",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label
+                    htmlFor="giving-member-filter"
+                    style={{ fontSize: "12px", color: "#6b7280" }}
+                  >
                       Filter by member
                     </label>
                     <select
@@ -5674,7 +5753,7 @@ function AppContent() {
                 </p>
               ) : filteredGiving.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                  No giving records match the filters above.
+                  No giving records match the search or filters above.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
