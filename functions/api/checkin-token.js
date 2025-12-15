@@ -9,11 +9,6 @@ const notificationCollection =
   process.env.FIRESTORE_NOTIFICATION_COLLECTION || 'notifications'
 const appBaseUrl = process.env.APP_BASE_URL
 
-function sanitizeEmail(email) {
-  if (typeof email !== 'string') return ''
-  return email.trim().toLowerCase()
-}
-
 function generateServiceCode() {
   // Generates a 6-digit string with leading zeros if necessary
   return String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
@@ -32,14 +27,13 @@ async function writeNonceRecord(nonce, payload) {
 }
 
 async function queueNotification({ email, link, memberId, churchId, serviceDate }) {
-  const sanitizedEmail = sanitizeEmail(email)
-  if (!sanitizedEmail) return null
+  if (!email) return null
 
   const sanitizedMemberId = memberId ?? null
 
   const data = {
     channel: 'email',
-    email: sanitizedEmail,
+    email,
     link,
     memberId: sanitizedMemberId,
     churchId,
@@ -103,21 +97,6 @@ async function handler(request, response) {
 
   const token = signJwt(payload, jwtSecret)
 
-  const normalizedBaseInput = [baseUrl, appBaseUrl].find(
-    (value) => typeof value === 'string' && value.trim() !== ''
-  )
-  const normalizedBase = normalizedBaseInput
-    ? normalizedBaseInput.trim().replace(/\/$/, '')
-    : ''
-
-  if (!normalizedBase) {
-    return response.status(400).json({
-      status: 'error',
-      message:
-        'A baseUrl parameter or APP_BASE_URL environment variable is required to generate check-in links.',
-    })
-  }
-
   try {
     await writeNonceRecord(nonce, {
       churchId,
@@ -127,12 +106,17 @@ async function handler(request, response) {
       expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt * 1000),
     })
 
-    const checkinLink = `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-      checkinLink
-    )}`
+    const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
+    const checkinLink = normalizedBase
+      ? `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
+      : null
+    const qrImageUrl = checkinLink
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+          checkinLink
+        )}`
+      : null
 
-    if (sanitizeEmail(email)) {
+    if (email && checkinLink) {
       await queueNotification({
         email,
         link: checkinLink,
