@@ -48,14 +48,16 @@ export default function GivePage() {
     return churchId ? `${normalizedBase}/give/${churchId}` : "";
   }, [churchId]);
 
-  const onlineGivingStatus = church?.onlineGivingStatus || "NOT_CONFIGURED";
-  const onlineGivingReady =
-    onlineGivingStatus === "ACTIVE" && !!church?.onlineGivingSubaccount;
+  const onlineGivingStatus =
+    church?.payoutStatus || church?.onlineGivingStatus || "NOT_CONFIGURED";
+  const onlineGivingSubaccount =
+    church?.paystackSubaccountCode || church?.onlineGivingSubaccount || "";
+  const onlineGivingReady = onlineGivingStatus === "ACTIVE" && !!onlineGivingSubaccount;
   const onlineGivingStatusMessage =
-    onlineGivingStatus === "PENDING_REVIEW"
+    onlineGivingStatus === "PENDING_REVIEW" || onlineGivingStatus === "PENDING_SUBACCOUNT"
       ? "Online giving is pending review. The church admin will enable this link once approved."
-      : onlineGivingStatus === "REJECTED"
-        ? "Online giving was rejected. Please contact the church admin for assistance."
+      : onlineGivingStatus === "REJECTED" || onlineGivingStatus === "FAILED_SUBACCOUNT"
+        ? "Online giving setup needs attention. Please contact the church admin for assistance."
         : onlineGivingStatus === "NOT_CONFIGURED"
           ? "Online giving is not active yet. Please contact the church admin to apply."
           : "";
@@ -161,7 +163,7 @@ export default function GivePage() {
         amount: Math.round(numericAmount * 100),
         currency: "GHS",
         ref: reference,
-        subaccount: church?.onlineGivingSubaccount,
+        subaccount: onlineGivingSubaccount,
         bearer: "subaccount",
         metadata: {
           churchId,
