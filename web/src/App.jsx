@@ -1394,7 +1394,7 @@ function AppContent() {
       churchId: payload.churchId?.trim(),
       serviceDate: payload.serviceDate,
       serviceType: payload.serviceType?.trim(),
-      baseUrl: normalizeBaseUrlMemo(PREFERRED_BASE_URL),
+      baseUrl: normalizeBaseUrlMemo(payload.baseUrl || PREFERRED_BASE_URL),
     };
 
     if (!normalizedPayload.churchId || !normalizedPayload.serviceDate) {
