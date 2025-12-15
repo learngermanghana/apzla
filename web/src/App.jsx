@@ -2351,6 +2351,163 @@ function AppContent() {
   const authValidationMessage = validateAuthInputs();
   const accessStatus = evaluateAccessStatus(churchPlan);
 
+
+  const resolveGivingPhone = useCallback(
+    (record) => {
+      if (!record) return "";
+
+      if (record.phone) return record.phone;
+      if (record.payerPhone) return record.payerPhone;
+      if (record.memberPhone) return record.memberPhone;
+
+      if (record.memberId) {
+        const memberMatch = members.find((m) => m.id === record.memberId);
+        if (memberMatch?.phone) return memberMatch.phone;
+      }
+
+      return "";
+    },
+    [members],
+  );
+
+  const resolveGivingReference = (record) =>
+    record?.reference || record?.paymentReference || record?.paystackReference || "";
+
+  const resolveGivingStatus = (record) =>
+    (record?.status || record?.paystackStatus || record?.paymentStatus || "completed").toLowerCase();
+
+  const givingTypeOptions = useMemo(() => {
+    const defaults = new Set(["Offering", "Tithe", "Special"]);
+    const fromData = new Set(
+      giving
+        .map((g) => g.type)
+        .filter(Boolean)
+        .map((t) => t.trim()),
+    );
+    const merged = new Set([...defaults, ...fromData]);
+    return Array.from(merged);
+  }, [giving]);
+
+  const filteredGiving = useMemo(() => {
+    return giving.filter((record) => {
+      const startDate = givingFilters.startDate ? new Date(givingFilters.startDate) : null;
+      const endDate = givingFilters.endDate ? new Date(givingFilters.endDate) : null;
+      const recordDate = record.date ? new Date(record.date) : null;
+      const normalizedType = (record.type || "").toLowerCase();
+      const normalizedFilterType = givingFilters.type.toLowerCase();
+      const phoneValue = resolveGivingPhone(record).toLowerCase();
+      const referenceValue = resolveGivingReference(record).toLowerCase();
+      const normalizedStatus = resolveGivingStatus(record);
+
+      if (startDate && recordDate && recordDate < startDate) return false;
+      if (endDate && recordDate && recordDate > endDate) return false;
+      if (normalizedFilterType && normalizedType !== normalizedFilterType) return false;
+
+      if (givingFilters.phone.trim()) {
+        const phoneFilter = givingFilters.phone.trim().toLowerCase();
+        if (!phoneValue.includes(phoneFilter)) return false;
+      }
+
+      if (givingFilters.reference.trim()) {
+        const refFilter = givingFilters.reference.trim().toLowerCase();
+        if (!referenceValue.includes(refFilter)) return false;
+      }
+
+      if (givingMemberFilter && record.memberId !== givingMemberFilter) return false;
+
+      if (givingFilters.status) {
+        const desired = givingFilters.status.toLowerCase();
+        if (desired === "reversed") {
+          if (normalizedStatus !== "reversed") return false;
+        } else if (normalizedStatus !== desired) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [giving, givingFilters, givingMemberFilter, resolveGivingPhone]);
+
+  const filteredGivingAmount = filteredGiving.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0,
+  );
+
+  const givingMonthlyTrend = useMemo(() => {
+    const monthMap = new Map();
+
+    filteredGiving.forEach((record) => {
+      if (!record.date) return;
+      const parsedDate = new Date(record.date);
+      if (Number.isNaN(parsedDate)) return;
+
+      const key = `${parsedDate.getFullYear()}-${String(
+        parsedDate.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      const current = monthMap.get(key) || 0;
+      monthMap.set(key, current + Number(record.amount || 0));
+    });
+
+    const entries = Array.from(monthMap.entries()).map(([key, amount]) => {
+      const [year, month] = key.split("-").map((v) => Number(v));
+      const date = new Date(year, month - 1, 1);
+      return {
+        label: date.toLocaleDateString("en-US", { month: "short" }),
+        year,
+        month,
+        amount,
+      };
+    });
+
+    entries.sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year));
+
+    return entries.slice(-6);
+  }, [filteredGiving]);
+
+  const givingWeeklyTrend = useMemo(() => {
+    const weekMap = new Map();
+
+    filteredGiving.forEach((record) => {
+      if (!record.date) return;
+      const parsedDate = new Date(record.date);
+      if (Number.isNaN(parsedDate)) return;
+
+      const day = parsedDate.getDay();
+      const diff = parsedDate.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(parsedDate);
+      monday.setDate(diff);
+      monday.setHours(0, 0, 0, 0);
+
+      const weekKey = monday.toISOString().slice(0, 10);
+      const current = weekMap.get(weekKey) || 0;
+      weekMap.set(weekKey, current + Number(record.amount || 0));
+    });
+
+    const entries = Array.from(weekMap.entries()).map(([key, amount]) => {
+      const labelDate = new Date(key);
+      const label = labelDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
+      return { label: `Week of ${label}`, amount, key };
+    });
+
+    entries.sort((a, b) => (a.key < b.key ? -1 : 1));
+
+    return entries.slice(-8);
+  }, [filteredGiving]);
+
+  const givingMonthlyChartMax = useMemo(
+    () => Math.max(...givingMonthlyTrend.map((p) => p.amount || 0), 1),
+    [givingMonthlyTrend],
+  );
+
+  const givingWeeklyChartMax = useMemo(
+    () => Math.max(...givingWeeklyTrend.map((p) => p.amount || 0), 1),
+    [givingWeeklyTrend],
+  );
+
   // ---------- UI: Auth screen ----------
   if (!user) {
     return (
@@ -2698,161 +2855,6 @@ function AppContent() {
   );
   const financeBalance = totalGivingAmount - totalExpenseAmount;
 
-  const resolveGivingPhone = useCallback(
-    (record) => {
-      if (!record) return "";
-
-      if (record.phone) return record.phone;
-      if (record.payerPhone) return record.payerPhone;
-      if (record.memberPhone) return record.memberPhone;
-
-      if (record.memberId) {
-        const memberMatch = members.find((m) => m.id === record.memberId);
-        if (memberMatch?.phone) return memberMatch.phone;
-      }
-
-      return "";
-    },
-    [members],
-  );
-
-  const resolveGivingReference = (record) =>
-    record?.reference || record?.paymentReference || record?.paystackReference || "";
-
-  const resolveGivingStatus = (record) =>
-    (record?.status || record?.paystackStatus || record?.paymentStatus || "completed").toLowerCase();
-
-  const givingTypeOptions = useMemo(() => {
-    const defaults = new Set(["Offering", "Tithe", "Special"]);
-    const fromData = new Set(
-      giving
-        .map((g) => g.type)
-        .filter(Boolean)
-        .map((t) => t.trim()),
-    );
-    const merged = new Set([...defaults, ...fromData]);
-    return Array.from(merged);
-  }, [giving]);
-
-  const filteredGiving = useMemo(() => {
-    return giving.filter((record) => {
-      const startDate = givingFilters.startDate ? new Date(givingFilters.startDate) : null;
-      const endDate = givingFilters.endDate ? new Date(givingFilters.endDate) : null;
-      const recordDate = record.date ? new Date(record.date) : null;
-      const normalizedType = (record.type || "").toLowerCase();
-      const normalizedFilterType = givingFilters.type.toLowerCase();
-      const phoneValue = resolveGivingPhone(record).toLowerCase();
-      const referenceValue = resolveGivingReference(record).toLowerCase();
-      const normalizedStatus = resolveGivingStatus(record);
-
-      if (startDate && recordDate && recordDate < startDate) return false;
-      if (endDate && recordDate && recordDate > endDate) return false;
-      if (normalizedFilterType && normalizedType !== normalizedFilterType) return false;
-
-      if (givingFilters.phone.trim()) {
-        const phoneFilter = givingFilters.phone.trim().toLowerCase();
-        if (!phoneValue.includes(phoneFilter)) return false;
-      }
-
-      if (givingFilters.reference.trim()) {
-        const refFilter = givingFilters.reference.trim().toLowerCase();
-        if (!referenceValue.includes(refFilter)) return false;
-      }
-
-      if (givingMemberFilter && record.memberId !== givingMemberFilter) return false;
-
-      if (givingFilters.status) {
-        const desired = givingFilters.status.toLowerCase();
-        if (desired === "reversed") {
-          if (normalizedStatus !== "reversed") return false;
-        } else if (normalizedStatus !== desired) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [giving, givingFilters, givingMemberFilter, resolveGivingPhone]);
-
-  const filteredGivingAmount = filteredGiving.reduce(
-    (sum, record) => sum + Number(record.amount || 0),
-    0,
-  );
-
-  const givingMonthlyTrend = useMemo(() => {
-    const monthMap = new Map();
-
-    filteredGiving.forEach((record) => {
-      if (!record.date) return;
-      const parsedDate = new Date(record.date);
-      if (Number.isNaN(parsedDate)) return;
-
-      const key = `${parsedDate.getFullYear()}-${String(
-        parsedDate.getMonth() + 1,
-      ).padStart(2, "0")}`;
-      const current = monthMap.get(key) || 0;
-      monthMap.set(key, current + Number(record.amount || 0));
-    });
-
-    const entries = Array.from(monthMap.entries()).map(([key, amount]) => {
-      const [year, month] = key.split("-").map((v) => Number(v));
-      const date = new Date(year, month - 1, 1);
-      return {
-        label: date.toLocaleDateString("en-US", { month: "short" }),
-        year,
-        month,
-        amount,
-      };
-    });
-
-    entries.sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year));
-
-    return entries.slice(-6);
-  }, [filteredGiving]);
-
-  const givingWeeklyTrend = useMemo(() => {
-    const weekMap = new Map();
-
-    filteredGiving.forEach((record) => {
-      if (!record.date) return;
-      const parsedDate = new Date(record.date);
-      if (Number.isNaN(parsedDate)) return;
-
-      const day = parsedDate.getDay();
-      const diff = parsedDate.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(parsedDate);
-      monday.setDate(diff);
-      monday.setHours(0, 0, 0, 0);
-
-      const weekKey = monday.toISOString().slice(0, 10);
-      const current = weekMap.get(weekKey) || 0;
-      weekMap.set(weekKey, current + Number(record.amount || 0));
-    });
-
-    const entries = Array.from(weekMap.entries()).map(([key, amount]) => {
-      const labelDate = new Date(key);
-      const label = labelDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-
-      return { label: `Week of ${label}`, amount, key };
-    });
-
-    entries.sort((a, b) => (a.key < b.key ? -1 : 1));
-
-    return entries.slice(-8);
-  }, [filteredGiving]);
-
-  const givingMonthlyChartMax = useMemo(
-    () => Math.max(...givingMonthlyTrend.map((p) => p.amount || 0), 1),
-    [givingMonthlyTrend],
-  );
-
-  const givingWeeklyChartMax = useMemo(
-    () => Math.max(...givingWeeklyTrend.map((p) => p.amount || 0), 1),
-    [givingWeeklyTrend],
-  );
 
   const normalizeSearchValue = (value = "") => value.toLowerCase().trim();
   const memberMatchesSearch = (member, searchValue) => {
@@ -6524,7 +6526,7 @@ function MissingConfigNotice({ message }) {
 }
 
 export default function App() {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured()) {
     return <MissingConfigNotice message={firebaseConfigError} />;
   }
 
