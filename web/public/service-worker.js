@@ -1,4 +1,4 @@
-const CACHE_NAME = "apzla-offline-v5"; // bump to force SW update
+const CACHE_NAME = "apzla-offline-v6"; // bump to force SW update
 const OFFLINE_URL = "/offline.html";
 const ASSETS_TO_CACHE = [
   OFFLINE_URL,
@@ -6,6 +6,17 @@ const ASSETS_TO_CACHE = [
   "/manifest.webmanifest",
   "/icons/apzla-icon.svg",
 ];
+
+function isStaticAssetRequest(url) {
+  return (
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".woff2") ||
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".svg")
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -34,9 +45,6 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (event.request.url.endsWith(".map")) return;
 
-  // Optional: don't SW-cache Vite build assets at all (very safe)
-  if (url.pathname.startsWith("/assets/")) return;
-
   if (event.request.mode === "navigate") {
     event.respondWith(
       (async () => {
@@ -58,21 +66,46 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (isStaticAssetRequest(url)) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+
+        try {
+          const response = await fetch(event.request);
+          if (response && response.status === 200) {
+            try {
+              await cache.put(event.request, response.clone());
+            } catch (_) {}
+          }
+          return response;
+        } catch (_) {
+          return Response.error();
+        }
+      })()
+    );
+    return;
+  }
+
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
       const cached = await cache.match(event.request);
       if (cached) return cached;
 
-      const response = await fetch(event.request);
-
-      if (response && response.status === 200) {
-        try {
-          await cache.put(event.request, response.clone());
-        } catch (_) {}
+      try {
+        const response = await fetch(event.request);
+        if (response && response.status === 200) {
+          try {
+            await cache.put(event.request, response.clone());
+          } catch (_) {}
+        }
+        return response;
+      } catch (_) {
+        return Response.error();
       }
-
-      return response;
     })()
   );
 });
