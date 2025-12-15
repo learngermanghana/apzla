@@ -10,15 +10,17 @@
   ],
   "routes": [
     {
-      "src": "/(checkin|attendance|self-checkin|give|join|status)(.*)",
-      "dest": "/web/dist/index.html"
-    },
-    {
       "src": "/api/transaction/verify/(?<reference>[^/]+)",
       "dest": "/functions/api/transaction/verify.js?reference=$reference"
     },
     { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
+
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/web/dist/index.html" }
+
+    {
+      "src": "/(checkin|attendance|self-checkin|give|join|status)(.*)",
+      "dest": "/index.html"
+    },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
