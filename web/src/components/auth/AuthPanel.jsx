@@ -29,34 +29,8 @@ export function AuthPanel({
   passwordResetMessage,
   passwordResetError,
   passwordResetLoading,
-
-  // ✅ Debug overlay props (optional)
-  user,
-  userProfile,
-  profileLoading,
-  planLoading,
-  profileError,
-  showDebug,
 }) {
   const inlineError = errorMessage || validationMessage;
-
-  // Show debug overlay by default only in dev builds.
-  // Works with Vite (import.meta.env.DEV) and CRA/Node (process.env.NODE_ENV).
-  const isDev =
-    (typeof import.meta !== "undefined" &&
-      import.meta.env &&
-      import.meta.env.DEV) ||
-    (typeof process !== "undefined" &&
-      process.env &&
-      process.env.NODE_ENV !== "production");
-
-  const shouldShowDebug =
-    (showDebug ?? isDev) &&
-    (user !== undefined ||
-      userProfile !== undefined ||
-      profileLoading !== undefined ||
-      planLoading !== undefined ||
-      profileError !== undefined);
 
   return (
     <div className="app-shell auth-gradient" style={{ color: "#0f172a" }}>
@@ -64,17 +38,9 @@ export function AuthPanel({
 
       <div className="auth-grid">
         <Card variant="frosted" style={{ borderRadius: "20px", padding: "28px" }}>
-          <div
-            className="auth-hero-photo"
-            role="img"
-            aria-label="Church community worshipping"
-          >
+          <div className="auth-hero-photo" role="img" aria-label="Church community worshipping">
             <div className="auth-hero-photo-overlay" />
-            <img
-              src={churchPhoto}
-              alt="Congregation worshipping"
-              loading="lazy"
-            />
+            <img src={churchPhoto} alt="Congregation worshipping" loading="lazy" />
             <div className="auth-hero-photo-caption">
               <span aria-hidden>🌅</span>
               <div>
@@ -178,44 +144,41 @@ export function AuthPanel({
               gap: "12px",
             }}
           >
-            {[
-              "Member care CRM",
-              "Attendance & giving",
-              "Visitor follow-up",
-              "Sermon + media links",
-            ].map((item) => (
-              <Card
-                key={item}
-                variant="compact"
-                style={{ display: "flex", alignItems: "center", gap: "10px" }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: "30px",
-                    height: "30px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "10px",
-                    background: "linear-gradient(135deg, #4338ca, #22c55e)",
-                    color: "white",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                  }}
+            {["Member care CRM", "Attendance & giving", "Visitor follow-up", "Sermon + media links"].map(
+              (item) => (
+                <Card
+                  key={item}
+                  variant="compact"
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
                 >
-                  ✓
-                </span>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
-                    {item}
-                  </p>
-                  <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>
-                    Purpose-built for ministry momentum.
-                  </p>
-                </div>
-              </Card>
-            ))}
+                  <span
+                    aria-hidden
+                    style={{
+                      width: "30px",
+                      height: "30px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "10px",
+                      background: "linear-gradient(135deg, #4338ca, #22c55e)",
+                      color: "white",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✓
+                  </span>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
+                      {item}
+                    </p>
+                    <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>
+                      Purpose-built for ministry momentum.
+                    </p>
+                  </div>
+                </Card>
+              )
+            )}
           </div>
         </Card>
 
@@ -230,7 +193,9 @@ export function AuthPanel({
           }}
         >
           <div>
-            <h2 style={{ fontSize: "24px", fontWeight: 800, margin: "0 0 6px" }}>
+            <h2
+              style={{ fontSize: "24px", fontWeight: 800, margin: "0 0 6px" }}
+            >
               Welcome back
             </h2>
             <p style={{ margin: 0, color: "#475569", fontSize: "14px" }}>
@@ -272,41 +237,38 @@ export function AuthPanel({
               onChange={onEmailChange}
               style={{ background: "#f8fafc" }}
             />
-            <Input
-              type="password"
-              placeholder="Password (min 6 characters)"
-              value={password}
-              onChange={onPasswordChange}
-              style={{ background: "#f8fafc" }}
-            />
-            {authMode === "login" && (
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button
-                  type="button"
-                  onClick={onForgotPassword}
-                  disabled={passwordResetLoading}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#4f46e5",
-                    cursor: passwordResetLoading ? "default" : "pointer",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    padding: "2px 0",
-                  }}
-                >
-                  {passwordResetLoading
-                    ? "Sending reset email..."
-                    : "Forgot password?"}
-                </button>
-              </div>
-            )}
-
-            {authMode === "register" && (
-              <>
-                <Input
-                  type="text"
-                  placeholder="Church name"
+          <Input
+            type="password"
+            placeholder="Password (min 6 characters)"
+            value={password}
+            onChange={onPasswordChange}
+            style={{ background: "#f8fafc" }}
+          />
+          {authMode === "login" && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                disabled={passwordResetLoading}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#4f46e5",
+                  cursor: passwordResetLoading ? "default" : "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  padding: "2px 0",
+                }}
+              >
+                {passwordResetLoading ? "Sending reset email..." : "Forgot password?"}
+              </button>
+            </div>
+          )}
+          {authMode === "register" && (
+            <>
+              <Input
+                type="text"
+                placeholder="Church name"
                   value={churchName}
                   onChange={onChurchNameChange}
                   style={{ background: "#f8fafc" }}
@@ -334,12 +296,11 @@ export function AuthPanel({
                 />
               </>
             )}
-
-            {inlineError && (
-              <p
-                role="alert"
-                style={{
-                  margin: 0,
+          {inlineError && (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
                   color: "#b91c1c",
                   fontSize: "13px",
                   background: "#fef2f2",
@@ -347,49 +308,46 @@ export function AuthPanel({
                   borderRadius: "10px",
                   padding: "10px 12px",
                 }}
-              >
-                {inlineError}
-              </p>
-            )}
-
-            {authMode === "login" && passwordResetMessage && (
-              <p
-                style={{
-                  margin: 0,
-                  color: "#166534",
-                  fontSize: "13px",
-                  background: "#ecfdf3",
-                  border: "1px solid #bbf7d0",
-                  borderRadius: "10px",
-                  padding: "10px 12px",
-                }}
-              >
-                {passwordResetMessage}
-              </p>
-            )}
-
-            {authMode === "login" && passwordResetError && (
-              <p
-                role="alert"
-                style={{
-                  margin: 0,
-                  color: "#b91c1c",
-                  fontSize: "13px",
-                  background: "#fef2f2",
-                  border: "1px solid #fecdd3",
-                  borderRadius: "10px",
-                  padding: "10px 12px",
-                }}
-              >
-                {passwordResetError}
-              </p>
-            )}
-
-            <Button
-              onClick={onSubmit}
-              disabled={disableSubmit}
-              fullWidth
-              style={{ marginTop: "8px" }}
+            >
+              {inlineError}
+            </p>
+          )}
+          {authMode === "login" && passwordResetMessage && (
+            <p
+              style={{
+                margin: 0,
+                color: "#166534",
+                fontSize: "13px",
+                background: "#ecfdf3",
+                border: "1px solid #bbf7d0",
+                borderRadius: "10px",
+                padding: "10px 12px",
+              }}
+            >
+              {passwordResetMessage}
+            </p>
+          )}
+          {authMode === "login" && passwordResetError && (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
+                color: "#b91c1c",
+                fontSize: "13px",
+                background: "#fef2f2",
+                border: "1px solid #fecdd3",
+                borderRadius: "10px",
+                padding: "10px 12px",
+              }}
+            >
+              {passwordResetError}
+            </p>
+          )}
+          <Button
+            onClick={onSubmit}
+            disabled={disableSubmit}
+            fullWidth
+            style={{ marginTop: "8px" }}
             >
               {loading
                 ? "Working..."
@@ -399,42 +357,18 @@ export function AuthPanel({
             </Button>
           </div>
 
-          <p style={{ marginTop: "8px", fontSize: "12px", color: "#64748b" }}>
-            Secure, role-aware access for every ministry leader. Need help? Email
-            us at hello@apzla.com.
+          <p
+            style={{
+              marginTop: "8px",
+              fontSize: "12px",
+              color: "#64748b",
+            }}
+          >
+            Secure, role-aware access for every ministry leader. Need help?
+            Email us at hello@apzla.com.
           </p>
         </Card>
       </div>
-
-      {/* ✅ Debug overlay (bottom-left). Only shows by default in dev builds. */}
-      {shouldShowDebug && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 10,
-            left: 10,
-            zIndex: 9999,
-            background: "#000",
-            color: "#0f0",
-            padding: 10,
-            fontSize: 12,
-            borderRadius: 8,
-            maxWidth: 320,
-            lineHeight: 1.35,
-            opacity: 0.92,
-          }}
-        >
-          user: {String(!!user)} | verified: {String(user?.emailVerified)}
-          <br />
-          profileLoading: {String(!!profileLoading)}
-          <br />
-          userProfile: {String(!!userProfile)}
-          <br />
-          planLoading: {String(!!planLoading)}
-          <br />
-          profileError: {String(profileError || "")}
-        </div>
-      )}
     </div>
   );
 }
@@ -463,14 +397,6 @@ AuthPanel.propTypes = {
   passwordResetMessage: PropTypes.string,
   passwordResetError: PropTypes.string,
   passwordResetLoading: PropTypes.bool,
-
-  // ✅ Debug overlay props
-  user: PropTypes.any,
-  userProfile: PropTypes.any,
-  profileLoading: PropTypes.bool,
-  planLoading: PropTypes.bool,
-  profileError: PropTypes.any,
-  showDebug: PropTypes.bool,
 };
 
 AuthPanel.defaultProps = {
@@ -489,14 +415,6 @@ AuthPanel.defaultProps = {
   passwordResetMessage: "",
   passwordResetError: "",
   passwordResetLoading: false,
-
-  // ✅ Debug overlay defaults
-  user: undefined,
-  userProfile: undefined,
-  profileLoading: false,
-  planLoading: false,
-  profileError: "",
-  showDebug: undefined,
 };
 
 export default AuthPanel;
