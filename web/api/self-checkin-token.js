@@ -28,6 +28,7 @@ function buildCheckinLink(token, baseUrl) {
   const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
   if (!normalizedBase) return null
 
+  // Keep Vercel + frontend aligned on the /checkin path
   return `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
 }
 

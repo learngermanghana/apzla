@@ -161,8 +161,7 @@ export default function CheckinPage() {
     try {
       setIsSubmitting(true);
 
-      // NOTE: Your resource list shows this is deployed as /functions/api/self-checkin-verify.js
-      // So the correct URL is /api/self-checkin-verify (not /api/self-checkin/verify)
+      // Hosted on Vercel under /api/self-checkin-verify (not /functions/api/...)
       const res = await fetch("/api/self-checkin-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
