@@ -3,6 +3,7 @@ const { admin, db, initError } = require("../lib/firestoreAdmin");
 const { verifyJwt } = require("../lib/jwtHelpers");
 
 const jwtSecret = process.env.CHECKIN_JWT_SECRET;
+const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || "checkinNonces";
 
 function sanitizeServiceType(serviceType = "Service") {
   return `${serviceType}`.trim().replace(/[^\w-]+/g, "_");
@@ -91,13 +92,13 @@ async function getNonceDoc(nonce) {
   if (!nonce) return null;
 
   // Most likely: docId === nonce
-  const ref = db.collection("checkinNonces").doc(nonce);
+  const ref = db.collection(nonceCollection).doc(nonce);
   const docSnap = await ref.get();
   if (docSnap.exists) return docSnap;
 
   // Fallback: query by field (in case docId differs)
   const qs = await db
-    .collection("checkinNonces")
+    .collection(nonceCollection)
     .where("nonce", "==", nonce)
     .limit(1)
     .get();

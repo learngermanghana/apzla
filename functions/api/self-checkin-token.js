@@ -23,7 +23,7 @@ function buildCheckinLink(token, baseUrl) {
   const normalizedBase = (baseUrl || appBaseUrl || '').replace(/\/$/, '')
   if (!normalizedBase) return null
 
-  return `${normalizedBase}/self-checkin?token=${encodeURIComponent(token)}`
+  return `${normalizedBase}/checkin?token=${encodeURIComponent(token)}`
 }
 
 async function handler(request, response) {

@@ -14,24 +14,20 @@ enforcePreferredHost();
 
 const { pathname } = window.location;
 
-// Accept both /checkin/... and /attendance/...
-const isCheckinRoute =
-  pathname === "/checkin" ||
-  pathname.startsWith("/checkin/") ||
-  pathname === "/attendance" ||
-  pathname.startsWith("/attendance/");
+const isCheckinRoute = ["/checkin", "/attendance", "/self-checkin"].some(
+  (route) => pathname === route || pathname.startsWith(`${route}/`)
+);
 
 const isStatusRoute = pathname === "/status" || pathname.startsWith("/status/");
 const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
 const isMemberInviteRoute = pathname === "/join" || pathname.startsWith("/join/");
 
 function getSecondSegment(path) {
-  // "/checkin/<token>" => "<token>"
+  // "/give/<id>" => "<id>"
   const parts = path.split("/").filter(Boolean); // removes empty
   return parts.length >= 2 ? parts[1] : null;
 }
 
-const checkinToken = isCheckinRoute ? getSecondSegment(pathname) : null;
 const giveId = isGiveRoute ? getSecondSegment(pathname) : null;
 const memberInviteId = isMemberInviteRoute ? getSecondSegment(pathname) : null;
 
@@ -39,7 +35,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <OfflineNotice />
     {isCheckinRoute ? (
-      <CheckinPage token={checkinToken} />
+      <CheckinPage />
     ) : isGiveRoute ? (
       <GivePage id={giveId} />
     ) : isMemberInviteRoute ? (
