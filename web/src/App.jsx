@@ -197,6 +197,8 @@ function AppContent() {
   const [givingPageCursor, setGivingPageCursor] = useState(null);
   const [givingHasMore, setGivingHasMore] = useState(true);
   const [givingMemberFilter, setGivingMemberFilter] = useState("");
+  const [givingTypeFilter, setGivingTypeFilter] = useState("all");
+  const [givingDateFilter, setGivingDateFilter] = useState("all");
   const [payoutStatus, setPayoutStatus] = useState("NOT_CONFIGURED");
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState(null);
   const [onlineGivingAppliedAt, setOnlineGivingAppliedAt] = useState(null);
@@ -248,6 +250,95 @@ function AppContent() {
       : onlineGivingFailed
         ? { bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" }
         : { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" };
+
+  const parseGivingDate = useCallback((record) => {
+    if (!record) return null;
+    const rawDate = record.date || record.createdAt;
+    if (!rawDate) return null;
+    const parsed = new Date(rawDate);
+    return Number.isNaN(parsed.valueOf()) ? null : parsed;
+  }, []);
+
+  const givingTypeOptions = useMemo(() => {
+    const uniqueTypes = new Set(["Offering", "Tithe", "Special"]);
+    giving.forEach((entry) => {
+      if (entry?.type) {
+        uniqueTypes.add(entry.type);
+      }
+    });
+    return Array.from(uniqueTypes);
+  }, [giving]);
+
+  const givingStats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let totalAmount = 0;
+    let monthAmount = 0;
+    let monthCount = 0;
+    const typeTotals = {};
+
+    giving.forEach((entry) => {
+      const amount = Number(entry.amount) || 0;
+      totalAmount += amount;
+
+      const parsedDate = parseGivingDate(entry);
+      if (
+        parsedDate &&
+        parsedDate.getMonth() === currentMonth &&
+        parsedDate.getFullYear() === currentYear
+      ) {
+        monthAmount += amount;
+        monthCount += 1;
+      }
+
+      const key = entry.type || "Unspecified";
+      typeTotals[key] = (typeTotals[key] || 0) + amount;
+    });
+
+    const [topType = "No records yet", topTypeAmount = 0] =
+      Object.entries(typeTotals).sort((a, b) => b[1] - a[1])[0] || [];
+
+    return {
+      totalAmount,
+      totalCount: giving.length,
+      monthAmount,
+      monthCount,
+      topType,
+      topTypeAmount,
+    };
+  }, [giving, parseGivingDate]);
+
+  const filteredGiving = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    return giving.filter((entry) => {
+      const matchesType =
+        givingTypeFilter === "all" || entry.type === givingTypeFilter;
+      if (!matchesType) return false;
+
+      if (givingDateFilter === "all") return true;
+
+      const parsedDate = parseGivingDate(entry);
+      if (!parsedDate) return false;
+
+      if (givingDateFilter === "thisMonth") {
+        return parsedDate >= startOfMonth && parsedDate <= now;
+      }
+      if (givingDateFilter === "last30Days") {
+        return parsedDate >= thirtyDaysAgo && parsedDate <= now;
+      }
+      if (givingDateFilter === "thisYear") {
+        return parsedDate >= startOfYear && parsedDate <= now;
+      }
+
+      return true;
+    });
+  }, [giving, givingDateFilter, givingTypeFilter, parseGivingDate]);
 
   // Sermons
   const [sermons, setSermons] = useState([]);
@@ -4938,6 +5029,104 @@ function AppContent() {
               )}
             </div>
 
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "12px",
+                marginBottom: "12px",
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  background: "#f9fafb",
+                  display: "grid",
+                  gap: "6px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    letterSpacing: "0.02em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Total recorded
+                </p>
+                <div style={{ fontSize: "22px", fontWeight: 700 }}>
+                  {givingStats.totalAmount.toLocaleString()}
+                </div>
+                <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>
+                  {givingStats.totalCount} entr{givingStats.totalCount === 1 ? "y" : "ies"} loaded
+                </p>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  background: "#f9fafb",
+                  display: "grid",
+                  gap: "6px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    letterSpacing: "0.02em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  This month
+                </p>
+                <div style={{ fontSize: "22px", fontWeight: 700 }}>
+                  {givingStats.monthAmount.toLocaleString()}
+                </div>
+                <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>
+                  {givingStats.monthCount || 0} contribution{givingStats.monthCount === 1 ? "" : "s"} this month
+                </p>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  background: "#f9fafb",
+                  display: "grid",
+                  gap: "6px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    letterSpacing: "0.02em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Top giving type
+                </p>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>
+                  {givingStats.topType}
+                </div>
+                <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>
+                  {givingStats.topTypeAmount > 0
+                    ? `${givingStats.topTypeAmount.toLocaleString()} recorded`
+                    : "No records yet"}
+                </p>
+              </div>
+            </div>
+
             {/* Giving form */}
             <div
               style={{
@@ -5088,7 +5277,6 @@ function AppContent() {
                 style={{
                   display: "flex",
                   alignItems: "flex-end",
-                  justifyContent: "space-between",
                   gap: "12px",
                   flexWrap: "wrap",
                   marginBottom: "8px",
@@ -5104,37 +5292,100 @@ function AppContent() {
                   Giving records
                 </h2>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <label
-                    htmlFor="giving-member-filter"
-                    style={{ fontSize: "12px", color: "#6b7280" }}
-                  >
-                    Filter by member
-                  </label>
-                  <select
-                    id="giving-member-filter"
-                    value={givingMemberFilter}
-                    onChange={(e) => setGivingMemberFilter(e.target.value)}
-                    style={{
-                      minWidth: "240px",
-                      padding: "8px 10px",
-                      borderRadius: "8px",
-                      border: "1px solid #d1d5db",
-                      fontSize: "13px",
-                    }}
-                  >
-                    <option value="">All giving records</option>
-                    {members.map((m) => {
-                      const fullName = `${m.firstName || ""} ${m.lastName || ""}`
-                        .trim()
-                        .replace(/\s+/g, " ");
-                      return (
-                        <option key={m.id} value={m.id}>
-                          {fullName || "Unnamed member"}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    alignItems: "flex-end",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label
+                      htmlFor="giving-member-filter"
+                      style={{ fontSize: "12px", color: "#6b7280" }}
+                    >
+                      Filter by member
+                    </label>
+                    <select
+                      id="giving-member-filter"
+                      value={givingMemberFilter}
+                      onChange={(e) => setGivingMemberFilter(e.target.value)}
+                      style={{
+                        minWidth: "220px",
+                        padding: "8px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <option value="">All giving records</option>
+                      {members.map((m) => {
+                        const fullName = `${m.firstName || ""} ${m.lastName || ""}`
+                          .trim()
+                          .replace(/\s+/g, " ");
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {fullName || "Unnamed member"}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label
+                      htmlFor="giving-type-filter"
+                      style={{ fontSize: "12px", color: "#6b7280" }}
+                    >
+                      Filter by type
+                    </label>
+                    <select
+                      id="giving-type-filter"
+                      value={givingTypeFilter}
+                      onChange={(e) => setGivingTypeFilter(e.target.value)}
+                      style={{
+                        minWidth: "160px",
+                        padding: "8px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <option value="all">All types</option>
+                      {givingTypeOptions.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
                         </option>
-                      );
-                    })}
-                  </select>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label
+                      htmlFor="giving-date-filter"
+                      style={{ fontSize: "12px", color: "#6b7280" }}
+                    >
+                      Filter by date
+                    </label>
+                    <select
+                      id="giving-date-filter"
+                      value={givingDateFilter}
+                      onChange={(e) => setGivingDateFilter(e.target.value)}
+                      style={{
+                        minWidth: "160px",
+                        padding: "8px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <option value="all">All dates</option>
+                      <option value="thisMonth">This month</option>
+                      <option value="last30Days">Last 30 days</option>
+                      <option value="thisYear">This year</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -5145,6 +5396,10 @@ function AppContent() {
               ) : giving.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
                   No giving records yet. Save your first one above.
+                </p>
+              ) : filteredGiving.length === 0 ? (
+                <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                  No giving records match the filters above.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -5171,7 +5426,7 @@ function AppContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {giving.map((g) => (
+                      {filteredGiving.map((g) => (
                         <tr
                           key={g.id}
                           style={{
