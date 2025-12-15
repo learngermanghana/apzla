@@ -14,9 +14,7 @@
       "dest": "/functions/api/transaction/verify.js?reference=$reference"
     },
     { "src": "/api/(.*)", "dest": "/functions/api/$1.js" },
-
     { "handle": "filesystem" },
-
     {
       "src": "/(checkin|attendance|self-checkin|give|join|status)(.*)",
       "dest": "/index.html"
