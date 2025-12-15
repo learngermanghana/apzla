@@ -1,4 +1,4 @@
-const { admin, db, initError } = require('../../lib/firestoreAdmin')
+const { admin, db, initError } = require('../lib/firestoreAdmin')
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
 
