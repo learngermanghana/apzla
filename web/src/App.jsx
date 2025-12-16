@@ -16,9 +16,6 @@ import {
   deleteDoc,
   setDoc,
   query,
-  limit,
-  orderBy,
-  startAfter,
   where,
 } from "firebase/firestore";
 import {
@@ -40,6 +37,9 @@ import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
+import { useToast } from "./hooks/useToast";
+import { useMembers } from "./hooks/useMembers";
+import { useGiving } from "./hooks/useGiving";
 
 function AppContent() {
   const {
@@ -51,6 +51,8 @@ function AppContent() {
     reloadProfile,
     refreshUser,
   } = useAuthProfile();
+
+  const { toasts, showToast, dismissToast } = useToast();
 
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
@@ -68,7 +70,6 @@ function AppContent() {
   const [verificationError, setVerificationError] = useState("");
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [toasts, setToasts] = useState([]);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
   const [churchSettings, setChurchSettings] = useState({
@@ -86,9 +87,6 @@ function AppContent() {
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
   const [activeTab, setActiveTab] = useState("overview");
 
-  const MEMBERS_PAGE_SIZE = 25;
-  const GIVING_PAGE_SIZE = 25;
-
   // Overview tab state
   const [memberAttendanceHistory, setMemberAttendanceHistory] = useState([]);
   const [overviewMetricsLoading, setOverviewMetricsLoading] = useState(false);
@@ -100,38 +98,28 @@ function AppContent() {
   const [churchCity, setChurchCity] = useState("");
   const [churchPhone, setChurchPhone] = useState("");
 
-  // Members (CRM)
-  const [members, setMembers] = useState([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [memberPageCursor, setMemberPageCursor] = useState(null);
-  const [membersHasMore, setMembersHasMore] = useState(true);
-  const [editingMemberId, setEditingMemberId] = useState(null);
-  const [editingMemberForm, setEditingMemberForm] = useState({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    email: "",
-    status: "VISITOR",
-  });
-  const [memberActionLoading, setMemberActionLoading] = useState(false);
-  const [memberForm, setMemberForm] = useState({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    email: "",
-    status: "VISITOR",
-  });
-  const [memberSearch, setMemberSearch] = useState("");
-
-  const memberLookup = useMemo(() => {
-    const map = new Map();
-    members.forEach((member) => {
-      const fullName = `${member.firstName || ""} ${member.lastName || ""}`.trim();
-      const fallback = member.email || member.phone || member.id;
-      map.set(member.id, fullName || fallback);
-    });
-    return map;
-  }, [members]);
+  const {
+    members,
+    membersLoading,
+    memberForm,
+    setMemberForm,
+    memberSearch,
+    setMemberSearch,
+    memberLookup,
+    editingMemberId,
+    editingMemberForm,
+    setEditingMemberForm,
+    memberActionLoading,
+    membersHasMore,
+    loadMembers,
+    loadMoreMembers,
+    handleCreateMember,
+    startEditingMember,
+    cancelEditingMember,
+    handleUpdateMember,
+    handleDeleteMember,
+    resetMembers,
+  } = useMembers({ db, userProfile, showToast });
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -200,14 +188,6 @@ function AppContent() {
   const [memberInviteBaseUrl, setMemberInviteBaseUrl] = useState(defaultBaseUrl);
 
   // Giving (collections & tithes)
-  const [giving, setGiving] = useState([]);
-  const [givingLoading, setGivingLoading] = useState(false);
-  const [givingPageCursor, setGivingPageCursor] = useState(null);
-  const [givingHasMore, setGivingHasMore] = useState(true);
-  const [givingMemberFilter, setGivingMemberFilter] = useState("");
-  const [givingTypeFilter, setGivingTypeFilter] = useState("all");
-  const [givingDateFilter, setGivingDateFilter] = useState("all");
-  const [givingSearch, setGivingSearch] = useState("");
   const [payoutStatus, setPayoutStatus] = useState("NOT_CONFIGURED");
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState(null);
   const [onlineGivingAppliedAt, setOnlineGivingAppliedAt] = useState(null);
@@ -219,14 +199,30 @@ function AppContent() {
     confirmDetails: false,
   });
   const [onlineGivingActionLoading, setOnlineGivingActionLoading] = useState(false);
-  const [givingForm, setGivingForm] = useState({
-    date: todayStr,
-    serviceType: "Sunday Service",
-    type: "Offering", // Offering | Tithe | Special
-    amount: "",
-    notes: "",
-    memberId: "",
-  });
+  const {
+    giving,
+    givingLoading,
+    givingHasMore,
+    givingMemberFilter,
+    setGivingMemberFilter,
+    givingTypeFilter,
+    setGivingTypeFilter,
+    givingDateFilter,
+    setGivingDateFilter,
+    givingSearch,
+    setGivingSearch,
+    givingForm,
+    setGivingForm,
+    givingTypeOptions,
+    givingStats,
+    filteredGiving,
+    loadGiving,
+    loadMoreGiving,
+    handleCreateGiving,
+    resolveGivingMember,
+    resetGiving,
+  } = useGiving({ db, userProfile, members, showToast });
+
   const onlineGivingLink = useMemo(() => {
     if (!userProfile?.churchId) return "";
     const origin =
@@ -241,6 +237,10 @@ function AppContent() {
       onlineGivingLink
     )}`;
   }, [onlineGivingLink]);
+
+  useEffect(() => {
+    setGivingForm((prev) => ({ ...prev, date: prev.date || todayStr }));
+  }, [todayStr, setGivingForm]);
 
   const onlineGivingActive = payoutStatus === "ACTIVE";
   const onlineGivingPending = payoutStatus === "PENDING_SUBACCOUNT";
@@ -259,110 +259,6 @@ function AppContent() {
       : onlineGivingFailed
         ? { bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" }
         : { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" };
-
-  const parseGivingDate = useCallback((record) => {
-    if (!record) return null;
-    const rawDate = record.date || record.createdAt;
-    if (!rawDate) return null;
-    const parsed = new Date(rawDate);
-    return Number.isNaN(parsed.valueOf()) ? null : parsed;
-  }, []);
-
-  const givingTypeOptions = useMemo(() => {
-    const uniqueTypes = new Set(["Offering", "Tithe", "Special"]);
-    giving.forEach((entry) => {
-      if (entry?.type) {
-        uniqueTypes.add(entry.type);
-      }
-    });
-    return Array.from(uniqueTypes);
-  }, [giving]);
-
-  const givingStats = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    let totalAmount = 0;
-    let monthAmount = 0;
-    let monthCount = 0;
-    const typeTotals = {};
-
-    giving.forEach((entry) => {
-      const amount = Number(entry.amount) || 0;
-      totalAmount += amount;
-
-      const parsedDate = parseGivingDate(entry);
-      if (
-        parsedDate &&
-        parsedDate.getMonth() === currentMonth &&
-        parsedDate.getFullYear() === currentYear
-      ) {
-        monthAmount += amount;
-        monthCount += 1;
-      }
-
-      const key = entry.type || "Unspecified";
-      typeTotals[key] = (typeTotals[key] || 0) + amount;
-    });
-
-    const [topType = "No records yet", topTypeAmount = 0] =
-      Object.entries(typeTotals).sort((a, b) => b[1] - a[1])[0] || [];
-
-    return {
-      totalAmount,
-      totalCount: giving.length,
-      monthAmount,
-      monthCount,
-      topType,
-      topTypeAmount,
-    };
-  }, [giving, parseGivingDate]);
-
-  const filteredGiving = useMemo(() => {
-    const searchTerm = givingSearch.trim().toLowerCase();
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-
-    return giving.filter((entry) => {
-      const matchesType =
-        givingTypeFilter === "all" || entry.type === givingTypeFilter;
-      if (!matchesType) return false;
-
-      if (searchTerm) {
-        const memberName = resolveGivingMember(entry).toLowerCase();
-        const matchesSearch = [
-          entry.date,
-          entry.serviceType,
-          entry.type,
-          entry.notes,
-          memberName,
-        ]
-          .filter(Boolean)
-          .some((value) => value.toString().toLowerCase().includes(searchTerm));
-        if (!matchesSearch) return false;
-      }
-
-      if (givingDateFilter === "all") return true;
-
-      const parsedDate = parseGivingDate(entry);
-      if (!parsedDate) return false;
-
-      if (givingDateFilter === "thisMonth") {
-        return parsedDate >= startOfMonth && parsedDate <= now;
-      }
-      if (givingDateFilter === "last30Days") {
-        return parsedDate >= thirtyDaysAgo && parsedDate <= now;
-      }
-      if (givingDateFilter === "thisYear") {
-        return parsedDate >= startOfYear && parsedDate <= now;
-      }
-
-      return true;
-    });
-  }, [giving, givingDateFilter, givingSearch, givingTypeFilter, parseGivingDate]);
 
   // Sermons
   const [sermons, setSermons] = useState([]);
@@ -458,18 +354,6 @@ function AppContent() {
     };
   };
 
-  const showToast = (message, variant = "info") => {
-    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
-    setToasts((prev) => [...prev, { id, message, variant }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 4200);
-  };
-
-  const dismissToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
-
   const syncOnlineGivingState = (data) => {
     setPayoutStatus(data?.payoutStatus || data?.onlineGivingStatus || "NOT_CONFIGURED");
     setPaystackSubaccountCode(
@@ -518,10 +402,9 @@ function AppContent() {
 
   // ---------- Reset data when auth user changes ----------
   useEffect(() => {
-    setMembers([]);
+    resetMembers();
     setAttendance([]);
-    setGiving([]);
-    setGivingMemberFilter("");
+    resetGiving();
     setSermons([]);
     setMemberAttendanceHistory([]);
   }, [user?.uid]);
@@ -1110,161 +993,7 @@ function AppContent() {
     }
   };
 
-  // ---------- Members (CRM) ----------
-  const loadMembers = async ({ append = false } = {}) => {
-    if (!userProfile?.churchId) return;
-    try {
-      setMembersLoading(true);
-      const colRef = collection(db, "members");
-      const constraints = [
-        where("churchId", "==", userProfile.churchId),
-        orderBy("createdAt", "desc"),
-      ];
-
-      if (append && memberPageCursor) {
-        constraints.push(startAfter(memberPageCursor));
-      }
-
-      constraints.push(limit(MEMBERS_PAGE_SIZE));
-
-      const qMembers = query(colRef, ...constraints);
-      const snapshot = await getDocs(qMembers);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setMembers((prev) => (append ? [...prev, ...data] : data));
-
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
-      setMemberPageCursor(lastDoc);
-      setMembersHasMore(snapshot.docs.length === MEMBERS_PAGE_SIZE);
-    } catch (err) {
-      console.error("Load members error:", err);
-      showToast("Error loading members.", "error");
-    } finally {
-      setMembersLoading(false);
-    }
-  };
-
-  const handleCreateMember = async () => {
-    if (!userProfile?.churchId) return;
-
-    if (!memberForm.firstName.trim()) {
-      showToast("First name is required.", "error");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await addDoc(collection(db, "members"), {
-        churchId: userProfile.churchId,
-        firstName: memberForm.firstName.trim(),
-        lastName: memberForm.lastName.trim(),
-        phone: memberForm.phone.trim(),
-        email: memberForm.email.trim(),
-        status: memberForm.status,
-        createdAt: new Date().toISOString(),
-      });
-
-      setMemberForm({
-        firstName: "",
-        lastName: "",
-        phone: "",
-        email: "",
-        status: "VISITOR",
-      });
-
-      await loadMembers();
-      showToast("Member saved.", "success");
-    } catch (err) {
-      console.error("Create member error:", err);
-      showToast(err.message || "Unable to save member.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startEditingMember = (member) => {
-    setEditingMemberId(member.id);
-    setEditingMemberForm({
-      firstName: member.firstName || "",
-      lastName: member.lastName || "",
-      phone: member.phone || "",
-      email: member.email || "",
-      status: (member.status || "VISITOR").toUpperCase(),
-    });
-  };
-
-  const cancelEditingMember = () => {
-    setEditingMemberId(null);
-    setEditingMemberForm({
-      firstName: "",
-      lastName: "",
-      phone: "",
-      email: "",
-      status: "VISITOR",
-    });
-  };
-
-  const handleUpdateMember = async () => {
-    if (!editingMemberId || !userProfile?.churchId) return;
-
-    if (!editingMemberForm.firstName.trim()) {
-      showToast("First name is required.", "error");
-      return;
-    }
-
-    try {
-      setMemberActionLoading(true);
-      const docRef = doc(db, "members", editingMemberId);
-      const payload = {
-        firstName: editingMemberForm.firstName.trim(),
-        lastName: editingMemberForm.lastName.trim(),
-        phone: editingMemberForm.phone.trim(),
-        email: editingMemberForm.email.trim(),
-        status: editingMemberForm.status,
-        updatedAt: new Date().toISOString(),
-      };
-      await updateDoc(docRef, payload);
-
-      setMembers((prev) =>
-        prev.map((m) => (m.id === editingMemberId ? { ...m, ...payload } : m))
-      );
-      showToast("Member updated.", "success");
-      cancelEditingMember();
-    } catch (err) {
-      console.error("Update member error:", err);
-      showToast(err.message || "Unable to update member.", "error");
-    } finally {
-      setMemberActionLoading(false);
-    }
-  };
-
-  const handleDeleteMember = async (memberId) => {
-    if (!userProfile?.churchId || !memberId) return;
-
-    const confirmed = window.confirm("Delete this member? This cannot be undone.");
-    if (!confirmed) return;
-
-    try {
-      setMemberActionLoading(true);
-      await deleteDoc(doc(db, "members", memberId));
-      setMembers((prev) => prev.filter((m) => m.id !== memberId));
-      if (editingMemberId === memberId) {
-        cancelEditingMember();
-      }
-      showToast("Member deleted.", "success");
-    } catch (err) {
-      console.error("Delete member error:", err);
-      showToast(err.message || "Unable to delete member.", "error");
-    } finally {
-      setMemberActionLoading(false);
-    }
-  };
-
   useEffect(() => {
-    setMemberPageCursor(null);
-    setMembersHasMore(true);
     if (
       (activeTab === "members" ||
         activeTab === "overview" ||
@@ -1277,11 +1006,6 @@ function AppContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
-
-  const loadMoreMembers = () => {
-    if (!membersHasMore || membersLoading) return;
-    return loadMembers({ append: true });
-  };
 
   // ---------- Attendance ----------
   const loadAttendance = async () => {
@@ -1917,101 +1641,7 @@ function AppContent() {
     }
   };
 
-  // ---------- Giving ----------
-  const loadGiving = async ({ append = false, memberId = givingMemberFilter } = {}) => {
-    if (!userProfile?.churchId) return;
-    try {
-      setGivingLoading(true);
-      const colRef = collection(db, "giving");
-      const constraints = [
-        where("churchId", "==", userProfile.churchId),
-      ];
-
-      if (memberId) {
-        constraints.push(where("memberId", "==", memberId));
-      }
-
-      constraints.push(orderBy("createdAt", "desc"));
-
-      if (append && givingPageCursor) {
-        constraints.push(startAfter(givingPageCursor));
-      }
-
-      constraints.push(limit(GIVING_PAGE_SIZE));
-
-      const qGiving = query(colRef, ...constraints);
-      const snapshot = await getDocs(qGiving);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setGiving((prev) => (append ? [...prev, ...data] : data));
-
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
-      setGivingPageCursor(lastDoc);
-      setGivingHasMore(snapshot.docs.length === GIVING_PAGE_SIZE);
-    } catch (err) {
-      console.error("Load giving error:", err);
-      showToast("Error loading giving records.", "error");
-    } finally {
-      setGivingLoading(false);
-    }
-  };
-
-  const handleCreateGiving = async () => {
-    if (!userProfile?.churchId) return;
-
-    if (!givingForm.date) {
-      showToast("Please select a date.", "error");
-      return;
-    }
-    if (!givingForm.amount) {
-      showToast("Please enter an amount.", "error");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const selectedMember =
-        givingForm.memberId && members.find((m) => m.id === givingForm.memberId);
-      const memberName = selectedMember
-        ? `${selectedMember.firstName || ""} ${selectedMember.lastName || ""}`.trim()
-        : "";
-      await addDoc(collection(db, "giving"), {
-        churchId: userProfile.churchId,
-        date: givingForm.date,
-        serviceType: givingForm.serviceType.trim() || "Service",
-        type: givingForm.type,
-        amount: Number(givingForm.amount),
-        notes: givingForm.notes.trim(),
-        memberId: givingForm.memberId || null,
-        memberName,
-        createdAt: new Date().toISOString(),
-      });
-
-      setGivingForm({
-        date: todayStr,
-        serviceType: "Sunday Service",
-        type: "Offering",
-        amount: "",
-        notes: "",
-        memberId: "",
-      });
-
-      await loadGiving();
-      showToast("Giving record saved.", "success");
-    } catch (err) {
-      console.error("Create giving error:", err);
-      showToast(err.message || "Unable to save giving record.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    setGivingPageCursor(null);
-    setGivingHasMore(true);
-    setGiving([]);
     if (
       (activeTab === "giving" || activeTab === "overview") &&
       userProfile?.churchId
@@ -2021,11 +1651,6 @@ function AppContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId, givingMemberFilter]);
-
-  const loadMoreGiving = () => {
-    if (!givingHasMore || givingLoading) return;
-    return loadGiving({ append: true });
-  };
 
   // ---------- Sermons ----------
   const loadSermons = async () => {
@@ -3690,7 +3315,7 @@ function AppContent() {
 
             <button
               onClick={handleCreateMember}
-              disabled={loading}
+              disabled={memberActionLoading}
               style={{
                 padding: "8px 14px",
                 borderRadius: "8px",
@@ -5587,7 +5212,7 @@ function AppContent() {
 
             <button
               onClick={handleCreateGiving}
-              disabled={loading}
+              disabled={givingLoading}
               style={{
                 padding: "8px 14px",
                 borderRadius: "8px",
