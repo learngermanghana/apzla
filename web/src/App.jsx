@@ -5154,12 +5154,21 @@ function AppContent() {
                           border: "1px solid #d1d5db",
                           fontSize: "14px",
                         }}
-                        placeholder="Exact Paystack code, e.g. MTN"
+                        placeholder="e.g. MTN, VOD, CAL"
                       />
+                      <datalist id="paystack-bank-codes">
+                        {PAYSTACK_BANK_OPTIONS.map((bank) => (
+                          <option
+                            key={bank.code}
+                            value={bank.code}
+                            label={`${bank.name} (${bank.code})`}
+                          >{`${bank.name} (${bank.code})`}</option>
+                        ))}
+                      </datalist>
                       <span style={{ fontSize: "12px", color: "#6b7280" }}>
-                        If the above field doesn&apos;t autofill the Paystack code, enter the
-                        exact code here (from Paystack&apos;s bank list). This is what we send
-                        to Paystack as <code>bank_code</code>.
+                        Select the exact Paystack bank or mobile money code from this list.
+                        If your bank isn&apos;t listed, enter the code from Paystack&apos;s bank
+                        directory so settlements don&apos;t fail.
                       </span>
                     </label>
 
