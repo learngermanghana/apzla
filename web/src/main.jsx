@@ -27,7 +27,9 @@ function AppRouter() {
   const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
   const isMemberInviteRoute =
     pathname === "/member-invite" || pathname.startsWith("/member-invite/");
-  const isTrustRoute = ["/privacy", "/terms", "/contact"].includes(pathname);
+  const isTrustRoute = ["/privacy", "/terms", "/contact"].some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
 
   const getSecondSegment = (path) => {
     // "/checkin/<token>" => "<token>"
