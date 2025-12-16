@@ -191,6 +191,13 @@ function AppContent() {
   });
   const [memberLinkLoadingId, setMemberLinkLoadingId] = useState(null);
 
+  // Member invite sharing
+  const [memberInviteLink, setMemberInviteLink] = useState("");
+  const [memberInviteQr, setMemberInviteQr] = useState("");
+  const [memberInviteLoading, setMemberInviteLoading] = useState(false);
+  const [memberInviteError, setMemberInviteError] = useState("");
+  const [memberInviteBaseUrl, setMemberInviteBaseUrl] = useState(defaultBaseUrl);
+
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
   const [givingLoading, setGivingLoading] = useState(false);
@@ -1596,6 +1603,70 @@ function AppContent() {
         serviceCode: checkinServiceCode,
       })
     : null;
+
+  const issueMemberInviteLink = async (event) => {
+    event?.preventDefault?.();
+
+    if (!userProfile?.churchId) {
+      showToast("Link a church before issuing invite links.", "error");
+      return;
+    }
+
+    const baseUrl = normalizeBaseUrlMemo(memberInviteBaseUrl || defaultBaseUrl);
+
+    setMemberInviteError("");
+    setMemberInviteLink("");
+    setMemberInviteQr("");
+
+    try {
+      setMemberInviteLoading(true);
+      const res = await fetch("/api/member-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ churchId: userProfile.churchId, baseUrl }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message = data?.message || "Unable to issue invite link.";
+        throw new Error(message);
+      }
+
+      setMemberInviteLink(data.link || "");
+      setMemberInviteQr(data.qrImageUrl || "");
+      showToast("Invite link ready to share.", "success");
+    } catch (err) {
+      console.error("Issue member invite link error:", err);
+      setMemberInviteError(err.message || "Unable to issue invite link.");
+    } finally {
+      setMemberInviteLoading(false);
+    }
+  };
+
+  const copyMemberInviteLink = async () => {
+    if (!memberInviteLink) return;
+    try {
+      await navigator.clipboard.writeText(memberInviteLink);
+      showToast("Invite link copied.", "success");
+    } catch (err) {
+      console.error("Copy invite link error:", err);
+      showToast("Unable to copy invite link.", "error");
+    }
+  };
+
+  const openMemberInviteLink = () => {
+    if (!memberInviteLink) return;
+    window.open(memberInviteLink, "_blank", "noopener,noreferrer");
+  };
+
+  const downloadMemberInviteQr = async () => {
+    await downloadQrImage(memberInviteQr, "member-invite-qr.png");
+  };
+
+  const printMemberInviteQr = async () => {
+    await printQrImage(memberInviteQr, "Print Member Invite QR");
+  };
 
   useEffect(() => {
     if (activeTab === "checkin" && userProfile?.churchId) {
@@ -3189,6 +3260,210 @@ function AppContent() {
               is the start of Apzla&apos;s customer management (CRM)
               features.
             </p>
+
+            <div
+              style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "12px 14px",
+                marginBottom: "18px",
+                background: "#f8fafc",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{ fontWeight: 600, color: "#111827", marginBottom: "6px" }}
+                  >
+                    Share invite link
+                  </div>
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: "14px" }}>
+                    Generate a public form link or QR code to collect member or visitor
+                    details. Submissions are added automatically to your Firebase
+                    members list.
+                  </p>
+                </div>
+                <div style={{ minWidth: "240px", maxWidth: "360px", width: "100%" }}>
+                  <label style={{ display: "block", fontSize: "13px", color: "#374151" }}>
+                    Base URL
+                    <input
+                      type="text"
+                      value={memberInviteBaseUrl}
+                      onChange={(e) => setMemberInviteBaseUrl(e.target.value)}
+                      placeholder="https://app.example.com"
+                      style={{
+                        marginTop: "6px",
+                        width: "100%",
+                        padding: "8px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </label>
+                  <button
+                    onClick={issueMemberInviteLink}
+                    disabled={memberInviteLoading}
+                    style={{
+                      marginTop: "8px",
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: memberInviteLoading ? "#9ca3af" : "#111827",
+                      color: "white",
+                      cursor: memberInviteLoading ? "default" : "pointer",
+                      width: "100%",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {memberInviteLoading ? "Issuing…" : "Issue invite link"}
+                  </button>
+                </div>
+              </div>
+
+              {memberInviteError && (
+                <div
+                  style={{
+                    marginTop: "8px",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #fecaca",
+                    background: "#fef2f2",
+                    color: "#b91c1c",
+                    fontSize: "13px",
+                  }}
+                >
+                  {memberInviteError}
+                </div>
+              )}
+
+              {memberInviteLink && (
+                <div
+                  style={{
+                    marginTop: "10px",
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0,1fr) auto",
+                    alignItems: "center",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "13px", color: "#4b5563" }}>Invite link</div>
+                    <div
+                      style={{
+                        marginTop: "4px",
+                        padding: "10px 12px",
+                        borderRadius: "10px",
+                        border: "1px solid #d1d5db",
+                        background: "white",
+                        wordBreak: "break-all",
+                        fontWeight: 600,
+                        color: "#111827",
+                      }}
+                    >
+                      {memberInviteLink}
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                      <button
+                        onClick={copyMemberInviteLink}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: "8px",
+                          border: "1px solid #e5e7eb",
+                          background: "white",
+                          cursor: "pointer",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Copy
+                      </button>
+                      <button
+                        onClick={openMemberInviteLink}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: "8px",
+                          border: "1px solid #e5e7eb",
+                          background: "#f3f4f6",
+                          cursor: "pointer",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </div>
+
+                  {memberInviteQr && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <a
+                        href={memberInviteLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Open invite link"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <img
+                          src={memberInviteQr}
+                          alt="Member invite QR"
+                          style={{
+                            width: "120px",
+                            height: "120px",
+                            objectFit: "contain",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            background: "#fff",
+                            padding: "8px",
+                          }}
+                        />
+                      </a>
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        <button
+                          onClick={downloadMemberInviteQr}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: "8px",
+                            border: "1px solid #e5e7eb",
+                            background: "white",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                          }}
+                        >
+                          Download QR
+                        </button>
+                        <button
+                          onClick={printMemberInviteQr}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: "8px",
+                            border: "1px solid #e5e7eb",
+                            background: "white",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                          }}
+                        >
+                          Print
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Member form */}
             <div
