@@ -13,48 +13,56 @@ import "./index.css";
 
 enforcePreferredHost();
 
-const { pathname } = window.location;
+function AppRouter() {
+  const pathname = window.location.pathname || "/";
 
-// Accept both /checkin/... and /attendance/...
-const isCheckinRoute =
-  pathname === "/checkin" ||
-  pathname.startsWith("/checkin/") ||
-  pathname === "/attendance" ||
-  pathname.startsWith("/attendance/");
+  // Accept both /checkin/... and /attendance/...
+  const isCheckinRoute =
+    pathname === "/checkin" ||
+    pathname.startsWith("/checkin/") ||
+    pathname === "/attendance" ||
+    pathname.startsWith("/attendance/");
 
-const isStatusRoute = pathname === "/status" || pathname.startsWith("/status/");
-const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
-const isMemberInviteRoute =
-  pathname === "/member-invite" || pathname.startsWith("/member-invite/");
-const isTrustRoute = ["/privacy", "/terms", "/contact"].includes(pathname);
+  const isStatusRoute = pathname === "/status" || pathname.startsWith("/status/");
+  const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
+  const isMemberInviteRoute =
+    pathname === "/member-invite" || pathname.startsWith("/member-invite/");
+  const isTrustRoute = ["/privacy", "/terms", "/contact"].includes(pathname);
 
-function getSecondSegment(path) {
-  // "/checkin/<token>" => "<token>"
-  const parts = path.split("/").filter(Boolean); // removes empty
-  return parts.length >= 2 ? parts[1] : null;
+  const getSecondSegment = (path) => {
+    // "/checkin/<token>" => "<token>"
+    const parts = path.split("/").filter(Boolean); // removes empty
+    return parts.length >= 2 ? parts[1] : null;
+  };
+
+  const checkinToken = isCheckinRoute ? getSecondSegment(pathname) : null;
+  const giveId = isGiveRoute ? getSecondSegment(pathname) : null;
+  const inviteToken = isMemberInviteRoute ? getSecondSegment(pathname) : null;
+  const trustPage = isTrustRoute ? pathname.slice(1) : null;
+
+  return (
+    <>
+      <OfflineNotice />
+      {isCheckinRoute ? (
+        <CheckinPage token={checkinToken} />
+      ) : isGiveRoute ? (
+        <GivePage id={giveId} />
+      ) : isMemberInviteRoute ? (
+        <MemberInvitePage token={inviteToken} />
+      ) : isStatusRoute ? (
+        <StatusPage />
+      ) : isTrustRoute ? (
+        <TrustPage page={trustPage} />
+      ) : (
+        <App />
+      )}
+    </>
+  );
 }
-
-const checkinToken = isCheckinRoute ? getSecondSegment(pathname) : null;
-const giveId = isGiveRoute ? getSecondSegment(pathname) : null;
-const inviteToken = isMemberInviteRoute ? getSecondSegment(pathname) : null;
-const trustPage = isTrustRoute ? pathname.slice(1) : null;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <OfflineNotice />
-    {isCheckinRoute ? (
-      <CheckinPage token={checkinToken} />
-    ) : isGiveRoute ? (
-      <GivePage id={giveId} />
-    ) : isMemberInviteRoute ? (
-      <MemberInvitePage token={inviteToken} />
-    ) : isStatusRoute ? (
-      <StatusPage />
-    ) : isTrustRoute ? (
-      <TrustPage page={trustPage} />
-    ) : (
-      <App />
-    )}
+    <AppRouter />
   </React.StrictMode>
 );
 
