@@ -5,6 +5,7 @@ import CheckinPage from "./components/checkin/CheckinPage.jsx";
 import GivePage from "./components/giving/GivePage.jsx";
 import MemberInvitePage from "./components/members/MemberInvitePage.jsx";
 import StatusPage from "./components/status/StatusPage.jsx";
+import TrustPage from "./components/trust/TrustPage.jsx";
 import OfflineNotice from "./components/ui/OfflineNotice.jsx";
 import { registerServiceWorker } from "./serviceWorker";
 import { enforcePreferredHost } from "./utils/baseUrl";
@@ -25,6 +26,7 @@ const isStatusRoute = pathname === "/status" || pathname.startsWith("/status/");
 const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
 const isMemberInviteRoute =
   pathname === "/member-invite" || pathname.startsWith("/member-invite/");
+const isTrustRoute = ["/privacy", "/terms", "/contact"].includes(pathname);
 
 function getSecondSegment(path) {
   // "/checkin/<token>" => "<token>"
@@ -35,6 +37,7 @@ function getSecondSegment(path) {
 const checkinToken = isCheckinRoute ? getSecondSegment(pathname) : null;
 const giveId = isGiveRoute ? getSecondSegment(pathname) : null;
 const inviteToken = isMemberInviteRoute ? getSecondSegment(pathname) : null;
+const trustPage = isTrustRoute ? pathname.slice(1) : null;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -47,6 +50,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <MemberInvitePage token={inviteToken} />
     ) : isStatusRoute ? (
       <StatusPage />
+    ) : isTrustRoute ? (
+      <TrustPage page={trustPage} />
     ) : (
       <App />
     )}
