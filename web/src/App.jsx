@@ -214,6 +214,7 @@ function AppContent() {
     network: "",
     confirmDetails: false,
   });
+  const [editingPayoutDetails, setEditingPayoutDetails] = useState(false);
   const [onlineGivingActionLoading, setOnlineGivingActionLoading] = useState(false);
   const [givingForm, setGivingForm] = useState({
     date: todayStr,
@@ -255,6 +256,9 @@ function AppContent() {
       : onlineGivingFailed
         ? { bg: "#fef2f2", color: "#991b1b", border: "#fecdd3" }
         : { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" };
+  const showPayoutForm =
+    editingPayoutDetails ||
+    (!onlineGivingActive && !onlineGivingPending && !onlineGivingFailed);
 
   // Sermons
   const [sermons, setSermons] = useState([]);
@@ -1804,6 +1808,65 @@ function AppContent() {
         console.error("Failed to record payout failure state:", updateError);
       }
       setPayoutStatus((prev) => (prev === "PENDING_SUBACCOUNT" ? "FAILED_SUBACCOUNT" : prev));
+    } finally {
+      setOnlineGivingActionLoading(false);
+    }
+  };
+
+  const startEditingPayoutDetails = () => {
+    setEditingPayoutDetails(true);
+    setPayoutForm((prev) => ({ ...prev, confirmDetails: false }));
+  };
+
+  const handleResetOnlineGiving = async () => {
+    if (!userProfile?.churchId) {
+      showToast("Link a church before deleting payout details.", "error");
+      return;
+    }
+
+    try {
+      setOnlineGivingActionLoading(true);
+      await updateDoc(doc(db, "churches", userProfile.churchId), {
+        payoutStatus: "NOT_CONFIGURED",
+        paystackSubaccountCode: null,
+        payoutBankType: "",
+        payoutAccountName: "",
+        payoutAccountNumber: "",
+        payoutNetwork: "",
+        onlineGivingAppliedAt: null,
+        onlineGivingEnabled: false,
+      });
+
+      setPayoutStatus("NOT_CONFIGURED");
+      setPaystackSubaccountCode(null);
+      setOnlineGivingAppliedAt(null);
+      setPayoutForm({
+        bankType: "",
+        accountName: "",
+        accountNumber: "",
+        network: "",
+        confirmDetails: false,
+      });
+      setChurchPlan((prev) =>
+        prev
+          ? {
+              ...prev,
+              payoutStatus: "NOT_CONFIGURED",
+              paystackSubaccountCode: null,
+              payoutBankType: "",
+              payoutAccountName: "",
+              payoutAccountNumber: "",
+              payoutNetwork: "",
+              onlineGivingAppliedAt: null,
+              onlineGivingEnabled: false,
+            }
+          : prev
+      );
+      setEditingPayoutDetails(false);
+      showToast("Payout details removed. Online giving is disabled.", "success");
+    } catch (err) {
+      console.error("Reset online giving error:", err);
+      showToast(err.message || "Unable to delete payout details right now.", "error");
     } finally {
       setOnlineGivingActionLoading(false);
     }
@@ -4900,10 +4963,74 @@ function AppContent() {
                   We couldn’t create the Paystack subaccount. Double-check the payout details
                   and try again.
                 </div>
-              ) : (
+              ) : null}
+
+              {(onlineGivingFailed || onlineGivingActive || onlineGivingPending) && (
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  {onlineGivingFailed && (
+                    <button
+                      type="button"
+                      onClick={handleSubmitOnlineGivingApplication}
+                      disabled={onlineGivingActionLoading}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid #dc2626",
+                        background: "#fef2f2",
+                        color: "#991b1b",
+                        fontWeight: 700,
+                        cursor: onlineGivingActionLoading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {onlineGivingActionLoading ? "Retrying..." : "Try again"}
+                    </button>
+                  )}
+                  {(onlineGivingActive || onlineGivingFailed || onlineGivingPending) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        editingPayoutDetails
+                          ? setEditingPayoutDetails(false)
+                          : startEditingPayoutDetails()
+                      }
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid #111827",
+                        background: "white",
+                        color: "#111827",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {editingPayoutDetails ? "Hide edit form" : "Edit payout details"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleResetOnlineGiving}
+                    disabled={onlineGivingActionLoading}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      background: "#f3f4f6",
+                      color: "#111827",
+                      fontWeight: 700,
+                      cursor: onlineGivingActionLoading ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {onlineGivingActionLoading ? "Working..." : "Delete payout account"}
+                  </button>
+                </div>
+              )}
+
+              {showPayoutForm && (
                 <>
-                  <p style={{ margin: "0 0 4px", color: "#374151" }}>
-                    Add payout details to auto-create a Paystack subaccount.
+                  <p style={{ margin: "12px 0 4px", color: "#374151" }}>
+                    {onlineGivingActive || onlineGivingPending || onlineGivingFailed
+                      ? "Update the payout details to refresh the Paystack subaccount."
+                      : "Add payout details to auto-create a Paystack subaccount."}
                   </p>
 
                   <form
@@ -5038,7 +5165,9 @@ function AppContent() {
                           ? "Submitting..."
                           : onlineGivingPending
                             ? "Creating Paystack subaccount..."
-                            : "Save payout details"}
+                            : onlineGivingActive
+                              ? "Update payout details"
+                              : "Save payout details"}
                       </button>
                     </div>
                   </form>
