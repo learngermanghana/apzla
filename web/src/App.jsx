@@ -34,6 +34,24 @@ import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
 
+const PAYSTACK_BANK_OPTIONS = [
+  { code: "MTN", name: "MTN Mobile Money" },
+  { code: "VOD", name: "Vodafone Cash" },
+  { code: "TIGO", name: "AirtelTigo Money" },
+  { code: "ACCESS", name: "Access Bank Ghana" },
+  { code: "CAL", name: "CAL Bank" },
+  { code: "ECOBANK", name: "Ecobank Ghana" },
+  { code: "FIDELITY", name: "Fidelity Bank Ghana" },
+  { code: "FAB", name: "First Atlantic Bank" },
+  { code: "FBNGH", name: "FirstBank Ghana" },
+  { code: "GCB", name: "GCB Bank" },
+  { code: "GTB", name: "GTBank Ghana" },
+  { code: "RBBA", name: "Republic Bank Ghana" },
+  { code: "SBGH", name: "Stanbic Bank Ghana" },
+  { code: "SCB", name: "Standard Chartered Ghana" },
+  { code: "UBAGH", name: "UBA Ghana" },
+];
+
 function AppContent() {
   const {
     user,
@@ -5058,6 +5076,7 @@ function AppContent() {
                       <span style={{ fontSize: "13px", color: "#374151" }}>Bank / MoMo type</span>
                       <input
                         type="text"
+                        list="paystack-bank-codes"
                         value={payoutForm.bankType}
                         onChange={(e) =>
                           setPayoutForm((prev) => ({
@@ -5071,7 +5090,22 @@ function AppContent() {
                           border: "1px solid #d1d5db",
                           fontSize: "14px",
                         }}
+                        placeholder="e.g. MTN, VOD, CAL"
                       />
+                      <datalist id="paystack-bank-codes">
+                        {PAYSTACK_BANK_OPTIONS.map((bank) => (
+                          <option
+                            key={bank.code}
+                            value={bank.code}
+                            label={`${bank.name} (${bank.code})`}
+                          >{`${bank.name} (${bank.code})`}</option>
+                        ))}
+                      </datalist>
+                      <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                        Select the exact Paystack bank or mobile money code from this list.
+                        If your bank isn&apos;t listed, enter the code from Paystack&apos;s bank
+                        directory so settlements don&apos;t fail.
+                      </span>
                     </label>
 
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
