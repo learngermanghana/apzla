@@ -2247,21 +2247,6 @@ function AppContent() {
       )
     : [];
 
-  const resolveGivingMember = (record) => {
-    if (record.memberName) return record.memberName;
-    if (record.memberId) {
-      const member = members.find((m) => m.id === record.memberId);
-      if (member) {
-        const name = `${member.firstName || ""} ${member.lastName || ""}`
-          .trim()
-          .replace(/\s+/g, " ");
-        return name || "Member";
-      }
-      return "Linked member";
-    }
-    return "—";
-  };
-
   const filteredAttendance = useMemo(() => {
     const term = attendanceSearch.trim().toLowerCase();
     if (!term) return attendance;
