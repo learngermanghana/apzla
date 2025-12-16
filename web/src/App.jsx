@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  auth,
-  db,
-  firebaseConfigError,
-  functions,
-  isFirebaseConfigured,
-} from "./firebase";
+import { auth, db, firebaseConfigError, isFirebaseConfigured } from "./firebase";
 import {
   collection,
   addDoc,
@@ -28,7 +22,6 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
-import { httpsCallableFromURL } from "firebase/functions";
 
 import AuthPanel from "./components/auth/AuthPanel";
 import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
@@ -1776,11 +1769,28 @@ function AppContent() {
         typeof window !== "undefined" && window.location.origin
           ? window.location.origin.replace(/\/$/, "")
           : "https://www.apzla.com";
-      const createSubaccount = httpsCallableFromURL(
-        functions,
-        `${callableBase}/api/create-church-subaccount`
-      );
-      const result = await createSubaccount({ churchId: userProfile.churchId });
+
+      const idToken = await auth?.currentUser?.getIdToken?.();
+
+      const response = await fetch(`${callableBase}/api/create-church-subaccount`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ churchId: userProfile.churchId }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result?.status !== "success") {
+        const message =
+          result?.message ||
+          response.statusText ||
+          "Unable to create the Paystack subaccount right now.";
+        throw new Error(message);
+      }
+
       const subaccountCode = result?.data?.subaccountCode || null;
 
       setPaystackSubaccountCode(subaccountCode);
