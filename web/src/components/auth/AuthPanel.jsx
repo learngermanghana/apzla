@@ -365,7 +365,7 @@ export function AuthPanel({
             }}
           >
             Secure, role-aware access for every ministry leader. Need help?
-            Email us at hello@apzla.com.
+            Email us at sedifexbiz@gmail.com.
           </p>
         </Card>
       </div>
