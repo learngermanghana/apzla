@@ -223,6 +223,7 @@ function AppContent() {
     accountName: "",
     accountNumber: "",
     network: "",
+    bankCode: "",
     confirmDetails: false,
   });
   const [editingPayoutDetails, setEditingPayoutDetails] = useState(false);
@@ -389,6 +390,7 @@ function AppContent() {
       accountName: data?.payoutAccountName || prev.accountName,
       accountNumber: data?.payoutAccountNumber || prev.accountNumber,
       network: data?.payoutNetwork || prev.network,
+      bankCode: data?.payoutBankCode || prev.bankCode,
     }));
   };
 
@@ -1754,8 +1756,22 @@ function AppContent() {
       setOnlineGivingActionLoading(true);
       const nowIso = new Date().toISOString();
 
+      const bankCode =
+        payoutForm.bankCode.trim() ||
+        payoutForm.network.trim() ||
+        payoutForm.bankType.trim();
+
+      if (!bankCode) {
+        showToast("Paystack bank code or MoMo network is required.", "error");
+        return;
+      }
+
+      const normalizedBankCode = bankCode.toUpperCase();
+      const normalizedBankType = payoutForm.bankType.trim();
+
       await updateDoc(doc(db, "churches", userProfile.churchId), {
-        payoutBankType: payoutForm.bankType.trim(),
+        payoutBankType: normalizedBankType,
+        payoutBankCode: normalizedBankCode,
         payoutAccountName: payoutForm.accountName.trim(),
         payoutAccountNumber: payoutForm.accountNumber.trim(),
         payoutNetwork: payoutForm.network.trim() || null,
@@ -1774,7 +1790,8 @@ function AppContent() {
               ...prev,
               payoutStatus: "PENDING_SUBACCOUNT",
               paystackSubaccountCode: null,
-              payoutBankType: payoutForm.bankType.trim(),
+              payoutBankType: normalizedBankType,
+              payoutBankCode: normalizedBankCode,
               payoutAccountName: payoutForm.accountName.trim(),
               payoutAccountNumber: payoutForm.accountNumber.trim(),
               payoutNetwork: payoutForm.network.trim() || "",
@@ -1858,6 +1875,7 @@ function AppContent() {
         payoutStatus: "NOT_CONFIGURED",
         paystackSubaccountCode: null,
         payoutBankType: "",
+        payoutBankCode: "",
         payoutAccountName: "",
         payoutAccountNumber: "",
         payoutNetwork: "",
@@ -1873,6 +1891,7 @@ function AppContent() {
         accountName: "",
         accountNumber: "",
         network: "",
+        bankCode: "",
         confirmDetails: false,
       });
       setChurchPlan((prev) =>
@@ -1882,6 +1901,7 @@ function AppContent() {
               payoutStatus: "NOT_CONFIGURED",
               paystackSubaccountCode: null,
               payoutBankType: "",
+              payoutBankCode: "",
               payoutAccountName: "",
               payoutAccountNumber: "",
               payoutNetwork: "",
@@ -5082,6 +5102,50 @@ function AppContent() {
                           setPayoutForm((prev) => ({
                             ...prev,
                             bankType: e.target.value,
+                            bankCode:
+                              PAYSTACK_BANK_OPTIONS.find(
+                                (bank) =>
+                                  bank.code.toLowerCase() ===
+                                  e.target.value.trim().toLowerCase()
+                              )?.code || e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                        }}
+                        placeholder="e.g. MTN, VOD, CAL"
+                      />
+                      <datalist id="paystack-bank-codes">
+                        {PAYSTACK_BANK_OPTIONS.map((bank) => (
+                          <option
+                            key={bank.code}
+                            value={bank.code}
+                            label={`${bank.name} (${bank.code})`}
+                          >{`${bank.name} (${bank.code})`}</option>
+                        ))}
+                      </datalist>
+                      <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                        Select the exact Paystack bank or mobile money code from this list.
+                        If your bank isn&apos;t listed, enter the code from Paystack&apos;s bank
+                        directory so settlements don&apos;t fail.
+                      </span>
+                    </label>
+
+                    <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>
+                        Paystack bank code (optional override)
+                      </span>
+                      <input
+                        type="text"
+                        list="paystack-bank-codes"
+                        value={payoutForm.bankCode}
+                        onChange={(e) =>
+                          setPayoutForm((prev) => ({
+                            ...prev,
+                            bankCode: e.target.value,
                           }))
                         }
                         style={{
