@@ -48,6 +48,61 @@ async function queueNotification({ email, link, memberId, churchId, serviceDate 
   await db.collection(notificationCollection).add(data)
 }
 
+function validatePayload(body) {
+  if (!body || typeof body !== 'object') {
+    return {
+      valid: false,
+      message: 'Request body must be a JSON object.',
+    }
+  }
+
+  const errors = []
+
+  const churchId = `${body.churchId || ''}`.trim()
+  const serviceDate = `${body.serviceDate || ''}`.trim()
+  const serviceType = body.serviceType === undefined ? undefined : `${body.serviceType}`.trim()
+  const email = body.email === undefined ? undefined : `${body.email}`.trim()
+  const baseUrl = body.baseUrl === undefined ? undefined : `${body.baseUrl}`.trim()
+
+  if (!churchId) {
+    errors.push('churchId is required.')
+  }
+
+  if (!serviceDate) {
+    errors.push('serviceDate is required.')
+  }
+
+  if (serviceType !== undefined && !serviceType) {
+    errors.push('serviceType cannot be empty when provided.')
+  }
+
+  if (email !== undefined && !email) {
+    errors.push('email cannot be empty when provided.')
+  }
+
+  if (baseUrl !== undefined && !baseUrl) {
+    errors.push('baseUrl cannot be empty when provided.')
+  }
+
+  if (errors.length) {
+    return {
+      valid: false,
+      message: errors.join(' '),
+    }
+  }
+
+  return {
+    valid: true,
+    value: {
+      churchId,
+      serviceDate,
+      serviceType,
+      email,
+      baseUrl,
+    },
+  }
+}
+
 async function handler(request, response) {
   if (request.method !== 'POST') {
     return response.status(405).json({
@@ -63,13 +118,12 @@ async function handler(request, response) {
     })
   }
 
-  const { churchId, serviceDate, serviceType, email, baseUrl } =
-    request.body || {}
+  const validation = validatePayload(request.body)
 
-  if (!churchId || !serviceDate) {
+  if (!validation.valid) {
     return response.status(400).json({
       status: 'error',
-      message: 'churchId and serviceDate are required.',
+      message: validation.message,
     })
   }
 
@@ -79,6 +133,8 @@ async function handler(request, response) {
       message: 'CHECKIN_JWT_SECRET environment variable is not configured.',
     })
   }
+
+  const { churchId, serviceDate, serviceType, email, baseUrl } = validation.value
 
   const issuedAt = Math.floor(Date.now() / 1000)
   const expiresAt = issuedAt + tokenTtlMinutes * 60

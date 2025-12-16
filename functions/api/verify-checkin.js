@@ -83,12 +83,22 @@ async function handler(request, response) {
     })
   }
 
-  const { token, phone, serviceCode } = request.body || {}
+  const hasBody = request.body && typeof request.body === 'object'
+  const token = hasBody ? `${request.body.token || ''}`.trim() : ''
+  const phone = hasBody ? `${request.body.phone || ''}`.trim() : ''
+  const serviceCode = hasBody ? `${request.body.serviceCode || ''}`.trim() : ''
 
-  if (!token || !phone || !serviceCode) {
+  const missingFields = []
+  if (!token) missingFields.push('token')
+  if (!phone) missingFields.push('phone')
+  if (!serviceCode) missingFields.push('serviceCode')
+
+  if (missingFields.length) {
     return response.status(400).json({
       status: 'error',
-      message: 'token, phone, and serviceCode are required for verification.',
+      message: `${missingFields.join(', ')} ${
+        missingFields.length > 1 ? 'are' : 'is'
+      } required for verification.`,
     })
   }
 

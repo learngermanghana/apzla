@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "npm install --prefix web && npm run build --prefix web",
-    "test": "npm run test --prefix web"
+    "test": "node --test functions/__tests__/*.test.js",
+    "test:functions": "node --test functions/__tests__/*.test.js",
+    "test:web": "npm run test --prefix web"
   },
   "keywords": [],
   "author": "",
