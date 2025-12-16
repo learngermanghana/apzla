@@ -37,13 +37,14 @@ const CARD_COPY = {
     contacts: [
       {
         label: "Email",
-        value: "hello@apzla.com",
-        href: "mailto:hello@apzla.com",
+        value: "sedifexbiz@gmail.com",
+        href: "mailto:sedifexbiz@gmail.com",
         helper: "Best for support, billing questions, and data requests.",
       },
       {
         label: "Phone",
-        value: "+233 (0) 54 123 4567",
+        value: "+233 59 505 4266",
+        href: "tel:+233595054266",
         helper: "Weekdays 9am–6pm GMT for urgent account issues.",
       },
       {
