@@ -2611,6 +2611,27 @@ function AppContent() {
     memberMatchesSearch(m, memberSearch)
   );
 
+  const filteredMemberOptions = useMemo(() => {
+    const filtered = members.filter((m) =>
+      memberMatchesSearch(m, memberSelectSearch)
+    );
+
+    if (
+      selectedMemberId &&
+      !filtered.some((member) => member.id === selectedMemberId)
+    ) {
+      const selectedMember = members.find(
+        (member) => member.id === selectedMemberId
+      );
+
+      if (selectedMember) {
+        return [selectedMember, ...filtered];
+      }
+    }
+
+    return filtered;
+  }, [memberSelectSearch, members, selectedMemberId]);
+
   const normalizedCheckinSearch = normalizeSearchValue(
     memberAttendanceForm.search
   );
