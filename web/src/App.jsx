@@ -133,6 +133,7 @@ function AppContent() {
     status: "VISITOR",
   });
   const [memberSearch, setMemberSearch] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -2196,6 +2197,22 @@ function AppContent() {
     [givingTrend],
   );
 
+  const selectedMember = useMemo(
+    () => members.find((m) => m.id === selectedMemberId) || null,
+    [members, selectedMemberId],
+  );
+
+  const selectedMemberAttendance = useMemo(
+    () =>
+      memberAttendanceHistory.filter((entry) => entry.memberId === selectedMemberId),
+    [memberAttendanceHistory, selectedMemberId],
+  );
+
+  const selectedMemberGiving = useMemo(
+    () => giving.filter((record) => record.memberId === selectedMemberId),
+    [giving, selectedMemberId],
+  );
+
   const memberLastAttendance = new Map();
   memberAttendanceHistory.forEach((entry) => {
     if (!memberLastAttendance.has(entry.memberId)) {
@@ -3739,6 +3756,112 @@ function AppContent() {
                     <span style={{ color: "#6b7280", fontSize: "13px" }}>
                       Showing {filteredMembers.length} of {members.length} members
                     </span>
+                  </div>
+
+                  <div
+                    style={{
+                      marginBottom: "12px",
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "1px solid #e5e7eb",
+                      background: "#f9fafb",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: "#111827" }}>
+                        View member data
+                      </div>
+                      <select
+                        value={selectedMemberId}
+                        onChange={(e) => setSelectedMemberId(e.target.value)}
+                        style={{
+                          minWidth: "240px",
+                          padding: "9px 10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <option value="">Select a member</option>
+                        {members.map((m) => {
+                          const fullName = `${m.firstName || ""} ${m.lastName || ""}`
+                            .trim()
+                            .replace(/\s+/g, " ");
+                          return (
+                            <option key={m.id} value={m.id}>
+                              {fullName || "Unnamed member"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {selectedMember ? (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                          gap: "10px",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Name</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {(selectedMember.firstName || "").trim()} {(selectedMember.lastName || "").trim()}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Phone</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {selectedMember.phone || "Not provided"}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Email</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {selectedMember.email || "Not provided"}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Status</div>
+                          <div style={{ fontWeight: 600 }}>{selectedMember.status}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Last attendance</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {memberLastAttendance.get(selectedMemberId) || "No attendance recorded"}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Attendance entries</div>
+                          <div style={{ fontWeight: 600 }}>{selectedMemberAttendance.length}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: "#6b7280" }}>Total recorded giving</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {selectedMemberGiving
+                              .reduce((sum, record) => sum + Number(record.amount || 0), 0)
+                              .toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, color: "#6b7280" }}>
+                        Choose a member to see their contact, attendance, and giving summary.
+                      </p>
+                    )}
                   </div>
 
                   <div
