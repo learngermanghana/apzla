@@ -134,7 +134,6 @@ function AppContent() {
   });
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [memberSelectSearch, setMemberSelectSearch] = useState("");
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -3804,20 +3803,6 @@ function AppContent() {
                       <div style={{ fontWeight: 600, color: "#111827" }}>
                         View member data
                       </div>
-                      <input
-                        value={memberSelectSearch}
-                        onChange={(e) => setMemberSelectSearch(e.target.value)}
-                        placeholder="Search members by name, phone, or email"
-                        style={{
-                          flex: 1,
-                          minWidth: "180px",
-                          maxWidth: "320px",
-                          padding: "9px 10px",
-                          borderRadius: "8px",
-                          border: "1px solid #d1d5db",
-                          fontSize: "13px",
-                        }}
-                      />
                       <select
                         value={selectedMemberId}
                         onChange={(e) => setSelectedMemberId(e.target.value)}
@@ -3830,7 +3815,7 @@ function AppContent() {
                         }}
                       >
                         <option value="">Select a member</option>
-                        {filteredMemberOptions.map((m) => {
+                        {members.map((m) => {
                           const fullName = `${m.firstName || ""} ${m.lastName || ""}`
                             .trim()
                             .replace(/\s+/g, " ");
@@ -3840,11 +3825,6 @@ function AppContent() {
                             </option>
                           );
                         })}
-                        {!filteredMemberOptions.length && (
-                          <option disabled value="">
-                            No members match your search
-                          </option>
-                        )}
                       </select>
                     </div>
 
