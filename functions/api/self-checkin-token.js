@@ -5,7 +5,8 @@ const { signJwt } = require('../lib/jwtHelpers')
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'
 const tokenTtlMinutes = Number(process.env.CHECKIN_TOKEN_TTL_MINUTES) || 30
-const appBaseUrl = process.env.APP_BASE_URL
+const defaultBaseUrl = 'https://www.apzla.com'
+const appBaseUrl = process.env.APP_BASE_URL || defaultBaseUrl
 
 async function writeNonceRecord(nonce, payload) {
   const data = {
