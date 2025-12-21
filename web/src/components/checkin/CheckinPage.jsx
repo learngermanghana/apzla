@@ -1,8 +1,6 @@
 // web/src/components/checkin/CheckinPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./checkin.css";
-import { db } from "../../firebase";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import StatusBanner from "../StatusBanner";
 
 const LOCAL_PHONE_KEY = "apzla_last_phone";
@@ -70,40 +68,6 @@ export default function CheckinPage() {
       year: "numeric",
       month: "short",
       day: "2-digit",
-    });
-  };
-
-  const recordAttendanceIfNew = async ({
-    churchId,
-    memberId,
-    serviceDate,
-    serviceType,
-  }) => {
-    if (!churchId || !memberId || !serviceDate) return;
-
-    const colRef = collection(db, "attendance");
-    const normalizedService = (serviceType || "").toLowerCase();
-
-    const qExisting = query(
-      colRef,
-      where("churchId", "==", churchId),
-      where("memberId", "==", memberId),
-      where("date", "==", serviceDate),
-      where("serviceType", "==", normalizedService)
-    );
-
-    const existingSnapshot = await getDocs(qExisting);
-    if (!existingSnapshot.empty) {
-      return;
-    }
-
-    await addDoc(colRef, {
-      churchId,
-      memberId,
-      date: serviceDate,
-      serviceType: normalizedService,
-      checkedInAt: new Date().toISOString(),
-      source: "SELF",
     });
   };
 
@@ -180,7 +144,10 @@ export default function CheckinPage() {
       }
 
       // Handle duplicate / already checked in
-      if (data.alreadyCheckedIn) {
+      const alreadyCheckedIn =
+        data.alreadyCheckedIn ?? data.data?.alreadyPresent ?? false;
+
+      if (alreadyCheckedIn) {
         setFeedback({
           ok: true,
           message:
@@ -198,17 +165,16 @@ export default function CheckinPage() {
         setStatusTone("success");
       }
 
-      const newSummary = data.summary || null;
-      setSummary(newSummary);
-
-      // Also persist attendance in Firestore if needed
+      const newSummary = data.summary || data.data || null;
       if (newSummary) {
-        await recordAttendanceIfNew({
-          churchId: newSummary.churchId,
-          memberId: newSummary.memberId,
-          serviceDate: newSummary.serviceDate,
-          serviceType: newSummary.serviceType,
+        setSummary({
+          ...newSummary,
+          date: newSummary.date || newSummary.serviceDate || "",
+          serviceDate: newSummary.serviceDate || newSummary.date || "",
+          serviceType: newSummary.serviceType || newSummary.service_type || "",
         });
+      } else {
+        setSummary(null);
       }
     } catch (err) {
       console.error(err);

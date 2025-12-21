@@ -1267,6 +1267,29 @@ function AppContent() {
   }, [activeTab, userProfile?.churchId]);
 
   // ---------- Member attendance (per-person check-ins) ----------
+  const normalizeServiceTypeKey = (value = "") =>
+    `${value}`
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w]+/g, "_");
+
+  const normalizeMemberAttendanceRecord = (entry = {}) => {
+    const dateValue = entry.date || entry.serviceDate || "";
+    const serviceTypeValue =
+      entry.serviceType ||
+      entry.service_type ||
+      entry.service ||
+      entry.serviceName ||
+      "";
+
+    return {
+      ...entry,
+      date: dateValue,
+      serviceDate: entry.serviceDate || entry.date || "",
+      serviceType: serviceTypeValue,
+    };
+  };
+
   const loadMemberAttendanceHistory = async () => {
     if (!userProfile?.churchId) return;
 
@@ -1280,8 +1303,11 @@ function AppContent() {
 
       const snapshot = await getDocs(qMemberAttendance);
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const normalizedData = data.map((entry) =>
+        normalizeMemberAttendanceRecord(entry)
+      );
 
-      const sortedByDate = data.sort((a, b) => {
+      const sortedByDate = normalizedData.sort((a, b) => {
         const aDate = a.date || "";
         const bDate = b.date || "";
         return bDate.localeCompare(aDate);
@@ -1300,20 +1326,35 @@ function AppContent() {
     if (!userProfile?.churchId) return;
     try {
       setMemberAttendanceLoading(true);
-      const normalizedServiceType =
-        memberAttendanceForm.serviceType.trim() || "Service";
-
       const colRef = collection(db, "memberAttendance");
       const qMemberAttendance = query(
         colRef,
-        where("churchId", "==", userProfile.churchId),
-        where("date", "==", memberAttendanceForm.date),
-        where("serviceType", "==", normalizedServiceType)
+        where("churchId", "==", userProfile.churchId)
       );
 
       const snapshot = await getDocs(qMemberAttendance);
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setMemberAttendance(data);
+      const normalizedRecords = data.map((entry) =>
+        normalizeMemberAttendanceRecord(entry)
+      );
+
+      const targetDate = memberAttendanceForm.date;
+      const targetServiceKey = normalizeServiceTypeKey(
+        memberAttendanceForm.serviceType || "Service"
+      );
+
+      const filtered = normalizedRecords.filter((entry) => {
+        const matchesDate =
+          entry.date === targetDate || entry.serviceDate === targetDate;
+
+        const entryServiceKey = normalizeServiceTypeKey(
+          entry.serviceType || "Service"
+        );
+
+        return matchesDate && entryServiceKey === targetServiceKey;
+      });
+
+      setMemberAttendance(filtered);
     } catch (err) {
       console.error("Load member attendance error:", err);
       showToast("Error loading member attendance.", "error");
@@ -1343,6 +1384,7 @@ function AppContent() {
       });
 
       await loadMemberAttendance();
+      await loadMemberAttendanceHistory();
       showToast("Member marked present.", "success");
     } catch (err) {
       console.error("Create member attendance error:", err);
