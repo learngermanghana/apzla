@@ -8,6 +8,7 @@ export const DASHBOARD_TABS = [
   { id: "giving", label: "Giving (Tithes & Offerings)" },
   { id: "followup", label: "Follow-up" },
   { id: "sermons", label: "Sermons" },
+  { id: "activity", label: "Live activity" },
 ];
 
 function DashboardTabs({ activeTab, onTabChange, tabs = DASHBOARD_TABS }) {
