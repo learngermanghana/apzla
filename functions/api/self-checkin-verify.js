@@ -67,6 +67,7 @@ async function upsertAttendance({ memberId, churchId, serviceDate, serviceType }
   await ref.set({
     memberId,
     churchId,
+    date: serviceDate,
     serviceDate,
     serviceType,
     status: "PRESENT",
@@ -227,9 +228,19 @@ async function handler(req, res) {
       serviceType,
     });
 
+    const summary = {
+      memberId,
+      churchId,
+      serviceDate,
+      date: serviceDate,
+      serviceType,
+      alreadyPresent: attendanceResult.alreadyPresent,
+    };
+
     return res.status(200).json({
       status: "success",
-      data: { memberId, churchId, serviceDate, serviceType, ...attendanceResult },
+      data: summary,
+      summary,
       message: attendanceResult.alreadyPresent
         ? "You are already checked in for this service."
         : "Check-in recorded successfully.",
