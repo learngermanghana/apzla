@@ -94,11 +94,12 @@ function AppContent() {
   const [planLoading, setPlanLoading] = useState(false);
   const [paystackLoading, setPaystackLoading] = useState(false);
 
-  // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
+  // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup" | "activity"
   const [activeTab, setActiveTab] = useState("overview");
 
   const MEMBERS_PAGE_SIZE = 25;
   const GIVING_PAGE_SIZE = 25;
+  const ACTIVITY_PAGE_SIZE = 12;
 
   // Overview tab state
   const [memberAttendanceHistory, setMemberAttendanceHistory] = useState([]);
@@ -236,6 +237,7 @@ function AppContent() {
     notes: "",
     memberId: "",
   });
+  const [activityPage, setActivityPage] = useState(0);
   const onlineGivingLink = useMemo(() => {
     if (!userProfile?.churchId) return "";
     const origin =
@@ -1178,7 +1180,8 @@ function AppContent() {
         activeTab === "overview" ||
         activeTab === "followup" ||
         activeTab === "checkin" ||
-        activeTab === "giving") &&
+        activeTab === "giving" ||
+        activeTab === "activity") &&
       userProfile?.churchId
     ) {
       loadMembers();
@@ -1258,7 +1261,9 @@ function AppContent() {
 
   useEffect(() => {
     if (
-      (activeTab === "attendance" || activeTab === "overview") &&
+      (activeTab === "attendance" ||
+        activeTab === "overview" ||
+        activeTab === "activity") &&
       userProfile?.churchId
     ) {
       loadAttendance();
@@ -1734,7 +1739,10 @@ function AppContent() {
   }, [activeTab, userProfile?.churchId, memberAttendanceForm.date, memberAttendanceForm.serviceType]);
 
   useEffect(() => {
-    if (activeTab === "attendance" && userProfile?.churchId) {
+    if (
+      (activeTab === "attendance" || activeTab === "activity") &&
+      userProfile?.churchId
+    ) {
       loadMemberAttendanceHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2039,7 +2047,9 @@ function AppContent() {
     setGivingHasMore(true);
     setGiving([]);
     if (
-      (activeTab === "giving" || activeTab === "overview") &&
+      (activeTab === "giving" ||
+        activeTab === "overview" ||
+        activeTab === "activity") &&
       userProfile?.churchId
     ) {
       const memberId = activeTab === "overview" ? "" : givingMemberFilter;
@@ -2677,6 +2687,140 @@ function AppContent() {
       return "Linked member";
     }
     return "—";
+  };
+
+  const parseTimestamp = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const activityEvents = useMemo(() => {
+    const events = [];
+
+    members.forEach((member) => {
+      const name = `${member.firstName || ""} ${member.lastName || ""}`
+        .trim()
+        .replace(/\s+/g, " ");
+
+      events.push({
+        id: `member-${member.id}`,
+        type: "member",
+        title: "New member added",
+        summary: name || member.email || member.phone || "New profile",
+        detail: member.status ? `Status: ${member.status}` : "Added to directory",
+        timestamp: member.createdAt,
+      });
+    });
+
+    memberAttendanceHistory.forEach((entry) => {
+      const memberName =
+        memberLookup.get(entry.memberId) || entry.memberName || "Member";
+      const timestamp = entry.checkedInAt || entry.createdAt || entry.date;
+
+      events.push({
+        id: `checkin-${entry.id || `${entry.memberId}-${entry.date}`}`,
+        type: "checkin",
+        title: "Check-in recorded",
+        summary: `${memberName} checked in`,
+        detail: `${entry.serviceType || "Service"} • ${entry.serviceDate || entry.date}`,
+        timestamp,
+      });
+    });
+
+    giving.forEach((record) => {
+      events.push({
+        id: `giving-${record.id}`,
+        type: "giving",
+        title: "Giving received",
+        summary: `${record.type || "Giving"} • ${
+          record.amount?.toLocaleString?.() ?? record.amount
+        }`,
+        detail: `${record.serviceType || "Service"} • ${record.date}`,
+        timestamp: record.createdAt || record.date,
+      });
+    });
+
+    attendance.forEach((record) => {
+      const headcount =
+        (record.adults || 0) + (record.children || 0) + (record.visitors || 0);
+
+      events.push({
+        id: `attendance-${record.id}`,
+        type: "attendance",
+        title: "Service attendance submitted",
+        summary: `${headcount} people present`,
+        detail: `${record.serviceType || "Service"} • ${record.date}`,
+        timestamp: record.createdAt || record.date,
+      });
+    });
+
+    return events.sort((a, b) => {
+      const aDate = parseTimestamp(a.timestamp);
+      const bDate = parseTimestamp(b.timestamp);
+      const aTime = aDate ? aDate.getTime() : 0;
+      const bTime = bDate ? bDate.getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [attendance, giving, memberAttendanceHistory, memberLookup, members]);
+
+  const paginatedActivity = useMemo(() => {
+    const start = activityPage * ACTIVITY_PAGE_SIZE;
+    return activityEvents.slice(start, start + ACTIVITY_PAGE_SIZE);
+  }, [ACTIVITY_PAGE_SIZE, activityEvents, activityPage]);
+
+  const hasMoreActivity =
+    (activityPage + 1) * ACTIVITY_PAGE_SIZE < activityEvents.length;
+
+  useEffect(() => {
+    if (activeTab === "activity") {
+      setActivityPage(0);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const maxPage = Math.max(
+      0,
+      Math.ceil(activityEvents.length / ACTIVITY_PAGE_SIZE) - 1
+    );
+    if (activityPage > maxPage) {
+      setActivityPage(maxPage);
+    }
+  }, [ACTIVITY_PAGE_SIZE, activityEvents.length, activityPage]);
+
+  const formatActivityTime = (value) => {
+    const parsed = parseTimestamp(value);
+    if (!parsed) return "Timestamp unavailable";
+    return parsed.toLocaleString();
+  };
+
+  const handleDownloadActivity = () => {
+    if (!activityEvents.length) return;
+
+    const header = ["Type", "Title", "Summary", "Detail", "When"];
+    const rows = activityEvents.map((event) => [
+      event.type,
+      event.title,
+      event.summary,
+      event.detail,
+      formatActivityTime(event.timestamp),
+    ]);
+
+    const csv = [header, ...rows]
+      .map((row) =>
+        row
+          .map((cell = "") => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "live-activity.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const normalizedSermonSearch = normalizeSearchValue(sermonSearch);
@@ -5833,6 +5977,226 @@ function AppContent() {
                 >
                   {givingLoading ? "Loading..." : "Load more giving records"}
                 </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "activity" && (
+          <>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "12px",
+                marginBottom: "12px",
+              }}
+            >
+              <div>
+                <p className="eyebrow">Live activity</p>
+                <h2 style={{ margin: "4px 0" }}>All signals in one place</h2>
+                <p style={{ color: "#4b5563", margin: 0 }}>
+                  Follow new members, check-ins, giving, and attendance as they land.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setActivityPage(0)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #e5e7eb",
+                    background: "white",
+                    color: "#111827",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Jump to latest
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadActivity}
+                  disabled={!activityEvents.length}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #111827",
+                    background: "#111827",
+                    color: "white",
+                    fontWeight: 700,
+                    cursor: activityEvents.length ? "pointer" : "not-allowed",
+                    opacity: activityEvents.length ? 1 : 0.5,
+                  }}
+                >
+                  Download feed (CSV)
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <div className="stat-card">
+                <p className="eyebrow">Events captured</p>
+                <div className="stat-value">{activityEvents.length}</div>
+                <p className="stat-helper">All sources combined</p>
+              </div>
+              <div className="stat-card stat-card--accent">
+                <p className="eyebrow">People joined</p>
+                <div className="stat-value">{members.length}</div>
+                <p className="stat-helper">Directory size to date</p>
+              </div>
+              <div className="stat-card">
+                <p className="eyebrow">Service check-ins</p>
+                <div className="stat-value">{memberAttendanceHistory.length}</div>
+                <p className="stat-helper">Individual attendance signals</p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "14px",
+                padding: "16px",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <p style={{ margin: "0 0 4px", color: "#6b7280", fontSize: "13px" }}>
+                    Latest {ACTIVITY_PAGE_SIZE} events
+                  </p>
+                  <p style={{ margin: 0, fontWeight: 700, color: "#111827" }}>
+                    Page {activityPage + 1} of {Math.max(1, Math.ceil(activityEvents.length / ACTIVITY_PAGE_SIZE))}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setActivityPage((prev) => Math.max(0, prev - 1))}
+                    disabled={activityPage === 0}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid #e5e7eb",
+                      background: "white",
+                      color: "#111827",
+                      fontWeight: 600,
+                      cursor: activityPage === 0 ? "not-allowed" : "pointer",
+                      opacity: activityPage === 0 ? 0.5 : 1,
+                    }}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivityPage((prev) => prev + 1)}
+                    disabled={!hasMoreActivity}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid #111827",
+                      background: "#111827",
+                      color: "white",
+                      fontWeight: 700,
+                      cursor: hasMoreActivity ? "pointer" : "not-allowed",
+                      opacity: hasMoreActivity ? 1 : 0.5,
+                    }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+
+              {paginatedActivity.length === 0 ? (
+                <div
+                  style={{
+                    padding: "14px",
+                    border: "1px dashed #e5e7eb",
+                    borderRadius: "10px",
+                    textAlign: "center",
+                    color: "#6b7280",
+                    fontSize: "14px",
+                  }}
+                >
+                  No activity yet. Add members, record attendance, or log giving to see live signals.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {paginatedActivity.map((event) => {
+                    const accent = {
+                      member: "#2563eb",
+                      checkin: "#16a34a",
+                      giving: "#f97316",
+                      attendance: "#7c3aed",
+                    }[event.type] || "#0f172a";
+
+                    return (
+                      <div
+                        key={event.id}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "auto 1fr auto",
+                          gap: "10px",
+                          alignItems: "center",
+                          padding: "12px",
+                          borderRadius: "12px",
+                          border: "1px solid #f3f4f6",
+                          background: "#f9fafb",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "12px",
+                            height: "12px",
+                            borderRadius: "999px",
+                            background: accent,
+                            display: "inline-block",
+                          }}
+                          aria-hidden
+                        />
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 700, color: "#111827" }}>
+                            {event.title}
+                          </p>
+                          <p style={{ margin: "2px 0", color: "#111827" }}>{event.summary}</p>
+                          <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>
+                            {event.detail}
+                          </p>
+                        </div>
+                        <span
+                          style={{
+                            color: "#6b7280",
+                            fontSize: "12px",
+                            textAlign: "right",
+                            minWidth: "120px",
+                          }}
+                        >
+                          {formatActivityTime(event.timestamp)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </>
