@@ -11,7 +11,20 @@ export function useAuthProfile() {
   const [profileError, setProfileError] = useState("");
 
   const loadProfile = async (firebaseUser) => {
-    if (!firebaseUser) return;
+    if (!firebaseUser) {
+      setProfileError("You are not signed in. Please log in again.");
+      setUserProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    if (!db) {
+      setProfileError(
+        "Firebase is not initialized. Please check the environment configuration."
+      );
+      setProfileLoading(false);
+      return;
+    }
 
     setProfileLoading(true);
     setProfileError("");
@@ -35,7 +48,7 @@ export function useAuthProfile() {
   };
 
   const reloadProfile = () => {
-    const currentUser = auth.currentUser;
+    const currentUser = auth?.currentUser;
     if (!currentUser) {
       setProfileError("You are not signed in. Please log in again.");
       setProfileLoading(false);
@@ -46,7 +59,7 @@ export function useAuthProfile() {
   };
 
   const refreshUser = async () => {
-    const currentUser = auth.currentUser;
+    const currentUser = auth?.currentUser;
     if (!currentUser) return null;
 
     await currentUser.reload();
@@ -61,6 +74,14 @@ export function useAuthProfile() {
       setProfileError(
         firebaseConfigError ||
           "Firebase is not configured. Please set the required environment variables to continue."
+      );
+      setProfileLoading(false);
+      return () => {};
+    }
+
+    if (!auth || !db) {
+      setProfileError(
+        "Unable to initialize Firebase. Please refresh and ensure your configuration is valid."
       );
       setProfileLoading(false);
       return () => {};
