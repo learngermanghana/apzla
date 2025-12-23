@@ -124,6 +124,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
+    ageGroup: "ABOVE_18",
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -132,6 +133,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
+    ageGroup: "ABOVE_18",
   });
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
@@ -145,6 +147,14 @@ function AppContent() {
     });
     return map;
   }, [members]);
+
+  const formatAgeGroup = (ageGroup) => {
+    if (!ageGroup) return "Not set";
+    const normalized = ageGroup.toUpperCase();
+    if (normalized === "BELOW_18") return "Below 18";
+    if (normalized === "ABOVE_18") return "18 and above";
+    return ageGroup;
+  };
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -1073,6 +1083,7 @@ function AppContent() {
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
         status: memberForm.status,
+        ageGroup: memberForm.ageGroup,
         createdAt: new Date().toISOString(),
       });
 
@@ -1082,6 +1093,7 @@ function AppContent() {
         phone: "",
         email: "",
         status: "VISITOR",
+        ageGroup: "ABOVE_18",
       });
 
       await loadMembers();
@@ -1102,6 +1114,7 @@ function AppContent() {
       phone: member.phone || "",
       email: member.email || "",
       status: (member.status || "VISITOR").toUpperCase(),
+      ageGroup: (member.ageGroup || "ABOVE_18").toUpperCase(),
     });
   };
 
@@ -1113,6 +1126,7 @@ function AppContent() {
       phone: "",
       email: "",
       status: "VISITOR",
+      ageGroup: "ABOVE_18",
     });
   };
 
@@ -1133,6 +1147,7 @@ function AppContent() {
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
         status: editingMemberForm.status,
+        ageGroup: editingMemberForm.ageGroup,
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(docRef, payload);
@@ -3839,6 +3854,25 @@ function AppContent() {
                 }}
               />
               <select
+                value={memberForm.ageGroup}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    ageGroup: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="BELOW_18">Below 18</option>
+                <option value="ABOVE_18">18 and above</option>
+              </select>
+              <select
                 value={memberForm.status}
                 onChange={(e) =>
                   setMemberForm((f) => ({
@@ -4025,6 +4059,12 @@ function AppContent() {
                           <div style={{ fontWeight: 600 }}>{selectedMember.status}</div>
                         </div>
                         <div>
+                          <div style={{ color: "#6b7280" }}>Age group</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {formatAgeGroup(selectedMember.ageGroup)}
+                          </div>
+                        </div>
+                        <div>
                           <div style={{ color: "#6b7280" }}>Last attendance</div>
                           <div style={{ fontWeight: 600 }}>
                             {memberLastAttendance.get(selectedMemberId) || "No attendance recorded"}
@@ -4072,6 +4112,7 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Phone</th>
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
+                          <th style={{ padding: "6px 4px" }}>Age group</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
                         </tr>
                       </thead>
@@ -4204,6 +4245,29 @@ function AppContent() {
                                   </select>
                                 ) : (
                                   <>{m.status}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
+                                  <select
+                                    value={editingMemberForm.ageGroup}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        ageGroup: e.target.value,
+                                      }))
+                                    }
+                                    style={{
+                                      padding: "6px 8px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #d1d5db",
+                                    }}
+                                  >
+                                    <option value="BELOW_18">Below 18</option>
+                                    <option value="ABOVE_18">18 and above</option>
+                                  </select>
+                                ) : (
+                                  <>{formatAgeGroup(m.ageGroup)}</>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
