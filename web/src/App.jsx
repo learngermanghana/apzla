@@ -175,6 +175,9 @@ function AppContent() {
     notes: "",
   });
 
+  const normalizeServiceTypeKey = (value = "") =>
+    value.trim().toLowerCase() || "service";
+
   // Member attendance (per person check-ins)
   const [memberAttendance, setMemberAttendance] = useState([]);
   const [memberAttendanceLoading, setMemberAttendanceLoading] = useState(false);
@@ -1255,6 +1258,57 @@ function AppContent() {
     }
   };
 
+  const handleOverrideAttendance = async (record) => {
+    if (!userProfile?.churchId || !record?.date) return;
+
+    const parseNonNegativeNumber = (value) => {
+      const parsed = Number(value);
+      if (Number.isNaN(parsed) || parsed < 0) return 0;
+      return parsed;
+    };
+
+    const adultsInput = window.prompt("Adults", record.adults ?? 0);
+    if (adultsInput === null) return;
+    const childrenInput = window.prompt("Children", record.children ?? 0);
+    if (childrenInput === null) return;
+    const visitorsInput = window.prompt("Visitors", record.visitors ?? 0);
+    if (visitorsInput === null) return;
+    const notesInput = window.prompt("Notes", record.notes || "");
+
+    const payload = {
+      churchId: userProfile.churchId,
+      date: record.date,
+      serviceType: record.serviceType || "Service",
+      adults: parseNonNegativeNumber(adultsInput),
+      children: parseNonNegativeNumber(childrenInput),
+      visitors: parseNonNegativeNumber(visitorsInput),
+      notes: (notesInput || "").trim(),
+    };
+
+    try {
+      setLoading(true);
+
+      if (record.manualIds && record.manualIds.length > 0) {
+        const targetId = record.manualIds[0];
+        const docRef = doc(db, "attendance", targetId);
+        await updateDoc(docRef, payload);
+      } else {
+        await addDoc(collection(db, "attendance"), {
+          ...payload,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      await loadAttendance();
+      showToast("Attendance updated.", "success");
+    } catch (err) {
+      console.error("Override attendance error:", err);
+      showToast(err.message || "Unable to update attendance.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (
       (activeTab === "attendance" || activeTab === "overview") &&
@@ -2196,6 +2250,121 @@ function AppContent() {
     [givingTrend],
   );
 
+  const combinedAttendanceRecords = useMemo(() => {
+    const map = new Map();
+
+    attendance.forEach((record) => {
+      const keyDate = record.date || "";
+      const normalizedService = normalizeServiceTypeKey(
+        record.serviceType || "Service",
+      );
+      const key = `${keyDate}__${normalizedService}`;
+
+      const adults = Number(record.adults || 0);
+      const children = Number(record.children || 0);
+      const visitors = Number(record.visitors || 0);
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.adults += adults;
+        existing.children += children;
+        existing.visitors += visitors;
+        if (record.id) existing.manualIds.push(record.id);
+        if (!existing.notes && record.notes) existing.notes = record.notes;
+        if (!existing.serviceType && record.serviceType) {
+          existing.serviceType = record.serviceType;
+        }
+      } else {
+        map.set(key, {
+          key,
+          date: keyDate,
+          serviceType: record.serviceType || "Service",
+          normalizedService,
+          notes: record.notes || "",
+          adults,
+          children,
+          visitors,
+          selfCheckins: 0,
+          manualIds: record.id ? [record.id] : [],
+          createdAt: record.createdAt || "",
+        });
+      }
+    });
+
+    memberAttendanceHistory.forEach((entry) => {
+      const keyDate = entry.date || "";
+      const normalizedService = normalizeServiceTypeKey(
+        entry.serviceType || "Service",
+      );
+      const key = `${keyDate}__${normalizedService}`;
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.selfCheckins += 1;
+        if (!existing.serviceType && entry.serviceType) {
+          existing.serviceType = entry.serviceType;
+        }
+        if (!existing.createdAt && entry.checkedInAt) {
+          existing.createdAt = entry.checkedInAt;
+        }
+      } else {
+        map.set(key, {
+          key,
+          date: keyDate,
+          serviceType: entry.serviceType || "Service",
+          normalizedService,
+          notes: "",
+          adults: 0,
+          children: 0,
+          visitors: 0,
+          selfCheckins: 1,
+          manualIds: [],
+          createdAt: entry.checkedInAt || "",
+        });
+      }
+    });
+
+    const records = Array.from(map.values()).map((record) => {
+      const total =
+        Number(record.adults || 0) +
+        Number(record.children || 0) +
+        Number(record.visitors || 0) +
+        Number(record.selfCheckins || 0);
+
+      let sourceLabel = "Manual entry";
+      if (record.selfCheckins > 0 && record.manualIds.length > 0) {
+        sourceLabel = "Manual + self check-in";
+      } else if (record.selfCheckins > 0) {
+        sourceLabel = "Self check-in";
+      }
+
+      return {
+        ...record,
+        total,
+        sourceLabel,
+      };
+    });
+
+    records.sort((a, b) => {
+      const aTime = new Date(a.date || "").getTime();
+      const bTime = new Date(b.date || "").getTime();
+
+      const aValid = !Number.isNaN(aTime);
+      const bValid = !Number.isNaN(bTime);
+
+      if (aValid && bValid && aTime !== bTime) {
+        return bTime - aTime;
+      }
+
+      if (!aValid && bValid) return 1;
+      if (aValid && !bValid) return -1;
+
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    });
+
+    return records;
+  }, [attendance, memberAttendanceHistory]);
+
   const memberLastAttendance = new Map();
   memberAttendanceHistory.forEach((entry) => {
     if (!memberLastAttendance.has(entry.memberId)) {
@@ -2557,21 +2726,9 @@ function AppContent() {
   // Overview summary metrics
   const totalMembers = members.length;
 
-  let lastAttendanceTotal = 0;
-  let lastAttendanceDate = "";
-  if (attendance.length > 0) {
-    const sortedAttendance = [...attendance].sort((a, b) => {
-      if (!a.date) return -1;
-      if (!b.date) return 1;
-      return a.date.localeCompare(b.date);
-    });
-    const last = sortedAttendance[sortedAttendance.length - 1];
-    const adults = Number(last.adults || 0);
-    const children = Number(last.children || 0);
-    const visitors = Number(last.visitors || 0);
-    lastAttendanceTotal = adults + children + visitors;
-    lastAttendanceDate = last.date || "";
-  }
+  const lastAttendanceRecord = combinedAttendanceRecords[0];
+  const lastAttendanceTotal = lastAttendanceRecord?.total || 0;
+  const lastAttendanceDate = lastAttendanceRecord?.date || "";
 
   const normalizeSearchValue = (value = "") => value.toLowerCase().trim();
   const memberMatchesSearch = (member, searchValue) => {
@@ -4170,7 +4327,7 @@ function AppContent() {
                 <p style={{ fontSize: "14px", color: "#6b7280" }}>
                   Loading attendance…
                 </p>
-              ) : attendance.length === 0 ? (
+              ) : combinedAttendanceRecords.length === 0 ? (
                 <p style={{ fontSize: "14px", color: "#9ca3af" }}>
                   No attendance records yet. Save your first one above.
                 </p>
@@ -4199,51 +4356,73 @@ function AppContent() {
                         <th style={{ padding: "6px 4px" }}>
                           Visitors
                         </th>
+                        <th style={{ padding: "6px 4px" }}>Self check-ins</th>
                         <th style={{ padding: "6px 4px" }}>Total</th>
                         <th style={{ padding: "6px 4px" }}>Notes</th>
+                        <th style={{ padding: "6px 4px" }}>Source</th>
+                        <th style={{ padding: "6px 4px" }}></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {attendance.map((a) => {
-                        const total =
-                          (a.adults || 0) +
-                          (a.children || 0) +
-                          (a.visitors || 0);
-                        return (
-                          <tr
-                            key={a.id}
+                      {combinedAttendanceRecords.map((a) => (
+                        <tr
+                          key={a.key}
+                          style={{
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          <td style={{ padding: "6px 4px" }}>{a.date}</td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.serviceType}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.adults ?? 0}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.children ?? 0}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.visitors ?? 0}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.selfCheckins ?? 0}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.total}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {a.notes || "-"}
+                          </td>
+                          <td
                             style={{
-                              borderBottom: "1px solid #f3f4f6",
+                              padding: "6px 4px",
+                              color: "#6b7280",
+                              textTransform: "capitalize",
                             }}
                           >
-                            <td style={{ padding: "6px 4px" }}>
-                              {a.date}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {a.serviceType}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {a.adults ?? 0}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {a.children ?? 0}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {a.visitors ?? 0}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                              {total}
-                            </td>
-                            <td style={{ padding: "6px 4px" }}>
-                          {a.notes || "-"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                            {a.sourceLabel || "-"}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            <button
+                              onClick={() => handleOverrideAttendance(a)}
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: "6px",
+                                border: "1px solid #d1d5db",
+                                background: "white",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div style={{ marginTop: "18px" }}>
