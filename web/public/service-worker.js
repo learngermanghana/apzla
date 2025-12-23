@@ -1,8 +1,7 @@
-const CACHE_NAME = "apzla-offline-v5"; // bump to force SW update
+const CACHE_NAME = "apzla-offline-v6"; // bump to force SW update
 const OFFLINE_URL = "/offline.html";
 const ASSETS_TO_CACHE = [
   OFFLINE_URL,
-  "/",
   "/manifest.webmanifest",
   "/icons/apzla-icon.svg",
 ];
