@@ -55,6 +55,31 @@ const PAYSTACK_BANK_OPTIONS = [
 ];
 
 const REGISTRATION_CACHE_KEY = "registrationDraft";
+const SUBSCRIPTION_PLANS = {
+  monthly: {
+    id: "monthly",
+    label: "Monthly",
+    planLabel: "Monthly (GHS 100)",
+    amount: 100,
+    currency: "GHS",
+    durationMonths: 1,
+    badgeLabel: "GHS 100/mo",
+    ctaLabel: "Pay monthly subscription (GHS 100)",
+    description: "Pay month-to-month and keep your plan active for 30 days.",
+  },
+  yearly: {
+    id: "yearly",
+    label: "Yearly",
+    planLabel: "Yearly (GHS 1,100)",
+    amount: 1100,
+    currency: "GHS",
+    durationMonths: 12,
+    badgeLabel: "GHS 1,100/yr",
+    ctaLabel: "Pay yearly subscription (GHS 1,100)",
+    description: "Pay once for 12 months and save GHS 100 versus monthly.",
+  },
+};
+const DEFAULT_PLAN_ID = "monthly";
 
 function AppContent() {
   const {
@@ -97,6 +122,7 @@ function AppContent() {
   const [churchPlan, setChurchPlan] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [paystackLoading, setPaystackLoading] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState(DEFAULT_PLAN_ID);
 
   // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
   const [activeTab, setActiveTab] = useState("overview");
@@ -170,6 +196,17 @@ function AppContent() {
     if (typeof window === "undefined") return PREFERRED_BASE_URL;
     return normalizeBaseUrlMemo(window.location.origin || PREFERRED_BASE_URL);
   }, [normalizeBaseUrlMemo]);
+  const planOptions = Object.values(SUBSCRIPTION_PLANS);
+  const resolvePlanIdFromLabel = useCallback((planLabel = "") => {
+    if (planLabel.toLowerCase().includes("year")) return "yearly";
+    return DEFAULT_PLAN_ID;
+  }, []);
+  const getPlanDetails = useCallback(
+    (planId = selectedPlanId) =>
+      SUBSCRIPTION_PLANS[planId] || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID],
+    [selectedPlanId]
+  );
+  const selectedPlan = getPlanDetails(selectedPlanId);
   const [attendanceForm, setAttendanceForm] = useState({
     date: todayStr,
     serviceType: "Sunday Service",
@@ -512,18 +549,20 @@ function AppContent() {
 
         if (snapshot.exists()) {
           const data = snapshot.data();
+          const planId = resolvePlanIdFromLabel(data.subscriptionPlan);
           setChurchPlan({ id: snapshot.id, ...data });
           setSubscriptionInfo({
             status: data.subscriptionStatus || "INACTIVE",
-            plan: data.subscriptionPlan || "Monthly (GHS 120)",
-            amount: data.subscriptionAmount || 120,
-            currency: data.subscriptionCurrency || "GHS",
+            plan: data.subscriptionPlan || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].planLabel,
+            amount: data.subscriptionAmount || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].amount,
+            currency: data.subscriptionCurrency || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].currency,
             paidAt: data.subscriptionPaidAt || null,
             expiresAt: data.subscriptionExpiresAt || data.trialEndsAt || null,
             reference: data.subscriptionReference || null,
             trialStartedAt: data.trialStartedAt || null,
             trialEndsAt: data.trialEndsAt || null,
           });
+          setSelectedPlanId(planId);
           syncOnlineGivingState(data);
         } else {
           setChurchPlan(null);
@@ -742,11 +781,12 @@ function AppContent() {
           phone: data.phone || "",
         });
 
+        const planId = resolvePlanIdFromLabel(data.subscriptionPlan);
         setSubscriptionInfo({
           status: data.subscriptionStatus || "INACTIVE",
-          plan: data.subscriptionPlan || "Monthly (GHS 120)",
-          amount: data.subscriptionAmount || 120,
-          currency: data.subscriptionCurrency || "GHS",
+          plan: data.subscriptionPlan || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].planLabel,
+          amount: data.subscriptionAmount || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].amount,
+          currency: data.subscriptionCurrency || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].currency,
           paidAt: data.subscriptionPaidAt || null,
           expiresAt: data.subscriptionExpiresAt || data.trialEndsAt || null,
           reference: data.subscriptionReference || null,
@@ -754,6 +794,7 @@ function AppContent() {
           trialEndsAt: data.trialEndsAt || null,
         });
 
+        setSelectedPlanId(planId);
         setChurchPlan({ id: userProfile.churchId, ...data });
         syncOnlineGivingState(data);
       }
@@ -855,17 +896,23 @@ function AppContent() {
       document.body.appendChild(script);
     });
 
-  const handleRecordSubscription = async (response) => {
+  const handleRecordSubscription = async (response, planDetails = selectedPlan) => {
     if (!userProfile?.churchId) return;
 
+    const plan = planDetails || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID];
     const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    expiresAt.setMonth(expiresAt.getMonth() + plan.durationMonths);
+
+    const durationLabel =
+      plan.durationMonths === 12
+        ? "1 year"
+        : `${plan.durationMonths} month${plan.durationMonths > 1 ? "s" : ""}`;
 
     const subscriptionData = {
       subscriptionStatus: "ACTIVE",
-      subscriptionPlan: "Monthly (GHS 120)",
-      subscriptionAmount: 120,
-      subscriptionCurrency: "GHS",
+      subscriptionPlan: plan.planLabel,
+      subscriptionAmount: plan.amount,
+      subscriptionCurrency: plan.currency,
       subscriptionReference: response?.reference || `APZLA-${Date.now()}`,
       subscriptionPaidAt: new Date().toISOString(),
       subscriptionPaidBy: user?.email || "",
@@ -884,24 +931,26 @@ function AppContent() {
         expiresAt: subscriptionData.subscriptionExpiresAt,
         reference: subscriptionData.subscriptionReference,
       });
+      setSelectedPlanId(plan.id);
       setChurchPlan((prev) => ({
         ...(prev || {}),
         id: userProfile.churchId,
         ...subscriptionData,
       }));
-      showToast("Subscription activated for 1 month.", "success");
+      showToast(`Subscription activated for ${durationLabel}.`, "success");
     } catch (err) {
       console.error("Record subscription error:", err);
       showToast("Could not save subscription status.", "error");
     }
   };
 
-  const handlePaystackSubscription = async () => {
+  const handlePaystackSubscription = async (planId = selectedPlanId) => {
     if (!userProfile?.churchId || !user?.email) {
       showToast("Log in and link a church before paying.", "error");
       return;
     }
 
+    const plan = getPlanDetails(planId);
     const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
     if (!paystackKey) {
       showToast("Add VITE_PAYSTACK_PUBLIC_KEY to proceed with payment.", "error");
@@ -920,19 +969,19 @@ function AppContent() {
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: user.email,
-        amount: 120 * 100, // GHS 120 in pesewas
-        currency: "GHS",
+        amount: plan.amount * 100, // Paystack expects pesewas
+        currency: plan.currency,
         ref: `APZLA-${Date.now()}`,
         metadata: {
           churchId: userProfile.churchId,
           churchName: churchSettings.name || userProfile.churchName,
-          plan: "Monthly",
+          plan: plan.label,
         },
 
         // ✅ Plain function – Paystack will accept this
         callback: function (response) {
           // we don't mark loading false until we try to save
-          handleRecordSubscription(response)
+          handleRecordSubscription(response, plan)
             .catch((err) => {
               console.error("Record subscription error (callback):", err);
               showToast(
@@ -2925,6 +2974,10 @@ function AppContent() {
         onClose={() => setShowAccountSettings(false)}
         onSaveChurchSettings={handleSaveChurchSettings}
         onStartSubscription={handlePaystackSubscription}
+        planOptions={planOptions}
+        selectedPlanId={selectedPlanId}
+        selectedPlan={selectedPlan}
+        onSelectPlan={setSelectedPlanId}
       />
 
       {accessStatus.state === "expired" && (
