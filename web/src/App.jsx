@@ -504,14 +504,6 @@ function AppContent() {
     if (password.length < 6)
       return "Password must be at least 6 characters long.";
 
-    if (authMode === "register") {
-      if (!registrationChurchName.trim()) return "Church name is required.";
-      if (!registrationChurchAddress.trim())
-        return "Church address is required.";
-      if (!registrationChurchCity.trim()) return "City is required.";
-      if (!registrationChurchPhone.trim()) return "Church phone is required.";
-    }
-
     return "";
   };
 
@@ -918,6 +910,16 @@ function AppContent() {
 
     if (!churchAddress.trim()) {
       showToast("Please enter a church address.", "error");
+      return;
+    }
+
+    if (!churchCountry.trim()) {
+      showToast("Please enter a country.", "error");
+      return;
+    }
+
+    if (!churchCity.trim()) {
+      showToast("Please enter a city.", "error");
       return;
     }
 

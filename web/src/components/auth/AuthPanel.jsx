@@ -268,32 +268,41 @@ export function AuthPanel({
             <>
               <Input
                 type="text"
-                placeholder="Church name"
+                placeholder="Church name (optional)"
                   value={churchName}
                   onChange={onChurchNameChange}
                   style={{ background: "#f8fafc" }}
                 />
                 <Input
                   type="text"
-                  placeholder="Church address"
+                  placeholder="Church address (optional)"
                   value={churchAddress}
                   onChange={onChurchAddressChange}
                   style={{ background: "#f8fafc" }}
                 />
                 <Input
                   type="text"
-                  placeholder="City"
+                  placeholder="City (optional)"
                   value={churchCity}
                   onChange={onChurchCityChange}
                   style={{ background: "#f8fafc" }}
                 />
                 <Input
                   type="text"
-                  placeholder="Church phone number"
+                  placeholder="Church phone number (optional)"
                   value={churchPhone}
                   onChange={onChurchPhoneChange}
                   style={{ background: "#f8fafc" }}
                 />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  color: "#64748b",
+                }}
+              >
+                You can finish church details in the next step after creating your account.
+              </p>
               </>
             )}
           {inlineError && (

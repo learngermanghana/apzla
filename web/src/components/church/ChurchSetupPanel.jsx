@@ -120,6 +120,15 @@ export function ChurchSetupPanel({
             value={churchPhone}
             onChange={onChangeChurchPhone}
           />
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: "12px",
+              color: "#6b7280",
+            }}
+          >
+            All fields are required to create your church.
+          </p>
           <Button
             onClick={onCreateChurch}
             disabled={loading}
