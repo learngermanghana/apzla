@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { useAuthProfile } from '../hooks/useAuthProfile'
-import { getDoc } from 'firebase/firestore'
+import { onSnapshot } from 'firebase/firestore'
 import { auth } from '../firebase'
 
 const mockAuth = auth
@@ -34,20 +34,23 @@ vi.mock('firebase/auth', () => ({
 
 vi.mock('firebase/firestore', () => {
   const doc = vi.fn((db, collectionName, id) => ({ path: `${collectionName}/${id}` }))
-  const getDoc = vi.fn()
-  return { doc, getDoc }
+  const onSnapshot = vi.fn()
+  return { doc, onSnapshot }
 })
 
-const getDocMock = getDoc
+const onSnapshotMock = onSnapshot
 
 describe('useAuthProfile', () => {
   beforeEach(() => {
-    getDocMock.mockReset()
+    onSnapshotMock.mockReset()
     mockAuth.currentUser = null
   })
 
   it('loads a profile when authentication state changes', async () => {
-    getDocMock.mockResolvedValueOnce(mockProfileSnapshot)
+    onSnapshotMock.mockImplementationOnce((ref, onNext) => {
+      onNext(mockProfileSnapshot)
+      return vi.fn()
+    })
 
     const { result } = renderHook(() => useAuthProfile())
 
@@ -67,7 +70,10 @@ describe('useAuthProfile', () => {
   })
 
   it('surfaces profile errors and clears the cached profile', async () => {
-    getDocMock.mockRejectedValueOnce(new Error('boom'))
+    onSnapshotMock.mockImplementationOnce((ref, _onNext, onError) => {
+      onError(new Error('boom'))
+      return vi.fn()
+    })
 
     const { result } = renderHook(() => useAuthProfile())
 
@@ -83,6 +89,11 @@ describe('useAuthProfile', () => {
 
   it('refreshes the current user when refreshUser is called', async () => {
     mockAuth.currentUser = { ...mockUser, reload: vi.fn(() => Promise.resolve()) }
+
+    onSnapshotMock.mockImplementationOnce((ref, onNext) => {
+      onNext(mockProfileSnapshot)
+      return vi.fn()
+    })
 
     const { result } = renderHook(() => useAuthProfile())
 
