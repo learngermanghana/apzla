@@ -10,6 +10,10 @@ function AccountSettingsModal({
   onClose,
   onSaveChurchSettings,
   onStartSubscription,
+  planOptions,
+  selectedPlanId,
+  onSelectPlan,
+  selectedPlan,
 }) {
   if (!visible) return null;
 
@@ -31,8 +35,8 @@ function AccountSettingsModal({
               Manage church profile and subscription
             </h2>
             <p style={{ margin: 0, color: "#4b5563", fontSize: "13px" }}>
-              Update how your church appears and renew your monthly plan (GHS
-              120/month billed through Paystack).
+              Update how your church appears and renew your subscription (GHS
+              100/month or GHS 1,100/year billed through Paystack).
             </p>
           </div>
           <button
@@ -157,9 +161,9 @@ function AccountSettingsModal({
             <div className="modal-section-header">
               <div>
                 <p className="modal-label">Subscription</p>
-                <h3 className="modal-title">Monthly plan</h3>
+                <h3 className="modal-title">Plans</h3>
               </div>
-              <span className="modal-chip chip-green">GHS 120/mo</span>
+              <span className="modal-chip chip-green">From GHS 100/mo</span>
             </div>
 
             <div className="subscription-card">
@@ -168,7 +172,7 @@ function AccountSettingsModal({
                   Status: {subscriptionInfo?.status || "INACTIVE"}
                 </p>
                 <p className="subscription-meta">
-                  Plan: {subscriptionInfo?.plan || "Monthly (GHS 120)"}
+                  Plan: {subscriptionInfo?.plan || selectedPlan?.planLabel || "Monthly (GHS 100)"}
                 </p>
                 <p className="subscription-meta">
                   {subscriptionInfo?.status === "TRIAL"
@@ -187,8 +191,66 @@ function AccountSettingsModal({
                 )}
               </div>
 
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <p
+                  style={{
+                    margin: "0",
+                    color: "#4b5563",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Choose a plan
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  }}
+                >
+                  {planOptions.map((planOption) => {
+                    const isSelected = planOption.id === selectedPlanId;
+                    return (
+                      <button
+                        key={planOption.id}
+                        type="button"
+                        onClick={() => onSelectPlan(planOption.id)}
+                        style={{
+                          textAlign: "left",
+                          border: isSelected ? "2px solid #4338ca" : "1px solid #e5e7eb",
+                          background: isSelected ? "#eef2ff" : "#fff",
+                          borderRadius: "12px",
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          boxShadow: isSelected ? "0 10px 26px rgba(15, 23, 42, 0.08)" : "none",
+                        }}
+                        aria-pressed={isSelected}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, color: "#111827" }}>
+                            {planOption.label}
+                          </span>
+                          <span className="modal-chip">{planOption.badgeLabel}</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "12px", color: "#4b5563" }}>
+                          {planOption.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <button
-                onClick={onStartSubscription}
+                onClick={() => onStartSubscription(selectedPlanId)}
                 disabled={paystackLoading}
                 style={{
                   background: paystackLoading ? "#e5e7eb" : "#16a34a",
@@ -203,10 +265,10 @@ function AccountSettingsModal({
               >
                 {paystackLoading
                   ? "Opening Paystack..."
-                  : "Pay monthly subscription (GHS 120)"}
+                  : selectedPlan?.ctaLabel || "Start subscription"}
               </button>
               <p className="subscription-footnote">
-                Powered by Paystack. Billing renews monthly at GHS 120.
+                Powered by Paystack. Billing renews on the {selectedPlan?.label?.toLowerCase()} plan.
               </p>
             </div>
           </div>
@@ -238,6 +300,32 @@ AccountSettingsModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onSaveChurchSettings: PropTypes.func.isRequired,
   onStartSubscription: PropTypes.func.isRequired,
+  planOptions: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+      planLabel: PropTypes.string.isRequired,
+      amount: PropTypes.number.isRequired,
+      currency: PropTypes.string.isRequired,
+      durationMonths: PropTypes.number.isRequired,
+      badgeLabel: PropTypes.string,
+      ctaLabel: PropTypes.string,
+      description: PropTypes.string,
+    })
+  ).isRequired,
+  selectedPlanId: PropTypes.string.isRequired,
+  selectedPlan: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    planLabel: PropTypes.string.isRequired,
+    amount: PropTypes.number.isRequired,
+    currency: PropTypes.string.isRequired,
+    durationMonths: PropTypes.number.isRequired,
+    badgeLabel: PropTypes.string,
+    ctaLabel: PropTypes.string,
+    description: PropTypes.string,
+  }).isRequired,
+  onSelectPlan: PropTypes.func.isRequired,
 };
 
 AccountSettingsModal.defaultProps = {
