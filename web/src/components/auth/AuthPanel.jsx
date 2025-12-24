@@ -198,10 +198,27 @@ export function AuthPanel({
             >
               Welcome back
             </h2>
-            <p style={{ margin: 0, color: "#475569", fontSize: "14px" }}>
-              Sign in to shepherd your church with clarity and care.
-            </p>
+          <p style={{ margin: 0, color: "#475569", fontSize: "14px" }}>
+            Sign in to shepherd your church with clarity and care.
+          </p>
+          <div
+            style={{
+              marginTop: "10px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              background: "#eef2ff",
+              color: "#3730a3",
+              fontSize: "12px",
+              fontWeight: 600,
+              padding: "6px 10px",
+              borderRadius: "999px",
+            }}
+          >
+            <span aria-hidden>✨</span>
+            Start with a free 14-day trial before payment.
           </div>
+        </div>
 
           <div
             style={{
