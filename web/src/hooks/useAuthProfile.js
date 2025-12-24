@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 
 import { auth, db, firebaseConfigError, isFirebaseConfigured } from "../firebase";
 
@@ -9,30 +9,44 @@ export function useAuthProfile() {
   const [userProfile, setUserProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
+  const profileUnsubscribeRef = useRef(null);
 
-  const loadProfile = async (firebaseUser) => {
-    if (!firebaseUser) return;
-
-    setProfileLoading(true);
-    setProfileError("");
-
-    try {
-      const profileRef = doc(db, "users", firebaseUser.uid);
-      const snapshot = await getDoc(profileRef);
-
-      if (snapshot.exists()) {
-        setUserProfile({ id: snapshot.id, ...snapshot.data() });
-      } else {
-        setUserProfile(null);
-      }
-    } catch (error) {
-      console.error("Profile load error:", error);
-      setProfileError(error.message || "Unable to load your profile.");
-      setUserProfile(null);
-    } finally {
-      setProfileLoading(false);
+  const clearProfileSubscription = useCallback(() => {
+    if (profileUnsubscribeRef.current) {
+      profileUnsubscribeRef.current();
+      profileUnsubscribeRef.current = null;
     }
-  };
+  }, []);
+
+  const subscribeToProfile = useCallback(
+    (firebaseUser) => {
+      if (!firebaseUser) return;
+
+      clearProfileSubscription();
+      setProfileLoading(true);
+      setProfileError("");
+
+      const profileRef = doc(db, "users", firebaseUser.uid);
+      profileUnsubscribeRef.current = onSnapshot(
+        profileRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            setUserProfile({ id: snapshot.id, ...snapshot.data() });
+          } else {
+            setUserProfile(null);
+          }
+          setProfileLoading(false);
+        },
+        (error) => {
+          console.error("Profile load error:", error);
+          setProfileError(error.message || "Unable to load your profile.");
+          setUserProfile(null);
+          setProfileLoading(false);
+        }
+      );
+    },
+    [clearProfileSubscription]
+  );
 
   const reloadProfile = () => {
     const currentUser = auth.currentUser;
@@ -42,7 +56,7 @@ export function useAuthProfile() {
       return;
     }
 
-    loadProfile(currentUser);
+    subscribeToProfile(currentUser);
   };
 
   const refreshUser = async () => {
@@ -70,16 +84,20 @@ export function useAuthProfile() {
       setUser(firebaseUser);
 
       if (firebaseUser) {
-        loadProfile(firebaseUser);
+        subscribeToProfile(firebaseUser);
       } else {
+        clearProfileSubscription();
         setProfileError("");
         setUserProfile(null);
         setProfileLoading(false);
       }
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      clearProfileSubscription();
+      unsubscribe();
+    };
+  }, [clearProfileSubscription, subscribeToProfile]);
 
   return {
     user,
