@@ -30,8 +30,6 @@ import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsTab from "./components/tabs/SermonsTab";
 import MembersTab from "./components/tabs/MembersTab";
 import AttendanceTab from "./components/tabs/AttendanceTab";
-import CheckinTab from "./components/tabs/CheckinTab";
-import GivingTab from "./components/tabs/GivingTab";
 import FollowupTab from "./components/tabs/FollowupTab";
 import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
