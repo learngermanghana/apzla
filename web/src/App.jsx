@@ -54,6 +54,8 @@ const PAYSTACK_BANK_OPTIONS = [
   { code: "UBAGH", name: "UBA Ghana" },
 ];
 
+const REGISTRATION_CACHE_KEY = "registrationDraft";
+
 function AppContent() {
   const {
     user,
@@ -382,6 +384,24 @@ function AppContent() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  const persistRegistrationDraft = (draft) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(REGISTRATION_CACHE_KEY, JSON.stringify(draft));
+    } catch (err) {
+      console.error("Persist registration draft failed:", err);
+    }
+  };
+
+  const clearRegistrationDraft = () => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(REGISTRATION_CACHE_KEY);
+    } catch (err) {
+      console.error("Clear registration draft failed:", err);
+    }
+  };
+
   const syncOnlineGivingState = (data) => {
     setPayoutStatus(data?.payoutStatus || data?.onlineGivingStatus || "NOT_CONFIGURED");
     setPaystackSubaccountCode(
@@ -427,6 +447,36 @@ function AppContent() {
     if (typeof window === "undefined") return;
     localStorage.setItem("checkinTokenForm", JSON.stringify(checkinTokenForm));
   }, [checkinTokenForm]);
+
+  // ---------- Restore registration draft ----------
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const storedDraft = localStorage.getItem(REGISTRATION_CACHE_KEY);
+      if (!storedDraft) return;
+
+      const parsedDraft = JSON.parse(storedDraft) || {};
+      const {
+        churchName: cachedChurchName = "",
+        churchAddress: cachedChurchAddress = "",
+        churchCity: cachedChurchCity = "",
+        churchPhone: cachedChurchPhone = "",
+        email: cachedEmail = "",
+      } = parsedDraft;
+
+      setRegistrationChurchName((prev) => prev || cachedChurchName);
+      setRegistrationChurchAddress((prev) => prev || cachedChurchAddress);
+      setRegistrationChurchCity((prev) => prev || cachedChurchCity);
+      setRegistrationChurchPhone((prev) => prev || cachedChurchPhone);
+      setEmail((prev) => prev || cachedEmail);
+      setChurchName((prev) => prev || cachedChurchName);
+      setChurchAddress((prev) => prev || cachedChurchAddress);
+      setChurchCity((prev) => prev || cachedChurchCity);
+      setChurchPhone((prev) => prev || cachedChurchPhone);
+    } catch (err) {
+      console.error("Restore registration draft failed:", err);
+    }
+  }, []);
 
   // ---------- Reset data when auth user changes ----------
   useEffect(() => {
@@ -514,6 +564,12 @@ function AppContent() {
       return;
     }
 
+    const trimmedEmail = email.trim();
+    const trimmedChurchName = registrationChurchName.trim();
+    const trimmedChurchAddress = registrationChurchAddress.trim();
+    const trimmedChurchCity = registrationChurchCity.trim();
+    const trimmedChurchPhone = registrationChurchPhone.trim();
+
     try {
       setAuthLoading(true);
       setAuthError("");
@@ -521,7 +577,7 @@ function AppContent() {
       setPasswordResetError("");
       setVerificationMessage("");
       setVerificationError("");
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       if (auth.currentUser) {
         try {
           await sendEmailVerification(auth.currentUser);
@@ -535,10 +591,18 @@ function AppContent() {
           );
         }
       }
-      setChurchName(registrationChurchName.trim());
-      setChurchAddress(registrationChurchAddress.trim());
-      setChurchCity(registrationChurchCity.trim());
-      setChurchPhone(registrationChurchPhone.trim());
+      persistRegistrationDraft({
+        email: trimmedEmail,
+        churchName: trimmedChurchName,
+        churchAddress: trimmedChurchAddress,
+        churchCity: trimmedChurchCity,
+        churchPhone: trimmedChurchPhone,
+      });
+
+      setChurchName(trimmedChurchName);
+      setChurchAddress(trimmedChurchAddress);
+      setChurchCity(trimmedChurchCity);
+      setChurchPhone(trimmedChurchPhone);
       setEmail("");
       setPassword("");
       setRegistrationChurchName("");
@@ -1016,6 +1080,7 @@ function AppContent() {
       });
 
       showToast("Church created and linked to your account.", "success");
+      clearRegistrationDraft();
     } catch (err) {
       console.error("Create church error:", err);
       showToast(err.message || "Unable to create church.", "error");
