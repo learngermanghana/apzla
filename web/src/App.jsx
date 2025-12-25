@@ -52,6 +52,13 @@ const PAYSTACK_BANK_OPTIONS = [
   { code: "UBAGH", name: "UBA Ghana" },
 ];
 
+const memberAgeGroupOptions = [
+  { value: "UNDER_18", label: "Under 18" },
+  { value: "18_TO_39", label: "18 - 39" },
+  { value: "40_TO_70", label: "40 - 70" },
+  { value: "OVER_70", label: "Over 70" },
+];
+
 function AppContent() {
   const {
     user,
@@ -123,6 +130,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
+    ageGroup: "18_TO_39",
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -131,6 +139,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
+    ageGroup: "18_TO_39",
   });
   const [memberSearch, setMemberSearch] = useState("");
 
@@ -143,6 +152,17 @@ function AppContent() {
     });
     return map;
   }, [members]);
+
+  const ageGroupLabelLookup = useMemo(() => {
+    const map = new Map();
+    memberAgeGroupOptions.forEach((opt) => map.set(opt.value, opt.label));
+    return map;
+  }, []);
+
+  const formatAgeGroup = useCallback(
+    (value) => ageGroupLabelLookup.get(value) || value || "-",
+    [ageGroupLabelLookup]
+  );
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -1073,6 +1093,7 @@ function AppContent() {
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
         status: memberForm.status,
+        ageGroup: memberForm.ageGroup,
         createdAt: new Date().toISOString(),
       });
 
@@ -1082,6 +1103,7 @@ function AppContent() {
         phone: "",
         email: "",
         status: "VISITOR",
+        ageGroup: "18_TO_39",
       });
 
       await loadMembers();
@@ -1102,6 +1124,7 @@ function AppContent() {
       phone: member.phone || "",
       email: member.email || "",
       status: (member.status || "VISITOR").toUpperCase(),
+      ageGroup: (member.ageGroup || "18_TO_39").toUpperCase(),
     });
   };
 
@@ -1113,6 +1136,7 @@ function AppContent() {
       phone: "",
       email: "",
       status: "VISITOR",
+      ageGroup: "18_TO_39",
     });
   };
 
@@ -1133,6 +1157,7 @@ function AppContent() {
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
         status: editingMemberForm.status,
+        ageGroup: editingMemberForm.ageGroup,
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(docRef, payload);
@@ -3813,7 +3838,31 @@ function AppContent() {
                 <option value="REGULAR">Regular</option>
                 <option value="WORKER">Worker</option>
                 <option value="PASTOR">Pastor</option>
+                <option value="ELDER">Elder</option>
+                <option value="OTHER">Other</option>
                 <option value="INACTIVE">Inactive</option>
+              </select>
+              <select
+                value={memberForm.ageGroup}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    ageGroup: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {memberAgeGroupOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -3920,6 +3969,7 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Phone</th>
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
+                          <th style={{ padding: "6px 4px" }}>Age group</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
                         </tr>
                       </thead>
@@ -4048,10 +4098,38 @@ function AppContent() {
                                     <option value="REGULAR">Regular</option>
                                     <option value="WORKER">Worker</option>
                                     <option value="PASTOR">Pastor</option>
+                                    <option value="ELDER">Elder</option>
+                                    <option value="OTHER">Other</option>
                                     <option value="INACTIVE">Inactive</option>
                                   </select>
                                 ) : (
                                   <>{m.status}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
+                                  <select
+                                    value={editingMemberForm.ageGroup}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        ageGroup: e.target.value,
+                                      }))
+                                    }
+                                    style={{
+                                      padding: "6px 8px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #d1d5db",
+                                    }}
+                                  >
+                                    {memberAgeGroupOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <>{formatAgeGroup(m.ageGroup)}</>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
