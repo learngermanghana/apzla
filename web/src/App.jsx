@@ -59,6 +59,24 @@ const memberAgeGroupOptions = [
   { value: "OVER_70", label: "Over 70" },
 ];
 
+const memberStatusOptions = [
+  { value: "VISITOR", label: "Visitors", helper: "First-time guests and newcomers" },
+  { value: "NEW_CONVERT", label: "New converts", helper: "Recently committed" },
+  { value: "REGULAR", label: "Regulars", helper: "Consistently attending" },
+  { value: "WORKER", label: "Workers", helper: "Serving team members" },
+  { value: "PASTOR", label: "Pastors", helper: "Pastoral staff" },
+  { value: "ELDER", label: "Elders", helper: "Leadership team" },
+  { value: "OTHER", label: "Other", helper: "Custom status" },
+  { value: "INACTIVE", label: "Inactive", helper: "Needs engagement" },
+];
+
+const memberAgeGroupDescriptions = {
+  UNDER_18: "Kids and teens",
+  18_TO_39: "Young adults",
+  40_TO_70: "Adults",
+  OVER_70: "Seniors",
+};
+
 function AppContent() {
   const {
     user,
@@ -251,6 +269,7 @@ function AppContent() {
   const [editingPayoutDetails, setEditingPayoutDetails] = useState(false);
   const [onlineGivingActionLoading, setOnlineGivingActionLoading] = useState(false);
   const [givingForm, setGivingForm] = useState({
+    phone: "",
     date: todayStr,
     serviceType: "Sunday Service",
     type: "Offering", // Offering | Tithe | Special
@@ -2036,9 +2055,17 @@ function AppContent() {
       setLoading(true);
       const selectedMember =
         givingForm.memberId && members.find((m) => m.id === givingForm.memberId);
-      const memberName = selectedMember
-        ? `${selectedMember.firstName || ""} ${selectedMember.lastName || ""}`.trim()
+      const normalizedPhoneInput = normalizePhone(givingForm.phone);
+      const phoneMatchedMember =
+        !selectedMember && normalizedPhoneInput
+          ? members.find((m) => normalizePhone(m.phone) === normalizedPhoneInput)
+          : null;
+
+      const targetMember = selectedMember || phoneMatchedMember || null;
+      const memberName = targetMember
+        ? `${targetMember.firstName || ""} ${targetMember.lastName || ""}`.trim()
         : "";
+
       await addDoc(collection(db, "giving"), {
         churchId: userProfile.churchId,
         date: givingForm.date,
@@ -2046,12 +2073,15 @@ function AppContent() {
         type: givingForm.type,
         amount: Number(givingForm.amount),
         notes: givingForm.notes.trim(),
-        memberId: givingForm.memberId || null,
+        memberId: targetMember ? targetMember.id : null,
         memberName,
+        giverPhone: givingForm.phone.trim(),
+        phoneMatchMemberId: phoneMatchedMember ? phoneMatchedMember.id : null,
         createdAt: new Date().toISOString(),
       });
 
       setGivingForm({
+        phone: "",
         date: todayStr,
         serviceType: "Sunday Service",
         type: "Offering",
@@ -2166,12 +2196,21 @@ function AppContent() {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
   let givingThisMonth = 0;
+  let tithesThisMonth = 0;
+  let tithesLinkedThisMonth = 0;
   giving.forEach((g) => {
     if (!g.date) return;
     const d = new Date(g.date);
     if (Number.isNaN(d.getTime())) return;
     if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
       givingThisMonth += Number(g.amount || 0);
+      const isTithe = (g.type || "").toLowerCase() === "tithe";
+      if (isTithe) {
+        tithesThisMonth += Number(g.amount || 0);
+        if (g.memberId || g.phoneMatchMemberId) {
+          tithesLinkedThisMonth += 1;
+        }
+      }
     }
   });
 
@@ -2274,6 +2313,86 @@ function AppContent() {
     () => Math.max(...givingTrend.map((p) => p.amount || 0), 1),
     [givingTrend],
   );
+
+  const memberStatusStats = useMemo(() => {
+    const counts = new Map();
+
+    members.forEach((member) => {
+      const normalized = (member.status || "UNSPECIFIED").toUpperCase();
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    });
+
+    const total = members.length || 0;
+    const stats = memberStatusOptions.map((opt) => {
+      const count = counts.get(opt.value) || 0;
+      return {
+        ...opt,
+        count,
+        percent: total > 0 ? Math.round((count / total) * 100) : 0,
+      };
+    });
+
+    const extraKeys = Array.from(counts.keys()).filter(
+      (key) => !memberStatusOptions.some((opt) => opt.value === key)
+    );
+
+    if (extraKeys.length > 0) {
+      const extraCount = extraKeys.reduce(
+        (sum, key) => sum + (counts.get(key) || 0),
+        0
+      );
+      stats.push({
+        value: "UNSPECIFIED",
+        label: "Unspecified",
+        helper: "Needs a status update",
+        count: extraCount,
+        percent: total > 0 ? Math.round((extraCount / total) * 100) : 0,
+      });
+    }
+
+    return stats;
+  }, [members]);
+
+  const memberAgeGroupStats = useMemo(() => {
+    const counts = new Map();
+
+    members.forEach((member) => {
+      const normalized = (member.ageGroup || "UNSPECIFIED").toUpperCase();
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    });
+
+    const total = members.length || 0;
+    const stats = memberAgeGroupOptions.map((opt) => {
+      const count = counts.get(opt.value) || 0;
+      return {
+        value: opt.value,
+        label: opt.label,
+        helper: memberAgeGroupDescriptions[opt.value] || "Age group",
+        count,
+        percent: total > 0 ? Math.round((count / total) * 100) : 0,
+      };
+    });
+
+    const extraKeys = Array.from(counts.keys()).filter(
+      (key) => !memberAgeGroupOptions.some((opt) => opt.value === key)
+    );
+
+    if (extraKeys.length > 0) {
+      const extraCount = extraKeys.reduce(
+        (sum, key) => sum + (counts.get(key) || 0),
+        0
+      );
+      stats.push({
+        value: "UNSPECIFIED",
+        label: "Unspecified age",
+        helper: "Missing age group",
+        count: extraCount,
+        percent: total > 0 ? Math.round((extraCount / total) * 100) : 0,
+      });
+    }
+
+    return stats;
+  }, [members]);
 
   const combinedAttendanceRecords = useMemo(() => {
     const map = new Map();
@@ -2848,6 +2967,7 @@ function AppContent() {
   const followupTelegramLink = `https://t.me/share/url?text=${followupTemplateEncoded}`;
   const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
+  const normalizePhone = (value = "") => value.replace(/\D/g, "");
 
   const visitorMembers = members.filter(
     (m) => (m.status || "").toUpperCase() === "VISITOR"
@@ -3133,6 +3253,99 @@ function AppContent() {
                     ? "Current month total"
                     : "No giving records this month"}
                 </p>
+              </div>
+
+              <div className="stat-card">
+                <p className="eyebrow">Tithes this month</p>
+                <div className="stat-value">
+                  {tithesThisMonth.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <p className="stat-helper">
+                  {tithesThisMonth > 0
+                    ? `${tithesLinkedThisMonth} linked to members`
+                    : "Add phone to auto-link tithes"}
+                </p>
+              </div>
+            </div>
+
+            <div className="demographics-section">
+              <div className="demographics-grid">
+                <div className="demographic-card">
+                  <div className="demographic-card__header">
+                    <div>
+                      <p className="eyebrow">Demographics</p>
+                      <h3 className="chart-title">Member status</h3>
+                      <p className="demographic-note">
+                        Based on {totalMembers} profiles in your directory.
+                      </p>
+                    </div>
+                    <span className="pill pill-muted">Directory</span>
+                  </div>
+                  <div className="demographic-list">
+                    {memberStatusStats.map((stat) => (
+                      <div key={stat.value} className="demographic-row">
+                        <div>
+                          <div className="demographic-label">{stat.label}</div>
+                          <div className="demographic-helper">
+                            {stat.helper || "Status"}
+                          </div>
+                        </div>
+                        <div className="demographic-metric">
+                          <span className="demographic-count">{stat.count}</span>
+                          <span className="demographic-percent">
+                            {stat.percent}%
+                          </span>
+                        </div>
+                        <div className="demographic-progress" aria-hidden>
+                          <div
+                            className="demographic-progress__fill"
+                            style={{ width: `${stat.percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="demographic-card">
+                  <div className="demographic-card__header">
+                    <div>
+                      <p className="eyebrow">Demographics</p>
+                      <h3 className="chart-title">Age groups</h3>
+                      <p className="demographic-note">
+                        Use this to balance ministry focus areas.
+                      </p>
+                    </div>
+                    <span className="pill pill-muted">People</span>
+                  </div>
+                  <div className="demographic-list">
+                    {memberAgeGroupStats.map((stat) => (
+                      <div key={stat.value} className="demographic-row">
+                        <div>
+                          <div className="demographic-label">{stat.label}</div>
+                          <div className="demographic-helper">
+                            {stat.helper}
+                          </div>
+                        </div>
+                        <div className="demographic-metric">
+                          <span className="demographic-count">{stat.count}</span>
+                          <span className="demographic-percent">
+                            {stat.percent}%
+                          </span>
+                        </div>
+                        <div className="demographic-progress" aria-hidden>
+                          <div
+                            className="demographic-progress__fill demographic-progress__fill--teal"
+                            style={{ width: `${stat.percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -5647,12 +5860,31 @@ function AppContent() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: "8px",
-                marginBottom: "12px",
-                maxWidth: "620px",
-              }}
-            >
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: "8px",
+              marginBottom: "12px",
+              maxWidth: "620px",
+            }}
+          >
+              <input
+                type="tel"
+                placeholder="Giver phone (auto-link member)"
+                value={givingForm.phone}
+                onChange={(e) =>
+                  setGivingForm((f) => ({
+                    ...f,
+                    phone: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 3",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+
               <input
                 type="date"
                 value={givingForm.date}
@@ -5710,6 +5942,16 @@ function AppContent() {
                   );
                 })}
               </select>
+              <p
+                style={{
+                  gridColumn: "span 3",
+                  margin: "0",
+                  fontSize: "12px",
+                  color: "#6b7280",
+                }}
+              >
+                Add the phone number to auto-link tithes to existing members.
+              </p>
 
               <select
                 value={givingForm.type}
@@ -5867,14 +6109,15 @@ function AppContent() {
                           borderBottom: "1px solid #e5e7eb",
                         }}
                       >
-                        <th style={{ padding: "6px 4px" }}>Date</th>
-                        <th style={{ padding: "6px 4px" }}>Service</th>
-                        <th style={{ padding: "6px 4px" }}>Type</th>
-                        <th style={{ padding: "6px 4px" }}>Member</th>
-                        <th style={{ padding: "6px 4px" }}>Amount</th>
-                        <th style={{ padding: "6px 4px" }}>Notes</th>
-                      </tr>
-                    </thead>
+                          <th style={{ padding: "6px 4px" }}>Date</th>
+                          <th style={{ padding: "6px 4px" }}>Service</th>
+                          <th style={{ padding: "6px 4px" }}>Type</th>
+                          <th style={{ padding: "6px 4px" }}>Phone</th>
+                          <th style={{ padding: "6px 4px" }}>Member</th>
+                          <th style={{ padding: "6px 4px" }}>Amount</th>
+                          <th style={{ padding: "6px 4px" }}>Notes</th>
+                        </tr>
+                      </thead>
                     <tbody>
                       {giving.map((g) => (
                         <tr
@@ -5891,6 +6134,9 @@ function AppContent() {
                           </td>
                           <td style={{ padding: "6px 4px" }}>
                             {g.type}
+                          </td>
+                          <td style={{ padding: "6px 4px" }}>
+                            {g.giverPhone || "-"}
                           </td>
                           <td style={{ padding: "6px 4px" }}>
                             {resolveGivingMember(g)}
