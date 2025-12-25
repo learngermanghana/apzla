@@ -8,6 +8,15 @@ const statusOptions = [
   { value: "REGULAR", label: "Regular" },
   { value: "WORKER", label: "Worker" },
   { value: "PASTOR", label: "Pastor" },
+  { value: "ELDER", label: "Elder" },
+  { value: "OTHER", label: "Other" },
+];
+
+const ageGroupOptions = [
+  { value: "UNDER_18", label: "Under 18" },
+  { value: "18_TO_39", label: "18 - 39" },
+  { value: "40_TO_70", label: "40 - 70" },
+  { value: "OVER_70", label: "Over 70" },
 ];
 
 export default function MemberInvitePage({ token: initialToken = "" }) {
@@ -17,6 +26,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     phone: "",
     email: "",
     status: "VISITOR",
+    ageGroup: "18_TO_39",
   });
   const [token, setToken] = useState(initialToken || "");
   const [feedback, setFeedback] = useState({ ok: false, message: "" });
@@ -115,6 +125,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         phone: trimmedPhone,
         email: trimmedEmail,
         status: form.status,
+        ageGroup: form.ageGroup,
       });
     } catch (err) {
       console.error("Invite submit error", err);
@@ -188,6 +199,20 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
                 onChange={(e) => updateField("status", e.target.value)}
               >
                 {statusOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="checkin-field">
+              <span>Age group</span>
+              <select
+                value={form.ageGroup}
+                onChange={(e) => updateField("ageGroup", e.target.value)}
+              >
+                {ageGroupOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
