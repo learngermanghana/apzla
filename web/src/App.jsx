@@ -72,8 +72,8 @@ const memberStatusOptions = [
 
 const memberAgeGroupDescriptions = {
   UNDER_18: "Kids and teens",
-  18_TO_39: "Young adults",
-  40_TO_70: "Adults",
+  "18_TO_39": "Young adults",
+  "40_TO_70": "Adults",
   OVER_70: "Seniors",
 };
 
