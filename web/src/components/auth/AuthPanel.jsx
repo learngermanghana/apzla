@@ -365,7 +365,20 @@ export function AuthPanel({
             }}
           >
             Secure, role-aware access for every ministry leader. Need help?
-            Email us at hello@apzla.com.
+            Email us at{" "}
+            <a href="mailto:sedifexbiz@gmail.com" style={{ color: "#2563eb" }}>
+              sedifexbiz@gmail.com
+            </a>{" "}
+            or message us on{" "}
+            <a
+              href="https://wa.me/233595054266"
+              style={{ color: "#2563eb" }}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp via WhatsApp API
+            </a>
+            .
           </p>
         </Card>
       </div>
