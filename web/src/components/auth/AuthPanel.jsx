@@ -380,6 +380,35 @@ export function AuthPanel({
             </a>
             .
           </p>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+              fontSize: "12px",
+              color: "#64748b",
+            }}
+          >
+            <span style={{ fontWeight: 600, color: "#0f172a" }}>
+              Follow us:
+            </span>
+            <a
+              href="https://www.instagram.com/sedifexbiz"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#2563eb", fontWeight: 600 }}
+            >
+              Instagram
+            </a>
+            <a
+              href="https://www.tiktok.com/@sedifex"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#2563eb", fontWeight: 600 }}
+            >
+              TikTok
+            </a>
+          </div>
         </Card>
       </div>
     </div>
