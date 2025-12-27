@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
+import { sendBulkSms, sendBulkWhatsapp } from "../../utils/messageApi";
 
 function FollowupPage({
   followupPastorName,
@@ -16,7 +17,112 @@ function FollowupPage({
   followupTelegramLink,
   followupEmailLink,
   showToast,
+  churchId,
+  smsCredits,
+  whatsappCredits,
+  user,
 }) {
+  const [sendMode, setSendMode] = useState("FREE");
+  const [selectedRecipients, setSelectedRecipients] = useState([]);
+  const [sendingChannel, setSendingChannel] = useState(null);
+  const bulkLimit = 50;
+
+  const recipientsWithPhone = useMemo(
+    () =>
+      followupTargets.filter((member) => {
+        const normalized = (member.phone || "").trim();
+        return normalized.length > 0;
+      }),
+    [followupTargets]
+  );
+
+  const selectedMembers = useMemo(
+    () =>
+      recipientsWithPhone.filter((member) =>
+        selectedRecipients.includes(member.id)
+      ),
+    [recipientsWithPhone, selectedRecipients]
+  );
+
+  const selectedPhones = useMemo(
+    () => selectedMembers.map((member) => member.phone).filter(Boolean),
+    [selectedMembers]
+  );
+
+  const toggleRecipient = (memberId) => {
+    setSelectedRecipients((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    );
+  };
+
+  const toggleAllRecipients = () => {
+    if (selectedRecipients.length === recipientsWithPhone.length) {
+      setSelectedRecipients([]);
+      return;
+    }
+    setSelectedRecipients(recipientsWithPhone.map((member) => member.id));
+  };
+
+  const handleBulkSend = async (channel) => {
+    if (!churchId) {
+      showToast("Church ID missing. Please reload and try again.", "error");
+      return;
+    }
+
+    if (!user) {
+      showToast("Please sign in again to send bulk messages.", "error");
+      return;
+    }
+
+    if (selectedPhones.length === 0) {
+      showToast("Select at least one recipient with a phone number.", "error");
+      return;
+    }
+
+    if (selectedPhones.length > bulkLimit) {
+      showToast(
+        `Bulk send is limited to ${bulkLimit} recipients per request.`,
+        "error"
+      );
+      return;
+    }
+
+    const availableCredits =
+      channel === "sms" ? smsCredits : whatsappCredits;
+    if (availableCredits < selectedPhones.length) {
+      showToast("Not enough credits to send to all selected recipients.", "error");
+      return;
+    }
+
+    try {
+      setSendingChannel(channel);
+      const token = await user.getIdToken();
+      if (channel === "sms") {
+        await sendBulkSms({
+          churchId,
+          message: followupTemplate,
+          recipients: selectedPhones,
+          token,
+        });
+      } else {
+        await sendBulkWhatsapp({
+          churchId,
+          message: followupTemplate,
+          recipients: selectedPhones,
+          token,
+        });
+      }
+      showToast("Bulk message sent successfully.", "success");
+      setSelectedRecipients([]);
+    } catch (error) {
+      showToast(error.message || "Unable to send bulk message.", "error");
+    } finally {
+      setSendingChannel(null);
+    }
+  };
+
   return (
     <>
       <p
@@ -30,6 +136,87 @@ function FollowupPage({
         Copy it and send with your own phone via SMS or WhatsApp. No SMS
         cost is handled inside Apzla yet.
       </p>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          flexWrap: "wrap",
+          marginBottom: "16px",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "#111827",
+          }}
+        >
+          Mode
+        </span>
+        {[
+          { value: "FREE", label: "Send with my phone (Free)" },
+          { value: "BULK", label: "Bulk send inside Apzla (Uses credits)" },
+        ].map((mode) => {
+          const isActive = sendMode === mode.value;
+          return (
+            <button
+              key={mode.value}
+              onClick={() => {
+                setSendMode(mode.value);
+                setSelectedRecipients([]);
+              }}
+              style={{
+                padding: "6px 10px",
+                borderRadius: "20px",
+                border: isActive ? "1px solid #111827" : "1px solid #d1d5db",
+                background: isActive ? "#111827" : "white",
+                color: isActive ? "white" : "#374151",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 500,
+              }}
+            >
+              {mode.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {sendMode === "BULK" && (
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: "10px",
+            border: "1px solid #e5e7eb",
+            background: "white",
+            marginBottom: "16px",
+          }}
+        >
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>
+            Bulk send inside Apzla
+          </div>
+          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+            Uses church credits. Bulk sends are limited to {bulkLimit} recipients
+            per request.
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              flexWrap: "wrap",
+              marginTop: "8px",
+              fontSize: "12px",
+              color: "#111827",
+              fontWeight: 600,
+            }}
+          >
+            <span>SMS credits: {smsCredits}</span>
+            <span>WhatsApp credits: {whatsappCredits}</span>
+          </div>
+        </div>
+      )}
 
       {/* Pastor name for signature */}
       <div
@@ -147,6 +334,65 @@ function FollowupPage({
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
+            {sendMode === "BULK" && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                  marginBottom: "10px",
+                }}
+              >
+                <button
+                  onClick={() => handleBulkSend("sms")}
+                  disabled={sendingChannel !== null}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #6b7280",
+                    background:
+                      sendingChannel !== null ? "#f3f4f6" : "white",
+                    color: "#111827",
+                    cursor: sendingChannel !== null ? "default" : "pointer",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {sendingChannel === "sms"
+                    ? "Sending SMS..."
+                    : "Send SMS to selected"}
+                </button>
+                <button
+                  onClick={() => handleBulkSend("whatsapp")}
+                  disabled={sendingChannel !== null}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #22c55e",
+                    background:
+                      sendingChannel !== null ? "#dcfce7" : "#ecfdf3",
+                    color: "#15803d",
+                    cursor:
+                      sendingChannel !== null ? "default" : "pointer",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {sendingChannel === "whatsapp"
+                    ? "Sending WhatsApp..."
+                    : "Send WhatsApp to selected"}
+                </button>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    alignSelf: "center",
+                  }}
+                >
+                  Selected: {selectedPhones.length}
+                </span>
+              </div>
+            )}
             <table
               style={{
                 width: "100%",
@@ -161,6 +407,19 @@ function FollowupPage({
                     borderBottom: "1px solid #e5e7eb",
                   }}
                 >
+                  {sendMode === "BULK" && (
+                    <th style={{ padding: "6px 4px", width: "32px" }}>
+                      <input
+                        type="checkbox"
+                        checked={
+                          recipientsWithPhone.length > 0 &&
+                          selectedRecipients.length ===
+                            recipientsWithPhone.length
+                        }
+                        onChange={toggleAllRecipients}
+                      />
+                    </th>
+                  )}
                   <th style={{ padding: "6px 4px" }}>Name</th>
                   <th style={{ padding: "6px 4px" }}>Phone</th>
                   <th style={{ padding: "6px 4px" }}>Email</th>
@@ -186,6 +445,16 @@ function FollowupPage({
                         borderBottom: "1px solid #f3f4f6",
                       }}
                     >
+                      {sendMode === "BULK" && (
+                        <td style={{ padding: "6px 4px" }}>
+                          <input
+                            type="checkbox"
+                            disabled={!m.phone}
+                            checked={selectedRecipients.includes(m.id)}
+                            onChange={() => toggleRecipient(m.id)}
+                          />
+                        </td>
+                      )}
                       <td style={{ padding: "6px 4px" }}>
                         {m.firstName} {m.lastName}
                       </td>

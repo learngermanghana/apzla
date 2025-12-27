@@ -1,21 +1,7 @@
-const { admin, db, initError } = require('./lib/firestoreAdmin')
+const { db, initError } = require('./lib/firestoreAdmin')
+const verifyUser = require('./lib/verifyUser')
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY
-
-async function verifyUser(request) {
-  const authHeader = request.headers.authorization || ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return { error: { code: 401, message: 'Authorization token missing.' } }
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim()
-  try {
-    const decoded = await admin.auth().verifyIdToken(token)
-    return { uid: decoded.uid }
-  } catch (error) {
-    return { error: { code: 401, message: 'Invalid or expired authorization token.' } }
-  }
-}
 
 async function handler(request, response) {
   if (request.method !== 'POST') {

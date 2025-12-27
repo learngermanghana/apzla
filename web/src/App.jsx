@@ -6193,6 +6193,10 @@ function AppContent() {
             followupTelegramLink={followupTelegramLink}
             followupEmailLink={followupEmailLink}
             showToast={showToast}
+            churchId={userProfile.churchId}
+            smsCredits={churchPlan?.smsCredits ?? 0}
+            whatsappCredits={churchPlan?.whatsappCredits ?? 0}
+            user={user}
           />
         )}
 
