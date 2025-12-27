@@ -1,6 +1,6 @@
 import React from "react";
 
-function FollowupTab({
+function FollowupPage({
   followupPastorName,
   setFollowupPastorName,
   followupAudience,
@@ -466,4 +466,4 @@ function FollowupTab({
   );
 }
 
-export default FollowupTab;
+export default FollowupPage;
