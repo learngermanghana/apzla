@@ -27,8 +27,8 @@ import AuthPanel from "./components/auth/AuthPanel";
 import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
 import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
-import SermonsTab from "./components/tabs/SermonsTab";
-import FollowupTab from "./components/tabs/FollowupTab";
+import SermonsPage from "./modules/sermons/SermonsPage";
+import FollowupPage from "./modules/followup/FollowupPage";
 import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
@@ -6177,7 +6177,7 @@ function AppContent() {
         )}
 
         {activeTab === "followup" && (
-          <FollowupTab
+          <FollowupPage
             followupPastorName={followupPastorName}
             setFollowupPastorName={setFollowupPastorName}
             followupAudience={followupAudience}
@@ -6197,7 +6197,7 @@ function AppContent() {
         )}
 
         {activeTab === "sermons" && (
-          <SermonsTab
+          <SermonsPage
             sermonForm={sermonForm}
             setSermonForm={setSermonForm}
             handleCreateSermon={handleCreateSermon}

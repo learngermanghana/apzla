@@ -1,6 +1,6 @@
 import React from "react";
 
-function SermonsTab({
+function SermonsPage({
   sermonForm,
   setSermonForm,
   handleCreateSermon,
@@ -264,4 +264,4 @@ function SermonsTab({
   );
 }
 
-export default SermonsTab;
+export default SermonsPage;
