@@ -8,6 +8,17 @@ const normalizeChannel = (channel) => {
   return null
 }
 
+const getBundlesSnapshot = async () => {
+  const bundlesSnap = await db.collection('settings').doc('messagingBundles').get()
+  if (!bundlesSnap.exists) {
+    const error = new Error('Messaging bundles are not configured.')
+    error.statusCode = 500
+    throw error
+  }
+
+  return bundlesSnap.data() || {}
+}
+
 const getBundle = async ({ channel, bundleId }) => {
   const normalizedChannel = normalizeChannel(channel)
   if (!normalizedChannel) {
@@ -22,14 +33,7 @@ const getBundle = async ({ channel, bundleId }) => {
     throw error
   }
 
-  const bundlesSnap = await db.collection('settings').doc('messagingBundles').get()
-  if (!bundlesSnap.exists) {
-    const error = new Error('Messaging bundles are not configured.')
-    error.statusCode = 500
-    throw error
-  }
-
-  const bundles = bundlesSnap.data() || {}
+  const bundles = await getBundlesSnapshot()
   const bundleList = Array.isArray(bundles[normalizedChannel]) ? bundles[normalizedChannel] : []
   const bundle = bundleList.find((entry) => entry.id === bundleId)
 
@@ -42,4 +46,18 @@ const getBundle = async ({ channel, bundleId }) => {
   return { ...bundle, channel: normalizedChannel }
 }
 
-module.exports = { getBundle, normalizeChannel }
+const listBundles = async ({ channel }) => {
+  const normalizedChannel = normalizeChannel(channel)
+  if (!normalizedChannel) {
+    const error = new Error('Invalid channel provided.')
+    error.statusCode = 400
+    throw error
+  }
+
+  const bundles = await getBundlesSnapshot()
+  const bundleList = Array.isArray(bundles[normalizedChannel]) ? bundles[normalizedChannel] : []
+
+  return bundleList.map((bundle) => ({ ...bundle, channel: normalizedChannel }))
+}
+
+module.exports = { getBundle, listBundles, normalizeChannel }

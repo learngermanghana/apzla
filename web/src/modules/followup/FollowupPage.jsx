@@ -1,5 +1,10 @@
-import React, { useMemo, useState } from "react";
-import { sendBulkSms, sendBulkWhatsapp } from "../../utils/messageApi";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  fetchBundles,
+  sendBulkSms,
+  sendBulkWhatsapp,
+  startTopup,
+} from "../../utils/messageApi";
 
 function FollowupPage({
   followupPastorName,
@@ -25,6 +30,12 @@ function FollowupPage({
   const [sendMode, setSendMode] = useState("FREE");
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [sendingChannel, setSendingChannel] = useState(null);
+  const [topupChannel, setTopupChannel] = useState("sms");
+  const [bundleId, setBundleId] = useState("sms-100");
+  const [bundles, setBundles] = useState([]);
+  const [isPaying, setIsPaying] = useState(false);
+  const [isLoadingBundles, setIsLoadingBundles] = useState(false);
+  const [bundleError, setBundleError] = useState("");
   const bulkLimit = 50;
 
   const recipientsWithPhone = useMemo(
@@ -123,6 +134,82 @@ function FollowupPage({
     }
   };
 
+  useEffect(() => {
+    if (sendMode !== "BULK") {
+      return undefined;
+    }
+
+    if (!user) {
+      setBundles([]);
+      setBundleError("Sign in to view bundles.");
+      return undefined;
+    }
+
+    let isActive = true;
+
+    const loadBundles = async () => {
+      try {
+        setIsLoadingBundles(true);
+        setBundleError("");
+        const token = await user.getIdToken();
+        const bundleList = await fetchBundles({ channel: topupChannel, token });
+        if (!isActive) return;
+        setBundles(bundleList);
+        setBundleId((prev) =>
+          bundleList.some((bundle) => bundle.id === prev)
+            ? prev
+            : bundleList[0]?.id || ""
+        );
+      } catch (error) {
+        if (!isActive) return;
+        setBundles([]);
+        setBundleError(error.message || "Unable to load bundles.");
+      } finally {
+        if (isActive) {
+          setIsLoadingBundles(false);
+        }
+      }
+    };
+
+    loadBundles();
+
+    return () => {
+      isActive = false;
+    };
+  }, [sendMode, topupChannel, user]);
+
+  const handleBuyCredits = async () => {
+    if (!churchId) {
+      showToast("Church ID missing. Please reload and try again.", "error");
+      return;
+    }
+
+    if (!user) {
+      showToast("Please sign in again to buy credits.", "error");
+      return;
+    }
+
+    if (!bundleId) {
+      showToast("Select a bundle to continue.", "error");
+      return;
+    }
+
+    try {
+      setIsPaying(true);
+      const token = await user.getIdToken();
+      await startTopup({
+        churchId,
+        channel: topupChannel,
+        bundleId,
+        token,
+      });
+    } catch (error) {
+      showToast(error.message || "Could not start top-up.", "error");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   return (
     <>
       <p
@@ -214,6 +301,124 @@ function FollowupPage({
           >
             <span>SMS credits: {smsCredits}</span>
             <span>WhatsApp credits: {whatsappCredits}</span>
+          </div>
+          <div
+            style={{
+              marginTop: "12px",
+              padding: "10px 12px",
+              borderRadius: "10px",
+              border: "1px dashed #e5e7eb",
+              background: "#f9fafb",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#111827",
+              }}
+            >
+              Buy credits
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                }}
+              >
+                Channel
+                <select
+                  value={topupChannel}
+                  onChange={(event) => setTopupChannel(event.target.value)}
+                  style={{
+                    marginLeft: "6px",
+                    padding: "6px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "12px",
+                  }}
+                >
+                  <option value="sms">SMS</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </label>
+              <label
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                }}
+              >
+                Bundle
+                <select
+                  value={bundleId}
+                  onChange={(event) => setBundleId(event.target.value)}
+                  disabled={isLoadingBundles || bundles.length === 0}
+                  style={{
+                    marginLeft: "6px",
+                    padding: "6px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "12px",
+                    minWidth: "160px",
+                  }}
+                >
+                  {isLoadingBundles && (
+                    <option value="">Loading bundles...</option>
+                  )}
+                  {!isLoadingBundles && bundles.length === 0 && (
+                    <option value="">No bundles available</option>
+                  )}
+                  {bundles.map((bundle) => (
+                    <option key={bundle.id} value={bundle.id}>
+                      {bundle.name || bundle.label || bundle.id} · {bundle.credits}{" "}
+                      credits · GHS {bundle.priceGhs}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                onClick={handleBuyCredits}
+                disabled={
+                  isPaying ||
+                  isLoadingBundles ||
+                  !bundleId ||
+                  bundles.length === 0
+                }
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #111827",
+                  background: isPaying ? "#111827" : "#111827",
+                  color: "white",
+                  cursor:
+                    isPaying || isLoadingBundles || !bundleId
+                      ? "default"
+                      : "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  opacity:
+                    isPaying || isLoadingBundles || !bundleId ? 0.7 : 1,
+                }}
+              >
+                {isPaying ? "Starting payment..." : "Buy credits"}
+              </button>
+            </div>
+            {bundleError && (
+              <div style={{ fontSize: "12px", color: "#b91c1c" }}>
+                {bundleError}
+              </div>
+            )}
           </div>
         </div>
       )}
