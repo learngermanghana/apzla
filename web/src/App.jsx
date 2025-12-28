@@ -77,42 +77,17 @@ const memberAgeGroupDescriptions = {
   OVER_70: "Seniors",
 };
 
-const parseDateOfBirth = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  if (typeof value === "object") {
-    if (typeof value.toDate === "function") {
-      const parsed = value.toDate();
-      return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
-    }
-    if (typeof value.seconds === "number") {
-      const parsed = new Date(value.seconds * 1000);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-  }
-  return null;
-};
-
-const formatUpcomingBirthday = (value) => {
-  if (!value) return "-";
-  return value.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-};
-
 const formatDateOfBirth = (value) => {
-  const parsed = parseDateOfBirth(value);
-  if (!parsed) return "-";
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString();
 };
 
 const getAgeGroupFromDob = (dateOfBirth) => {
-  const dob = parseDateOfBirth(dateOfBirth);
-  if (!dob) return null;
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
   const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
   const hasBirthdayPassed =
@@ -126,17 +101,6 @@ const getAgeGroupFromDob = (dateOfBirth) => {
   if (age <= 39) return "18_TO_39";
   if (age <= 70) return "40_TO_70";
   return "OVER_70";
-};
-
-const getUpcomingBirthdayDate = (dateOfBirth, today = new Date()) => {
-  const dob = parseDateOfBirth(dateOfBirth);
-  if (!dob) return null;
-  const year = today.getFullYear();
-  let nextBirthday = new Date(year, dob.getMonth(), dob.getDate());
-  if (nextBirthday < today) {
-    nextBirthday = new Date(year + 1, dob.getMonth(), dob.getDate());
-  }
-  return nextBirthday;
 };
 
 function AppContent() {
