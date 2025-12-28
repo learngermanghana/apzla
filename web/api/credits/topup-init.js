@@ -101,19 +101,18 @@ async function handler(request, response) {
       })
     }
 
-    const ledgerRef = churchRef.collection('creditTransactions').doc(reference)
+    const topupRef = churchRef.collection('topups').doc(reference)
 
-    await ledgerRef.set({
-      type: 'TOPUP',
-      channel: channel.toUpperCase(),
-      credits: Number(bundle.credits) || 0,
+    await topupRef.set({
+      reference,
+      status: 'INIT',
+      channel,
+      units: Number(bundle.credits) || 0,
       amountGhs: Number(bundle.priceGhs),
-      paystackReference: reference,
-      status: 'pending',
+      feesEstimateGhs: null,
+      paystackEventId: null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      meta: {
-        bundleId,
-      },
+      paidAt: null,
     })
 
     return response.status(200).json({

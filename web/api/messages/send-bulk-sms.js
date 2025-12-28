@@ -26,12 +26,12 @@ const checkDailyLimit = async ({ churchRef, dailyLimit, requestedCount }) => {
   startOfDay.setHours(0, 0, 0, 0)
 
   const snapshot = await churchRef
-    .collection('messageJobs')
+    .collection('messageBatches')
     .where('createdAt', '>=', startOfDay)
     .get()
 
   const sentToday = snapshot.docs.reduce((total, doc) => {
-    return total + Number(doc.data()?.requestedCount || 0)
+    return total + Number(doc.data()?.recipientsCount || 0)
   }, 0)
 
   if (sentToday + requestedCount > Number(dailyLimit)) {
@@ -44,15 +44,15 @@ const checkDailyLimit = async ({ churchRef, dailyLimit, requestedCount }) => {
   return { ok: true }
 }
 
-const createMessageJobAndDebit = async ({
+const createMessageBatchAndReserve = async ({
   churchRef,
   message,
   requestedCount,
   creditsRequired,
   createdByUid,
 }) => {
-  const jobRef = churchRef.collection('messageJobs').doc()
-  const ledgerRef = churchRef.collection('creditTransactions').doc()
+  const batchRef = churchRef.collection('messageBatches').doc()
+  const ledgerRef = churchRef.collection('creditLedger').doc()
 
   await db.runTransaction(async (transaction) => {
     const churchSnap = await transaction.get(churchRef)
@@ -69,36 +69,34 @@ const createMessageJobAndDebit = async ({
 
     transaction.update(churchRef, {
       smsCredits: currentCredits - creditsRequired,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     })
 
-    transaction.set(jobRef, {
-      channel: 'SMS',
+    transaction.set(batchRef, {
+      channel: 'sms',
       message,
-      requestedCount,
+      recipientsCount: requestedCount,
+      reservedUnits: creditsRequired,
       sentCount: 0,
       failedCount: 0,
-      status: 'queued',
-      creditsDebited: creditsRequired,
+      status: 'QUEUED',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdByUid,
+      createdBy: createdByUid,
     })
 
     transaction.set(ledgerRef, {
-      type: 'DEBIT',
-      channel: 'SMS',
-      credits: creditsRequired,
-      status: 'confirmed',
+      type: 'RESERVE',
+      channel: 'sms',
+      units: -creditsRequired,
+      money: null,
+      paystackRef: null,
+      batchId: batchRef.id,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-      meta: {
-        reason: 'bulk_send',
-        jobId: jobRef.id,
-        provider: 'twilio',
-      },
+      createdBy: createdByUid,
     })
   })
 
-  return jobRef
+  return batchRef
 }
 
 const sendTwilioMessage = async ({ to, body }) => {
@@ -222,7 +220,7 @@ async function handler(request, response) {
     const creditsPerMessage = getCreditsPerMessage(churchData)
     const creditsRequired = recipients.length * creditsPerMessage
 
-    const jobRef = await createMessageJobAndDebit({
+    const batchRef = await createMessageBatchAndReserve({
       churchRef,
       message,
       requestedCount: recipients.length,
@@ -230,8 +228,8 @@ async function handler(request, response) {
       createdByUid: authResult.uid,
     })
 
-    await jobRef.update({
-      status: 'processing',
+    await batchRef.update({
+      status: 'SENDING',
       processingAt: admin.firestore.FieldValue.serverTimestamp(),
     })
 
@@ -264,7 +262,7 @@ async function handler(request, response) {
 
     const batch = db.batch()
     results.forEach((entry) => {
-      const recipientRef = jobRef.collection('recipients').doc()
+      const recipientRef = batchRef.collection('recipients').doc()
       batch.set(recipientRef, {
         phone: entry.recipient,
         status: entry.status,
@@ -273,52 +271,65 @@ async function handler(request, response) {
       })
     })
 
-    batch.update(jobRef, {
-      sentCount,
-      failedCount,
-      status: sentCount === 0 ? 'failed' : 'done',
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-    })
-
     await batch.commit()
 
-    if (failedCount > 0) {
-      const creditsToRefund = failedCount * creditsPerMessage
-      await db.runTransaction(async (transaction) => {
-        const churchSnap = await transaction.get(churchRef)
-        if (!churchSnap.exists) {
-          return
-        }
+    const sentUnits = sentCount * creditsPerMessage
+    const failedUnits = failedCount * creditsPerMessage
 
-        const currentCredits = Number(churchSnap.data()?.smsCredits ?? 0)
-        const refundRef = churchRef.collection('creditTransactions').doc()
+    await db.runTransaction(async (transaction) => {
+      const churchSnap = await transaction.get(churchRef)
+      if (!churchSnap.exists) {
+        return
+      }
 
+      const currentCredits = Number(churchSnap.data()?.smsCredits ?? 0)
+      const ledgerCollection = churchRef.collection('creditLedger')
+
+      if (failedUnits > 0) {
         transaction.update(churchRef, {
-          smsCredits: currentCredits + creditsToRefund,
+          smsCredits: currentCredits + failedUnits,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         })
-        transaction.set(refundRef, {
-          type: 'REFUND',
-          channel: 'SMS',
-          credits: creditsToRefund,
-          status: 'confirmed',
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-          meta: {
-            reason: 'failed_send',
-            jobId: jobRef.id,
-            provider: 'twilio',
-          },
-        })
-        transaction.update(jobRef, {
-          creditsRefunded: creditsToRefund,
-        })
+      }
+
+      transaction.update(batchRef, {
+        sentCount,
+        failedCount,
+        status: 'DONE',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
       })
-    }
+
+      if (sentUnits > 0) {
+        transaction.set(ledgerCollection.doc(), {
+          type: 'SPEND',
+          channel: 'sms',
+          units: -sentUnits,
+          money: null,
+          paystackRef: null,
+          batchId: batchRef.id,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: authResult.uid,
+        })
+      }
+
+      if (failedUnits > 0) {
+        transaction.set(ledgerCollection.doc(), {
+          type: 'REFUND',
+          channel: 'sms',
+          units: failedUnits,
+          money: null,
+          paystackRef: null,
+          batchId: batchRef.id,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: 'system',
+        })
+      }
+    })
 
     return response.status(200).json({
       status: 'success',
       data: {
-        jobId: jobRef.id,
+        batchId: batchRef.id,
         sent: sentCount,
         failed: failedCount,
         results,

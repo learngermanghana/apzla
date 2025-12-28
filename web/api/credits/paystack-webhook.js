@@ -48,6 +48,7 @@ async function handler(request, response) {
   const metadata = payload?.data?.metadata || {}
   const churchId = metadata?.churchId
   const channel = metadata?.channel
+  const paystackEventId = payload?.id || payload?.data?.id || null
 
   if (!reference || !churchId || !channel) {
     return response.status(400).json({
@@ -59,6 +60,26 @@ async function handler(request, response) {
   try {
     const verification = await verifyTransaction(reference)
     if (verification?.status !== 'success') {
+      const churchRef = db.collection('churches').doc(churchId)
+      const topupRef = churchRef.collection('topups').doc(reference)
+
+      await db.runTransaction(async (transaction) => {
+        const topupSnap = await transaction.get(topupRef)
+        if (!topupSnap.exists) {
+          return
+        }
+
+        const topup = topupSnap.data()
+        if (topup.status === 'PAID' || topup.status === 'FAILED') {
+          return
+        }
+
+        transaction.update(topupRef, {
+          status: 'FAILED',
+          paystackEventId,
+        })
+      })
+
       return response.status(200).json({
         status: 'success',
         message: 'Payment not successful. No credits applied.',
@@ -74,36 +95,52 @@ async function handler(request, response) {
     }
 
     const churchRef = db.collection('churches').doc(churchId)
-    const ledgerRef = churchRef.collection('creditTransactions').doc(reference)
+    const topupRef = churchRef.collection('topups').doc(reference)
+    const ledgerRef = churchRef.collection('creditLedger').doc()
 
     await db.runTransaction(async (transaction) => {
-      const [churchSnap, ledgerSnap] = await Promise.all([
+      const [churchSnap, topupSnap] = await Promise.all([
         transaction.get(churchRef),
-        transaction.get(ledgerRef),
+        transaction.get(topupRef),
       ])
 
       if (!churchSnap.exists) {
         throw new Error('Church not found.')
       }
 
-      if (!ledgerSnap.exists) {
-        throw new Error('Ledger transaction not found.')
+      if (!topupSnap.exists) {
+        throw new Error('Top-up record not found.')
       }
 
-      const ledger = ledgerSnap.data()
-      if (ledger.status === 'confirmed') {
+      const topup = topupSnap.data()
+      if (topup.status === 'PAID') {
         return
       }
 
-      const credits = Number(ledger.credits) || 0
+      const credits = Number(topup.units) || Number(metadata?.credits) || 0
       const currentCredits = Number(churchSnap.data()?.[creditsField] ?? 0)
 
       transaction.update(churchRef, {
         [creditsField]: currentCredits + credits,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })
-      transaction.update(ledgerRef, {
-        status: 'confirmed',
-        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      transaction.update(topupRef, {
+        status: 'PAID',
+        paystackEventId,
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+      transaction.set(ledgerRef, {
+        type: 'TOPUP',
+        channel,
+        units: credits,
+        money: {
+          amount: Number(topup.amountGhs) || null,
+          currency: 'GHS',
+        },
+        paystackRef: reference,
+        batchId: null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: 'system',
       })
     })
 
