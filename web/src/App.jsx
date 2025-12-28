@@ -2412,6 +2412,31 @@ function AppContent() {
     return stats;
   }, [members]);
 
+  const upcomingBirthdays = useMemo(() => {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const windowEnd = new Date(startOfToday);
+    windowEnd.setDate(windowEnd.getDate() + 30);
+
+    return members
+      .map((member) => {
+        const nextBirthday = getUpcomingBirthdayDate(member.dateOfBirth, startOfToday);
+        if (!nextBirthday) return null;
+        if (nextBirthday > windowEnd) return null;
+        const diffDays = Math.round(
+          (nextBirthday.getTime() - startOfToday.getTime()) / 86400000,
+        );
+        return {
+          id: member.id,
+          name: memberLookup.get(member.id) || member.id,
+          nextBirthday,
+          diffDays,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.diffDays - b.diffDays);
+  }, [members, memberLookup]);
+
   const combinedAttendanceRecords = useMemo(() => {
     const map = new Map();
 
@@ -3368,6 +3393,69 @@ function AppContent() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "10px",
+                }}
+              >
+                <div>
+                  <p className="eyebrow">People moments</p>
+                  <h3 style={{ margin: 0 }}>Upcoming birthdays</h3>
+                </div>
+                <span className="pill pill-muted">Next 30 days</span>
+              </div>
+
+              <div
+                style={{
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                  maxWidth: "520px",
+                }}
+              >
+                {upcomingBirthdays.length > 0 ? (
+                  <div style={{ display: "grid", gap: "8px" }}>
+                    {upcomingBirthdays.slice(0, 6).map((entry) => (
+                      <div
+                        key={entry.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{entry.name}</div>
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            {formatUpcomingBirthday(entry.nextBirthday)}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                          {entry.diffDays === 0
+                            ? "Today"
+                            : `In ${entry.diffDays} days`}
+                        </div>
+                      </div>
+                    ))}
+                    {upcomingBirthdays.length > 6 && (
+                      <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                        +{upcomingBirthdays.length - 6} more birthdays coming up
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                    Add dates of birth to start celebrating members.
+                  </div>
+                )}
               </div>
             </div>
 
