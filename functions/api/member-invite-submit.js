@@ -71,7 +71,8 @@ module.exports = async function handler(request, response) {
     })
   }
 
-  const { token, firstName, lastName, phone, email, status } = request.body || {}
+  const { token, firstName, lastName, phone, email, status, dateOfBirth } =
+    request.body || {}
 
   if (!token) {
     return response.status(400).json({
@@ -84,6 +85,7 @@ module.exports = async function handler(request, response) {
   const trimmedFirst = (firstName || '').trim()
   const trimmedLast = (lastName || '').trim()
   const trimmedEmail = (email || '').trim().toLowerCase()
+  const trimmedDob = typeof dateOfBirth === 'string' ? dateOfBirth.trim() : ''
 
   if (!trimmedFirst && !trimmedLast) {
     return response.status(400).json({
@@ -133,6 +135,7 @@ module.exports = async function handler(request, response) {
       phone: trimmedPhone,
       email: trimmedEmail,
       status: status || 'VISITOR',
+      ...(trimmedDob ? { dateOfBirth: trimmedDob } : {}),
       source: 'INVITE',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     })
