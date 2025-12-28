@@ -77,17 +77,28 @@ const memberAgeGroupDescriptions = {
   OVER_70: "Seniors",
 };
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "object" && typeof value.toDate === "function") {
+    const parsed = value.toDate();
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const formatDateOfBirth = (value) => {
   if (!value) return "-";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
+  const parsed = parseDateValue(value);
+  if (!parsed) return typeof value === "string" ? value : "-";
   return parsed.toLocaleDateString();
 };
 
 const getAgeGroupFromDob = (dateOfBirth) => {
   if (!dateOfBirth) return null;
-  const dob = new Date(dateOfBirth);
-  if (Number.isNaN(dob.getTime())) return null;
+  const dob = parseDateValue(dateOfBirth);
+  if (!dob) return null;
   const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
   const hasBirthdayPassed =
@@ -101,6 +112,26 @@ const getAgeGroupFromDob = (dateOfBirth) => {
   if (age <= 39) return "18_TO_39";
   if (age <= 70) return "40_TO_70";
   return "OVER_70";
+};
+
+const getUpcomingBirthdayDate = (dateOfBirth, startDate = new Date()) => {
+  const dob = parseDateValue(dateOfBirth);
+  if (!dob) return null;
+  const base = parseDateValue(startDate) || new Date();
+  const year = base.getFullYear();
+  const month = dob.getMonth();
+  const day = dob.getDate();
+  let nextBirthday = new Date(year, month, day);
+  if (nextBirthday < base) {
+    nextBirthday = new Date(year + 1, month, day);
+  }
+  return nextBirthday;
+};
+
+const formatUpcomingBirthday = (value) => {
+  const parsed = parseDateValue(value);
+  if (!parsed) return "-";
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
 function AppContent() {
