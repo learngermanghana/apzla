@@ -1,6 +1,6 @@
 // web/api/admin/seed-messaging-bundles.js
 const crypto = require('crypto')
-const { db, initError } = require('../lib/firestoreAdmin')
+const { db, initError } = require('../../lib/firestoreAdmin')
 
 const DEFAULT_BUNDLES = {
   sms: [

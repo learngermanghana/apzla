@@ -1,5 +1,5 @@
-const { admin, db, initError } = require('../lib/firestoreAdmin')
-const { verifyTransaction, verifySignature, getRawBody } = require('../lib/paystack')
+const { admin, db, initError } = require('../../lib/firestoreAdmin')
+const { verifyTransaction, verifySignature, getRawBody } = require('../../lib/paystack')
 
 const readRawBody = (request) =>
   new Promise((resolve, reject) => {
