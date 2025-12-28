@@ -1,0 +1,45 @@
+const { db } = require('./firestoreAdmin')
+
+const normalizeChannel = (channel) => {
+  if (!channel) return null
+  const normalized = String(channel).trim().toLowerCase()
+  if (normalized === 'sms') return 'sms'
+  if (normalized === 'whatsapp') return 'whatsapp'
+  return null
+}
+
+const getBundle = async ({ channel, bundleId }) => {
+  const normalizedChannel = normalizeChannel(channel)
+  if (!normalizedChannel) {
+    const error = new Error('Invalid channel provided.')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (!bundleId) {
+    const error = new Error('bundleId is required.')
+    error.statusCode = 400
+    throw error
+  }
+
+  const bundlesSnap = await db.collection('settings').doc('messagingBundles').get()
+  if (!bundlesSnap.exists) {
+    const error = new Error('Messaging bundles are not configured.')
+    error.statusCode = 500
+    throw error
+  }
+
+  const bundles = bundlesSnap.data() || {}
+  const bundleList = Array.isArray(bundles[normalizedChannel]) ? bundles[normalizedChannel] : []
+  const bundle = bundleList.find((entry) => entry.id === bundleId)
+
+  if (!bundle) {
+    const error = new Error('Bundle not found.')
+    error.statusCode = 404
+    throw error
+  }
+
+  return { ...bundle, channel: normalizedChannel }
+}
+
+module.exports = { getBundle, normalizeChannel }
