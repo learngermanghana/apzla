@@ -77,6 +77,32 @@ const memberAgeGroupDescriptions = {
   OVER_70: "Seniors",
 };
 
+const formatDateOfBirth = (value) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString();
+};
+
+const getAgeGroupFromDob = (dateOfBirth) => {
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const hasBirthdayPassed =
+    today.getMonth() > dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  if (!hasBirthdayPassed) {
+    age -= 1;
+  }
+  if (age < 0) return null;
+  if (age < 18) return "UNDER_18";
+  if (age <= 39) return "18_TO_39";
+  if (age <= 70) return "40_TO_70";
+  return "OVER_70";
+};
+
 function AppContent() {
   const {
     user,
@@ -148,7 +174,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
-    ageGroup: "18_TO_39",
+    dateOfBirth: "",
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -157,7 +183,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
-    ageGroup: "18_TO_39",
+    dateOfBirth: "",
   });
   const [memberSearch, setMemberSearch] = useState("");
 
@@ -170,17 +196,6 @@ function AppContent() {
     });
     return map;
   }, [members]);
-
-  const ageGroupLabelLookup = useMemo(() => {
-    const map = new Map();
-    memberAgeGroupOptions.forEach((opt) => map.set(opt.value, opt.label));
-    return map;
-  }, []);
-
-  const formatAgeGroup = useCallback(
-    (value) => ageGroupLabelLookup.get(value) || value || "-",
-    [ageGroupLabelLookup]
-  );
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -1112,7 +1127,7 @@ function AppContent() {
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
         status: memberForm.status,
-        ageGroup: memberForm.ageGroup,
+        dateOfBirth: memberForm.dateOfBirth,
         createdAt: new Date().toISOString(),
       });
 
@@ -1122,7 +1137,7 @@ function AppContent() {
         phone: "",
         email: "",
         status: "VISITOR",
-        ageGroup: "18_TO_39",
+        dateOfBirth: "",
       });
 
       await loadMembers();
@@ -1143,7 +1158,7 @@ function AppContent() {
       phone: member.phone || "",
       email: member.email || "",
       status: (member.status || "VISITOR").toUpperCase(),
-      ageGroup: (member.ageGroup || "18_TO_39").toUpperCase(),
+      dateOfBirth: member.dateOfBirth || "",
     });
   };
 
@@ -1155,7 +1170,7 @@ function AppContent() {
       phone: "",
       email: "",
       status: "VISITOR",
-      ageGroup: "18_TO_39",
+      dateOfBirth: "",
     });
   };
 
@@ -1176,7 +1191,7 @@ function AppContent() {
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
         status: editingMemberForm.status,
-        ageGroup: editingMemberForm.ageGroup,
+        dateOfBirth: editingMemberForm.dateOfBirth,
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(docRef, payload);
@@ -2357,7 +2372,10 @@ function AppContent() {
     const counts = new Map();
 
     members.forEach((member) => {
-      const normalized = (member.ageGroup || "UNSPECIFIED").toUpperCase();
+      const derivedGroup =
+        getAgeGroupFromDob(member.dateOfBirth) ||
+        (member.ageGroup ? member.ageGroup.toUpperCase() : "UNSPECIFIED");
+      const normalized = derivedGroup.toUpperCase();
       counts.set(normalized, (counts.get(normalized) || 0) + 1);
     });
 
@@ -4059,12 +4077,13 @@ function AppContent() {
                 <option value="OTHER">Other</option>
                 <option value="INACTIVE">Inactive</option>
               </select>
-              <select
-                value={memberForm.ageGroup}
+              <input
+                type="date"
+                value={memberForm.dateOfBirth}
                 onChange={(e) =>
                   setMemberForm((f) => ({
                     ...f,
-                    ageGroup: e.target.value,
+                    dateOfBirth: e.target.value,
                   }))
                 }
                 style={{
@@ -4074,13 +4093,7 @@ function AppContent() {
                   border: "1px solid #d1d5db",
                   fontSize: "14px",
                 }}
-              >
-                {memberAgeGroupOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <button
@@ -4186,7 +4199,7 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Phone</th>
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
-                          <th style={{ padding: "6px 4px" }}>Age group</th>
+                          <th style={{ padding: "6px 4px" }}>Date of birth</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
                         </tr>
                       </thead>
@@ -4325,12 +4338,13 @@ function AppContent() {
                               </td>
                               <td style={{ padding: "6px 4px" }}>
                                 {isEditing ? (
-                                  <select
-                                    value={editingMemberForm.ageGroup}
+                                  <input
+                                    type="date"
+                                    value={editingMemberForm.dateOfBirth}
                                     onChange={(e) =>
                                       setEditingMemberForm((f) => ({
                                         ...f,
-                                        ageGroup: e.target.value,
+                                        dateOfBirth: e.target.value,
                                       }))
                                     }
                                     style={{
@@ -4338,15 +4352,9 @@ function AppContent() {
                                       borderRadius: "6px",
                                       border: "1px solid #d1d5db",
                                     }}
-                                  >
-                                    {memberAgeGroupOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  />
                                 ) : (
-                                  <>{formatAgeGroup(m.ageGroup)}</>
+                                  <>{formatDateOfBirth(m.dateOfBirth)}</>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
