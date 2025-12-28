@@ -2548,6 +2548,10 @@ function AppContent() {
 
   const authValidationMessage = validateAuthInputs();
   const accessStatus = evaluateAccessStatus(churchPlan);
+  const smsCreditsPerMessage =
+    Number(churchPlan?.smsCreditPriceConfig?.creditsPerSms) || 1;
+  const whatsappCreditsPerMessage =
+    Number(churchPlan?.whatsappCreditPriceConfig?.creditsPerMsg) || 1;
 
   // ---------- UI: Auth screen ----------
   if (!user) {
@@ -6196,6 +6200,8 @@ function AppContent() {
             churchId={userProfile.churchId}
             smsCredits={churchPlan?.smsCredits ?? 0}
             whatsappCredits={churchPlan?.whatsappCredits ?? 0}
+            smsCreditsPerMessage={smsCreditsPerMessage}
+            whatsappCreditsPerMessage={whatsappCreditsPerMessage}
             user={user}
           />
         )}
