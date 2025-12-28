@@ -12,13 +12,6 @@ const statusOptions = [
   { value: "OTHER", label: "Other" },
 ];
 
-const ageGroupOptions = [
-  { value: "UNDER_18", label: "Under 18" },
-  { value: "18_TO_39", label: "18 - 39" },
-  { value: "40_TO_70", label: "40 - 70" },
-  { value: "OVER_70", label: "Over 70" },
-];
-
 export default function MemberInvitePage({ token: initialToken = "" }) {
   const [form, setForm] = useState({
     firstName: "",
@@ -26,7 +19,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     phone: "",
     email: "",
     status: "VISITOR",
-    ageGroup: "18_TO_39",
+    dateOfBirth: "",
   });
   const [token, setToken] = useState(initialToken || "");
   const [feedback, setFeedback] = useState({ ok: false, message: "" });
@@ -125,7 +118,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         phone: trimmedPhone,
         email: trimmedEmail,
         status: form.status,
-        ageGroup: form.ageGroup,
+        dateOfBirth: "",
       });
     } catch (err) {
       console.error("Invite submit error", err);
@@ -207,17 +200,15 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
             </label>
 
             <label className="checkin-field">
-              <span>Age group</span>
-              <select
-                value={form.ageGroup}
-                onChange={(e) => updateField("ageGroup", e.target.value)}
-              >
-                {ageGroupOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <span>Date of birth</span>
+              <input
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(e) => updateField("dateOfBirth", e.target.value)}
+              />
+              <div className="checkin-help-text">
+                We use this to place you in the right age group.
+              </div>
             </label>
 
             <label className="checkin-field">
