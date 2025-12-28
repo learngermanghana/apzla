@@ -1,6 +1,23 @@
 const { admin, db, initError } = require('../lib/firestoreAdmin')
 const { verifyTransaction, verifySignature, getRawBody } = require('../lib/paystack')
 
+const readRawBody = (request) =>
+  new Promise((resolve, reject) => {
+    const existingBody = getRawBody(request)
+    if (existingBody) {
+      resolve(existingBody)
+      return
+    }
+
+    let data = ''
+    request.setEncoding('utf8')
+    request.on('data', (chunk) => {
+      data += chunk
+    })
+    request.on('end', () => resolve(data))
+    request.on('error', reject)
+  })
+
 const getChannelCreditsField = (channel) => {
   if (channel === 'sms') return 'smsCredits'
   if (channel === 'whatsapp') return 'whatsappCredits'
@@ -23,7 +40,7 @@ async function handler(request, response) {
   }
 
   const signature = request.headers['x-paystack-signature']
-  const rawBody = getRawBody(request)
+  const rawBody = await readRawBody(request)
 
   if (!verifySignature({ signature, rawBody })) {
     return response.status(400).json({
@@ -33,6 +50,17 @@ async function handler(request, response) {
   }
 
   let payload = request.body
+  if (!payload) {
+    try {
+      payload = JSON.parse(rawBody)
+    } catch (error) {
+      return response.status(400).json({
+        status: 'error',
+        message: 'Invalid Paystack payload.',
+      })
+    }
+  }
+
   if (typeof payload === 'string') {
     try {
       payload = JSON.parse(payload)
@@ -157,3 +185,8 @@ async function handler(request, response) {
 }
 
 module.exports = handler
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
+}

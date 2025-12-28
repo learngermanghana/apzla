@@ -25,6 +25,8 @@ function FollowupPage({
   churchId,
   smsCredits,
   whatsappCredits,
+  smsCreditsPerMessage,
+  whatsappCreditsPerMessage,
   user,
 }) {
   const [sendMode, setSendMode] = useState("FREE");
@@ -102,7 +104,10 @@ function FollowupPage({
 
     const availableCredits =
       channel === "sms" ? smsCredits : whatsappCredits;
-    if (availableCredits < selectedPhones.length) {
+    const creditsPerMessage =
+      channel === "sms" ? smsCreditsPerMessage : whatsappCreditsPerMessage;
+    const creditsRequired = selectedPhones.length * creditsPerMessage;
+    if (availableCredits < creditsRequired) {
       showToast("Not enough credits to send to all selected recipients.", "error");
       return;
     }
