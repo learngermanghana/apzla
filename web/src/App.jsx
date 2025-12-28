@@ -77,11 +77,6 @@ const memberAgeGroupDescriptions = {
   OVER_70: "Seniors",
 };
 
-const formatUpcomingBirthday = (value) => {
-  if (!value) return "-";
-  return value.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-};
-
 const formatDateOfBirth = (value) => {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -106,18 +101,6 @@ const getAgeGroupFromDob = (dateOfBirth) => {
   if (age <= 39) return "18_TO_39";
   if (age <= 70) return "40_TO_70";
   return "OVER_70";
-};
-
-const getUpcomingBirthdayDate = (dateOfBirth, today = new Date()) => {
-  if (!dateOfBirth) return null;
-  const dob = new Date(dateOfBirth);
-  if (Number.isNaN(dob.getTime())) return null;
-  const year = today.getFullYear();
-  let nextBirthday = new Date(year, dob.getMonth(), dob.getDate());
-  if (nextBirthday < today) {
-    nextBirthday = new Date(year + 1, dob.getMonth(), dob.getDate());
-  }
-  return nextBirthday;
 };
 
 function AppContent() {
