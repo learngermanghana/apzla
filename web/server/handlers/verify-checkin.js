@@ -46,18 +46,46 @@ async function recordNonceVerification(nonce, metadata) {
   await db.collection(nonceCollection).doc(nonce).set(updateData, { merge: true })
 }
 
-async function findMemberByPhone(churchId, phone) {
-  const normalizedPhone = `${phone || ''}`.trim()
-  if (!normalizedPhone) return null
+function normalizePhone(phoneRaw) {
+  const p = `${phoneRaw || ''}`.trim()
+  if (!p) return ''
 
-  const snap = await db
-    .collection('members')
-    .where('churchId', '==', churchId)
-    .where('phone', '==', normalizedPhone)
-    .limit(1)
-    .get()
+  let digits = p.replace(/[^\d+]/g, '')
 
-  return snap.empty ? null : snap.docs[0]
+  if (digits.startsWith('+233')) digits = `0${digits.slice(4)}`
+  if (digits.startsWith('233')) digits = `0${digits.slice(3)}`
+
+  return digits
+}
+
+async function findMemberByPhone(churchId, phoneRaw) {
+  const trimmed = `${phoneRaw || ''}`.trim()
+  const normalized = normalizePhone(phoneRaw)
+  if (!trimmed && !normalized) return null
+
+  if (trimmed) {
+    const snap = await db
+      .collection('members')
+      .where('churchId', '==', churchId)
+      .where('phone', '==', trimmed)
+      .limit(1)
+      .get()
+
+    if (!snap.empty) return snap.docs[0]
+  }
+
+  if (normalized && normalized !== trimmed) {
+    const snap = await db
+      .collection('members')
+      .where('churchId', '==', churchId)
+      .where('phone', '==', normalized)
+      .limit(1)
+      .get()
+
+    if (!snap.empty) return snap.docs[0]
+  }
+
+  return null
 }
 
 async function getChurchName(churchId) {
