@@ -494,6 +494,7 @@ function AppContent() {
             parsed.baseUrl || prev.baseUrl || defaultBaseUrl
           ),
           serviceDate: parsed.serviceDate || prev.serviceDate || todayStr,
+          churchId: userProfile?.churchId || prev.churchId || "",
         }));
         return;
       }
@@ -504,11 +505,12 @@ function AppContent() {
     } catch (err) {
       console.error("Restore check-in token form failed:", err);
     }
-  }, [defaultBaseUrl, todayStr, normalizeBaseUrlMemo]);
+  }, [defaultBaseUrl, todayStr, normalizeBaseUrlMemo, userProfile?.churchId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem("checkinTokenForm", JSON.stringify(checkinTokenForm));
+    const { churchId, ...storedForm } = checkinTokenForm;
+    localStorage.setItem("checkinTokenForm", JSON.stringify(storedForm));
   }, [checkinTokenForm]);
 
   // ---------- Reset data when auth user changes ----------
@@ -524,7 +526,7 @@ function AppContent() {
   useEffect(() => {
     setCheckinTokenForm((prev) => ({
       ...prev,
-      churchId: prev.churchId || userProfile?.churchId || "",
+      churchId: userProfile?.churchId || "",
       baseUrl: normalizeBaseUrlMemo(prev.baseUrl || defaultBaseUrl),
     }));
   }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrlMemo]);
@@ -1544,16 +1546,17 @@ function AppContent() {
   const issueCheckinToken = async (event) => {
     event.preventDefault();
 
+    const churchId = userProfile?.churchId || "";
     const payload = {
       ...checkinTokenForm,
-      churchId: checkinTokenForm.churchId.trim(),
+      churchId: churchId.trim(),
       serviceDate: checkinTokenForm.serviceDate,
       serviceType: checkinTokenForm.serviceType.trim(),
       baseUrl: checkinTokenForm.baseUrl.trim(),
     };
 
     if (!payload.churchId || !payload.serviceDate) {
-      setCheckinTokenError("Church ID and service date are required.");
+      setCheckinTokenError("Link a church and pick a service date.");
       return;
     }
 
@@ -5275,14 +5278,10 @@ function AppContent() {
                             <span>Church ID*</span>
                             <input
                               type="text"
-                              value={checkinTokenForm.churchId}
-                              onChange={(e) =>
-                                setCheckinTokenForm((prev) => ({
-                                  ...prev,
-                                  churchId: e.target.value,
-                                }))
-                              }
-                              placeholder="e.g. church document ID"
+                              value={userProfile?.churchId || ""}
+                              readOnly
+                              disabled
+                              placeholder="Link a church to continue"
                             />
                           </label>
 
