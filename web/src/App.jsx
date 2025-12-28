@@ -77,6 +77,68 @@ const memberAgeGroupDescriptions = {
   OVER_70: "Seniors",
 };
 
+const parseDateOfBirth = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === "object") {
+    if (typeof value.toDate === "function") {
+      const parsed = value.toDate();
+      return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
+    }
+    if (typeof value.seconds === "number") {
+      const parsed = new Date(value.seconds * 1000);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  return null;
+};
+
+const formatUpcomingBirthday = (value) => {
+  if (!value) return "-";
+  return value.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+const formatDateOfBirth = (value) => {
+  const parsed = parseDateOfBirth(value);
+  if (!parsed) return "-";
+  return parsed.toLocaleDateString();
+};
+
+const getAgeGroupFromDob = (dateOfBirth) => {
+  const dob = parseDateOfBirth(dateOfBirth);
+  if (!dob) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const hasBirthdayPassed =
+    today.getMonth() > dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  if (!hasBirthdayPassed) {
+    age -= 1;
+  }
+  if (age < 0) return null;
+  if (age < 18) return "UNDER_18";
+  if (age <= 39) return "18_TO_39";
+  if (age <= 70) return "40_TO_70";
+  return "OVER_70";
+};
+
+const getUpcomingBirthdayDate = (dateOfBirth, today = new Date()) => {
+  const dob = parseDateOfBirth(dateOfBirth);
+  if (!dob) return null;
+  const year = today.getFullYear();
+  let nextBirthday = new Date(year, dob.getMonth(), dob.getDate());
+  if (nextBirthday < today) {
+    nextBirthday = new Date(year + 1, dob.getMonth(), dob.getDate());
+  }
+  return nextBirthday;
+};
+
 function AppContent() {
   const {
     user,
@@ -148,7 +210,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
-    ageGroup: "18_TO_39",
+    dateOfBirth: "",
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -157,7 +219,7 @@ function AppContent() {
     phone: "",
     email: "",
     status: "VISITOR",
-    ageGroup: "18_TO_39",
+    dateOfBirth: "",
   });
   const [memberSearch, setMemberSearch] = useState("");
 
@@ -170,17 +232,6 @@ function AppContent() {
     });
     return map;
   }, [members]);
-
-  const ageGroupLabelLookup = useMemo(() => {
-    const map = new Map();
-    memberAgeGroupOptions.forEach((opt) => map.set(opt.value, opt.label));
-    return map;
-  }, []);
-
-  const formatAgeGroup = useCallback(
-    (value) => ageGroupLabelLookup.get(value) || value || "-",
-    [ageGroupLabelLookup]
-  );
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -1112,7 +1163,7 @@ function AppContent() {
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
         status: memberForm.status,
-        ageGroup: memberForm.ageGroup,
+        dateOfBirth: memberForm.dateOfBirth,
         createdAt: new Date().toISOString(),
       });
 
@@ -1122,7 +1173,7 @@ function AppContent() {
         phone: "",
         email: "",
         status: "VISITOR",
-        ageGroup: "18_TO_39",
+        dateOfBirth: "",
       });
 
       await loadMembers();
@@ -1143,7 +1194,7 @@ function AppContent() {
       phone: member.phone || "",
       email: member.email || "",
       status: (member.status || "VISITOR").toUpperCase(),
-      ageGroup: (member.ageGroup || "18_TO_39").toUpperCase(),
+      dateOfBirth: member.dateOfBirth || "",
     });
   };
 
@@ -1155,7 +1206,7 @@ function AppContent() {
       phone: "",
       email: "",
       status: "VISITOR",
-      ageGroup: "18_TO_39",
+      dateOfBirth: "",
     });
   };
 
@@ -1176,7 +1227,7 @@ function AppContent() {
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
         status: editingMemberForm.status,
-        ageGroup: editingMemberForm.ageGroup,
+        dateOfBirth: editingMemberForm.dateOfBirth,
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(docRef, payload);
@@ -2357,7 +2408,10 @@ function AppContent() {
     const counts = new Map();
 
     members.forEach((member) => {
-      const normalized = (member.ageGroup || "UNSPECIFIED").toUpperCase();
+      const derivedGroup =
+        getAgeGroupFromDob(member.dateOfBirth) ||
+        (member.ageGroup ? member.ageGroup.toUpperCase() : "UNSPECIFIED");
+      const normalized = derivedGroup.toUpperCase();
       counts.set(normalized, (counts.get(normalized) || 0) + 1);
     });
 
@@ -2393,6 +2447,31 @@ function AppContent() {
 
     return stats;
   }, [members]);
+
+  const upcomingBirthdays = useMemo(() => {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const windowEnd = new Date(startOfToday);
+    windowEnd.setDate(windowEnd.getDate() + 30);
+
+    return members
+      .map((member) => {
+        const nextBirthday = getUpcomingBirthdayDate(member.dateOfBirth, startOfToday);
+        if (!nextBirthday) return null;
+        if (nextBirthday > windowEnd) return null;
+        const diffDays = Math.round(
+          (nextBirthday.getTime() - startOfToday.getTime()) / 86400000,
+        );
+        return {
+          id: member.id,
+          name: memberLookup.get(member.id) || member.id,
+          nextBirthday,
+          diffDays,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.diffDays - b.diffDays);
+  }, [members, memberLookup]);
 
   const combinedAttendanceRecords = useMemo(() => {
     const map = new Map();
@@ -3353,6 +3432,69 @@ function AppContent() {
               </div>
             </div>
 
+            <div style={{ marginBottom: "20px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "10px",
+                }}
+              >
+                <div>
+                  <p className="eyebrow">People moments</p>
+                  <h3 style={{ margin: 0 }}>Upcoming birthdays</h3>
+                </div>
+                <span className="pill pill-muted">Next 30 days</span>
+              </div>
+
+              <div
+                style={{
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                  maxWidth: "520px",
+                }}
+              >
+                {upcomingBirthdays.length > 0 ? (
+                  <div style={{ display: "grid", gap: "8px" }}>
+                    {upcomingBirthdays.slice(0, 6).map((entry) => (
+                      <div
+                        key={entry.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{entry.name}</div>
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            {formatUpcomingBirthday(entry.nextBirthday)}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                          {entry.diffDays === 0
+                            ? "Today"
+                            : `In ${entry.diffDays} days`}
+                        </div>
+                      </div>
+                    ))}
+                    {upcomingBirthdays.length > 6 && (
+                      <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                        +{upcomingBirthdays.length - 6} more birthdays coming up
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                    Add dates of birth to start celebrating members.
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Attendance summary */}
             <div style={{ marginBottom: "20px" }}>
               <h3
@@ -4059,12 +4201,13 @@ function AppContent() {
                 <option value="OTHER">Other</option>
                 <option value="INACTIVE">Inactive</option>
               </select>
-              <select
-                value={memberForm.ageGroup}
+              <input
+                type="date"
+                value={memberForm.dateOfBirth}
                 onChange={(e) =>
                   setMemberForm((f) => ({
                     ...f,
-                    ageGroup: e.target.value,
+                    dateOfBirth: e.target.value,
                   }))
                 }
                 style={{
@@ -4074,13 +4217,7 @@ function AppContent() {
                   border: "1px solid #d1d5db",
                   fontSize: "14px",
                 }}
-              >
-                {memberAgeGroupOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <button
@@ -4186,7 +4323,7 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Phone</th>
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
-                          <th style={{ padding: "6px 4px" }}>Age group</th>
+                          <th style={{ padding: "6px 4px" }}>Date of birth</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
                         </tr>
                       </thead>
@@ -4325,12 +4462,13 @@ function AppContent() {
                               </td>
                               <td style={{ padding: "6px 4px" }}>
                                 {isEditing ? (
-                                  <select
-                                    value={editingMemberForm.ageGroup}
+                                  <input
+                                    type="date"
+                                    value={editingMemberForm.dateOfBirth}
                                     onChange={(e) =>
                                       setEditingMemberForm((f) => ({
                                         ...f,
-                                        ageGroup: e.target.value,
+                                        dateOfBirth: e.target.value,
                                       }))
                                     }
                                     style={{
@@ -4338,15 +4476,9 @@ function AppContent() {
                                       borderRadius: "6px",
                                       border: "1px solid #d1d5db",
                                     }}
-                                  >
-                                    {memberAgeGroupOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  />
                                 ) : (
-                                  <>{formatAgeGroup(m.ageGroup)}</>
+                                  <>{formatDateOfBirth(m.dateOfBirth)}</>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
