@@ -1,6 +1,6 @@
 const crypto = require('crypto')
-const { admin, db, initError } = require('./lib/firestoreAdmin')
-const { signJwt } = require('./lib/jwtHelpers')
+const { admin, db, initError } = require('../lib/firestoreAdmin')
+const { signJwt } = require('../lib/jwtHelpers')
 
 const jwtSecret = process.env.CHECKIN_JWT_SECRET
 const nonceCollection = process.env.FIRESTORE_CHECKIN_COLLECTION || 'checkinNonces'

@@ -1,7 +1,7 @@
-const { admin, db, initError } = require('../lib/firestoreAdmin')
-const verifyUser = require('../lib/verifyUser')
-const ensureChurchAccess = require('../lib/ensureChurchAccess')
-const { normalizePhone } = require('../lib/phone')
+const { admin, db, initError } = require('../../lib/firestoreAdmin')
+const verifyUser = require('../../lib/verifyUser')
+const ensureChurchAccess = require('../../lib/ensureChurchAccess')
+const { normalizePhone } = require('../../lib/phone')
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN

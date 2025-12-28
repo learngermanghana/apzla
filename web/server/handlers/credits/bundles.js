@@ -1,6 +1,6 @@
-const { initError } = require('../lib/firestoreAdmin')
-const verifyUser = require('../lib/verifyUser')
-const { listBundles, normalizeChannel } = require('../lib/messagingBundles')
+const { initError } = require('../../lib/firestoreAdmin')
+const verifyUser = require('../../lib/verifyUser')
+const { listBundles, normalizeChannel } = require('../../lib/messagingBundles')
 
 async function handler(request, response) {
   if (request.method !== 'GET') {

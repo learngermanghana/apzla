@@ -1,8 +1,8 @@
-const { admin, db, initError } = require('../lib/firestoreAdmin')
-const verifyUser = require('../lib/verifyUser')
-const ensureChurchAccess = require('../lib/ensureChurchAccess')
-const { getBundle, normalizeChannel } = require('../lib/messagingBundles')
-const { initializeTransaction } = require('../lib/paystack')
+const { admin, db, initError } = require('../../lib/firestoreAdmin')
+const verifyUser = require('../../lib/verifyUser')
+const ensureChurchAccess = require('../../lib/ensureChurchAccess')
+const { getBundle, normalizeChannel } = require('../../lib/messagingBundles')
+const { initializeTransaction } = require('../../lib/paystack')
 
 const toPaystackAmount = (priceGhs) => Math.round(Number(priceGhs) * 100)
 
