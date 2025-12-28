@@ -1,5 +1,7 @@
 const { admin, db, initError } = require('../lib/firestoreAdmin')
 const verifyUser = require('../lib/verifyUser')
+const ensureChurchAccess = require('../lib/ensureChurchAccess')
+const { normalizePhone } = require('../lib/phone')
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
@@ -7,36 +9,96 @@ const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM
 
 const MAX_RECIPIENTS = 50
 
-const normalizeRecipient = (value) => {
-  if (!value) return null
-  const trimmed = String(value).trim()
-  if (!trimmed) return null
-  const cleaned = trimmed.replace(/[\s()-]/g, '')
-  if (!cleaned) return null
-  if (cleaned.startsWith('+')) return cleaned
-  if (cleaned.startsWith('00')) return `+${cleaned.slice(2)}`
-  return `+${cleaned}`
+const getCreditsPerMessage = (churchData) => {
+  const configured = Number(churchData?.whatsappCreditPriceConfig?.creditsPerMsg)
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured
+  }
+  return 1
 }
 
-const ensureCredits = async ({ churchRef, creditsField, count }) => {
-  try {
-    await db.runTransaction(async (transaction) => {
-      const churchSnap = await transaction.get(churchRef)
-      const currentCredits = Number(churchSnap.data()?.[creditsField] ?? 0)
-      if (currentCredits < count) {
-        throw new Error('NOT_ENOUGH_CREDITS')
-      }
-      transaction.update(churchRef, {
-        [creditsField]: currentCredits - count,
-      })
-    })
-    return { ok: true }
-  } catch (error) {
-    if (error.message === 'NOT_ENOUGH_CREDITS') {
-      return { ok: false, code: 402, message: 'Not enough credits.' }
-    }
-    throw error
+const checkDailyLimit = async ({ churchRef, dailyLimit, requestedCount }) => {
+  if (!dailyLimit || !Number.isFinite(Number(dailyLimit))) {
+    return null
   }
+
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+
+  const snapshot = await churchRef
+    .collection('messageJobs')
+    .where('createdAt', '>=', startOfDay)
+    .get()
+
+  const sentToday = snapshot.docs.reduce((total, doc) => {
+    return total + Number(doc.data()?.requestedCount || 0)
+  }, 0)
+
+  if (sentToday + requestedCount > Number(dailyLimit)) {
+    return {
+      ok: false,
+      message: `Daily limit of ${dailyLimit} messages exceeded.`,
+    }
+  }
+
+  return { ok: true }
+}
+
+const createMessageJobAndDebit = async ({
+  churchRef,
+  message,
+  requestedCount,
+  creditsRequired,
+  createdByUid,
+}) => {
+  const jobRef = churchRef.collection('messageJobs').doc()
+  const ledgerRef = churchRef.collection('creditTransactions').doc()
+
+  await db.runTransaction(async (transaction) => {
+    const churchSnap = await transaction.get(churchRef)
+    if (!churchSnap.exists) {
+      throw new Error('Church not found.')
+    }
+
+    const currentCredits = Number(churchSnap.data()?.whatsappCredits ?? 0)
+    if (currentCredits < creditsRequired) {
+      const error = new Error('NOT_ENOUGH_CREDITS')
+      error.statusCode = 402
+      throw error
+    }
+
+    transaction.update(churchRef, {
+      whatsappCredits: currentCredits - creditsRequired,
+    })
+
+    transaction.set(jobRef, {
+      channel: 'WHATSAPP',
+      message,
+      requestedCount,
+      sentCount: 0,
+      failedCount: 0,
+      status: 'queued',
+      creditsDebited: creditsRequired,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdByUid,
+    })
+
+    transaction.set(ledgerRef, {
+      type: 'DEBIT',
+      channel: 'WHATSAPP',
+      credits: creditsRequired,
+      status: 'confirmed',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      meta: {
+        reason: 'bulk_send',
+        jobId: jobRef.id,
+        provider: 'twilio',
+      },
+    })
+  })
+
+  return jobRef
 }
 
 const sendTwilioMessage = async ({ to, body }) => {
@@ -109,9 +171,7 @@ async function handler(request, response) {
     })
   }
 
-  const recipients = [
-    ...new Set(recipientsInput.map(normalizeRecipient).filter(Boolean)),
-  ]
+  const recipients = [...new Set(recipientsInput.map(normalizePhone).filter(Boolean))]
 
   if (recipients.length === 0) {
     return response.status(400).json({
@@ -136,47 +196,46 @@ async function handler(request, response) {
   }
 
   try {
-    const userDoc = await db.collection('users').doc(authResult.uid).get()
-    const userData = userDoc.exists ? userDoc.data() : null
-
-    if (userData?.churchId && userData.churchId !== churchId) {
-      return response.status(403).json({
-        status: 'error',
-        message: 'You are not allowed to manage this church.',
-      })
-    }
-
-    const churchRef = db.collection('churches').doc(churchId)
-    const churchSnap = await churchRef.get()
-
-    if (!churchSnap.exists) {
-      return response.status(404).json({
-        status: 'error',
-        message: 'Church not found.',
-      })
-    }
-
-    const church = churchSnap.data()
-
-    if (church.ownerUserId && church.ownerUserId !== authResult.uid) {
-      return response.status(403).json({
-        status: 'error',
-        message: 'You are not allowed to manage this church.',
-      })
-    }
-
-    const creditsCheck = await ensureCredits({
-      churchRef,
-      creditsField: 'whatsappCredits',
-      count: recipients.length,
+    const { churchRef, churchData } = await ensureChurchAccess({
+      uid: authResult.uid,
+      churchId,
     })
 
-    if (!creditsCheck.ok) {
-      return response.status(creditsCheck.code).json({
+    if (churchData?.messaging?.enabled === false) {
+      return response.status(403).json({
         status: 'error',
-        message: creditsCheck.message,
+        message: 'Messaging is disabled for this church.',
       })
     }
+
+    const dailyLimitCheck = await checkDailyLimit({
+      churchRef,
+      dailyLimit: churchData?.messaging?.dailyLimit,
+      requestedCount: recipients.length,
+    })
+
+    if (dailyLimitCheck && dailyLimitCheck.ok === false) {
+      return response.status(403).json({
+        status: 'error',
+        message: dailyLimitCheck.message,
+      })
+    }
+
+    const creditsPerMessage = getCreditsPerMessage(churchData)
+    const creditsRequired = recipients.length * creditsPerMessage
+
+    const jobRef = await createMessageJobAndDebit({
+      churchRef,
+      message,
+      requestedCount: recipients.length,
+      creditsRequired,
+      createdByUid: authResult.uid,
+    })
+
+    await jobRef.update({
+      status: 'processing',
+      processingAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
 
     const results = await Promise.all(
       recipients.map(async (recipient) => {
@@ -188,48 +247,95 @@ async function handler(request, response) {
           return {
             recipient,
             status: result.ok ? 'sent' : 'failed',
-            providerMessage: result.ok ? result.data?.sid : null,
+            providerMessageId: result.ok ? result.data?.sid : null,
             error: result.ok ? null : result.errorMessage,
           }
         } catch (error) {
           return {
             recipient,
             status: 'failed',
-            providerMessage: null,
+            providerMessageId: null,
             error: error.message || 'Failed to send.',
           }
         }
       })
     )
 
+    const sentCount = results.filter((entry) => entry.status === 'sent').length
+    const failedCount = results.length - sentCount
+
     const batch = db.batch()
-    const logsRef = churchRef.collection('messageLogs')
     results.forEach((entry) => {
-      const logRef = logsRef.doc()
-      batch.set(logRef, {
-        channel: 'whatsapp',
-        provider: 'twilio',
-        recipient: entry.recipient,
-        message,
+      const recipientRef = jobRef.collection('recipients').doc()
+      batch.set(recipientRef, {
+        phone: entry.recipient,
         status: entry.status,
-        providerMessage: entry.providerMessage,
+        providerMessageId: entry.providerMessageId,
         error: entry.error,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       })
     })
+
+    batch.update(jobRef, {
+      sentCount,
+      failedCount,
+      status: sentCount === 0 ? 'failed' : 'done',
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+
     await batch.commit()
+
+    if (failedCount > 0) {
+      const creditsToRefund = failedCount * creditsPerMessage
+      await db.runTransaction(async (transaction) => {
+        const churchSnap = await transaction.get(churchRef)
+        if (!churchSnap.exists) {
+          return
+        }
+
+        const currentCredits = Number(churchSnap.data()?.whatsappCredits ?? 0)
+        const refundRef = churchRef.collection('creditTransactions').doc()
+
+        transaction.update(churchRef, {
+          whatsappCredits: currentCredits + creditsToRefund,
+        })
+        transaction.set(refundRef, {
+          type: 'REFUND',
+          channel: 'WHATSAPP',
+          credits: creditsToRefund,
+          status: 'confirmed',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          meta: {
+            reason: 'failed_send',
+            jobId: jobRef.id,
+            provider: 'twilio',
+          },
+        })
+        transaction.update(jobRef, {
+          creditsRefunded: creditsToRefund,
+        })
+      })
+    }
 
     return response.status(200).json({
       status: 'success',
       data: {
-        sent: results.filter((entry) => entry.status === 'sent').length,
-        failed: results.filter((entry) => entry.status === 'failed').length,
+        jobId: jobRef.id,
+        sent: sentCount,
+        failed: failedCount,
         results,
       },
       message: 'Bulk WhatsApp sent.',
     })
   } catch (error) {
-    return response.status(500).json({
+    if (error.message === 'NOT_ENOUGH_CREDITS') {
+      return response.status(402).json({
+        status: 'error',
+        message: 'Not enough credits.',
+      })
+    }
+
+    return response.status(error.statusCode || 500).json({
       status: 'error',
       message: error.message || 'Unable to send bulk WhatsApp.',
     })
