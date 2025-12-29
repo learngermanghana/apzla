@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../checkin/checkin.css";
-import StatusBanner from "../StatusBanner";
+import { isValidEmail } from "../../utils/validation";
 
 const statusOptions = [
   { value: "VISITOR", label: "Visitor" },
@@ -13,6 +13,7 @@ const statusOptions = [
 ];
 
 export default function MemberInvitePage({ token: initialToken = "" }) {
+  const [language, setLanguage] = useState("en");
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -22,6 +23,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     dateOfBirth: "",
   });
   const [token, setToken] = useState(initialToken || "");
+  const [currentStep, setCurrentStep] = useState(0);
   const [feedback, setFeedback] = useState({ ok: false, message: "" });
   const [statusTone, setStatusTone] = useState("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +50,63 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     setToken((prev) => (prev?.trim() ? prev : tokenFromUrl));
   }, [tokenFromUrl]);
 
+  useEffect(() => {
+    setFeedback({ ok: false, message: "" });
+    setStatusTone("info");
+  }, [currentStep]);
+
+  useEffect(() => {
+    const trimmedToken = token.trim();
+    if (!trimmedToken) return;
+
+    let ignore = false;
+
+    const loadChurchInfo = async () => {
+      setChurchLoading(true);
+      setChurchError("");
+
+      try {
+        const res = await fetch(`/api/member-invite-info?token=${encodeURIComponent(trimmedToken)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.message || "Unable to load church details.");
+        }
+
+        if (!ignore) {
+          setChurchInfo({
+            name: data.church?.name || "",
+            pastorName: data.church?.pastorName || "",
+            welcomeMessage: data.church?.welcomeMessage || "",
+            serviceTimes: data.church?.serviceTimes || [],
+            address: data.church?.address || "",
+            city: data.church?.city || "",
+            country: data.church?.country || "",
+            mapUrl: data.church?.mapUrl || "",
+            mapLink: data.church?.mapLink || "",
+            logoUrl: data.church?.logoUrl || "",
+            brandColor: data.church?.brandColor || "",
+          });
+        }
+      } catch (err) {
+        if (!ignore) {
+          setChurchError(err.message || "Unable to load church details.");
+        }
+      } finally {
+        if (!ignore) {
+          setChurchLoading(false);
+        }
+      }
+    };
+
+    loadChurchInfo();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  const t = (key) => translations[language]?.[key] || translations.en[key] || key;
+
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -56,10 +115,33 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     e.preventDefault();
     if (isSubmitting) return;
 
+    if (currentStep < 2) {
+      if (currentStep === 0 && !(form.firstName.trim() || form.lastName.trim())) {
+        setFeedback({ ok: false, message: t("shareNameHelper") });
+        setStatusTone("error");
+        return;
+      }
+
+      if (
+        currentStep === 1 &&
+        !(
+          (form.phone.trim() && isValidPhone(form.phone)) ||
+          (form.email.trim() && isValidEmail(form.email))
+        )
+      ) {
+        setFeedback({ ok: false, message: t("shareContactHelper") });
+        setStatusTone("error");
+        return;
+      }
+
+      handleNext();
+      return;
+    }
+
     const trimmedToken = token.trim();
     const trimmedFirst = form.firstName.trim();
     const trimmedLast = form.lastName.trim();
-    const trimmedPhone = form.phone.trim();
+    const trimmedPhone = normalizePhone(form.phone);
     const trimmedEmail = form.email.trim();
 
     if (!trimmedToken) {
@@ -71,7 +153,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     if (!trimmedFirst && !trimmedLast) {
       setFeedback({
         ok: false,
-        message: "Please share at least your first or last name so we know who you are.",
+        message: t("shareNameHelper"),
       });
       setStatusTone("error");
       return;
@@ -80,7 +162,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     if (!trimmedPhone && !trimmedEmail) {
       setFeedback({
         ok: false,
-        message: "Please provide a phone number or email so we can follow up.",
+        message: t("shareContactHelper"),
       });
       setStatusTone("error");
       return;
@@ -129,19 +211,24 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     }
   };
 
-  return (
-    <div className="checkin-shell">
-      <div className="checkin-card">
-        <div className="checkin-header">
-          <div>
-            <h1 className="checkin-title">Share your details</h1>
-            <p className="checkin-subtitle">
-              A leader invited you to join their community list. Fill this form to be added
-              automatically.
-            </p>
-          </div>
-          <StatusBanner />
-        </div>
+  const steps = [
+    { id: 0, label: t("aboutYou") },
+    { id: 1, label: t("contact") },
+    { id: 2, label: t("optionalDetails") },
+  ];
+
+  const aboutYouReady = form.firstName.trim() || form.lastName.trim();
+  const contactReady =
+    (form.phone.trim() && isValidPhone(form.phone)) ||
+    (form.email.trim() && isValidEmail(form.email));
+  const phoneLooksGood = form.phone.trim() && isValidPhone(form.phone);
+  const emailLooksGood = form.email.trim() && isValidEmail(form.email);
+  const inviteHeroName = churchInfo.name || "Your church";
+  const inviteHeroMessage = churchInfo.welcomeMessage || t("welcomeFallback");
+  const inviteAccent = churchInfo.brandColor || "#4f46e5";
+  const locationLine = [churchInfo.address, churchInfo.city, churchInfo.country]
+    .filter(Boolean)
+    .join(", ");
 
         <form onSubmit={handleSubmit} className="checkin-form" autoComplete="on">
           <div className="checkin-grid">
@@ -232,9 +319,31 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
             </div>
           )}
 
-          <button type="submit" className="checkin-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Submitting…" : "Send my details"}
-          </button>
+          <div className="invite-actions">
+            <button
+              type="button"
+              className="invite-secondary"
+              onClick={handleBack}
+              disabled={currentStep === 0}
+            >
+              {t("back")}
+            </button>
+            <button
+              type="submit"
+              className="invite-primary"
+              disabled={
+                isSubmitting ||
+                (currentStep === 0 && !aboutYouReady) ||
+                (currentStep === 1 && !contactReady)
+              }
+            >
+              {currentStep === steps.length - 1
+                ? isSubmitting
+                  ? t("submitting")
+                  : t("submit")
+                : t("next")}
+            </button>
+          </div>
         </form>
       </div>
     </div>
