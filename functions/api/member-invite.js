@@ -1,224 +1,83 @@
-const { admin, db, initError } = require("../lib/firestoreAdmin");
-const { verifyJwt } = require("../lib/jwtHelpers");
+const { initError } = require('../lib/firestoreAdmin')
+const { signJwt } = require('../lib/jwtHelpers')
 
 const jwtSecret =
-  process.env.MEMBER_INVITE_JWT_SECRET || process.env.CHECKIN_JWT_SECRET || "";
+  process.env.MEMBER_INVITE_JWT_SECRET || process.env.CHECKIN_JWT_SECRET || ''
+const inviteTtlMinutes = Number(process.env.MEMBER_INVITE_TTL_MINUTES) || 10080 // 7 days
+const appBaseUrl = process.env.APP_BASE_URL || ''
 
-const MAX_PHOTO_BYTES = 650 * 1024; // keep under Firestore 1 MiB doc limit
-
-function estimateBase64Bytes(base64 = "") {
-  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
-  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
-}
-
-function sanitizePhotoDataUrl(photoDataUrlRaw) {
-  const raw = `${photoDataUrlRaw || ""}`.trim();
-  if (!raw) return "";
-
-  // Expect: data:image/<type>;base64,<payload>
-  if (!raw.startsWith("data:image/")) {
-    throw new Error("Photo must be an image.");
-  }
-  if (!raw.includes(";base64,")) {
-    throw new Error("Photo format is invalid.");
-  }
-
-  const base64 = raw.split(",")[1] || "";
-  const bytes = estimateBase64Bytes(base64);
-
-  if (!base64 || bytes <= 0) {
-    throw new Error("Photo is empty or invalid.");
-  }
-  if (bytes > MAX_PHOTO_BYTES) {
-    throw new Error("Photo is too large. Please use a smaller image.");
-  }
-
-  return raw;
-}
-
-async function findExistingMember({ churchId, phone, email }) {
-  if (!churchId) return null;
-
-  const normalizedPhone = phone?.trim();
-  const normalizedEmail = email?.trim()?.toLowerCase();
-
-  const queries = [];
-
-  if (normalizedPhone) {
-    queries.push(
-      db
-        .collection("members")
-        .where("churchId", "==", churchId)
-        .where("phone", "==", normalizedPhone)
-        .limit(1)
-        .get()
-    );
-  }
-
-  if (normalizedEmail) {
-    queries.push(
-      db
-        .collection("members")
-        .where("churchId", "==", churchId)
-        .where("email", "==", normalizedEmail)
-        .limit(1)
-        .get()
-    );
-  }
-
-  if (queries.length === 0) return null;
-
-  const snapshots = await Promise.all(queries);
-
-  for (const snap of snapshots) {
-    if (!snap.empty) {
-      const doc = snap.docs[0];
-      return { id: doc.id, data: doc.data() };
-    }
-  }
-
-  return null;
+function buildInviteLink(token, baseUrl) {
+  const normalizedBase = (baseUrl || '').replace(/\/$/, '') || appBaseUrl.replace(/\/$/, '')
+  if (!normalizedBase) return null
+  return `${normalizedBase}/member-invite?token=${encodeURIComponent(token)}`
 }
 
 module.exports = async function handler(request, response) {
-  if (request.method !== "POST") {
+  if (request.method !== 'POST') {
     return response.status(405).json({
-      status: "error",
-      message: "Method not allowed. Use POST.",
-    });
+      status: 'error',
+      message: 'Method not allowed. Use POST.',
+    })
   }
 
   if (initError) {
     return response.status(500).json({
-      status: "error",
-      message: initError.message || "Unable to initialize Firebase.",
-    });
+      status: 'error',
+      message: initError.message || 'Unable to initialize Firebase.',
+    })
   }
 
   if (!jwtSecret) {
     return response.status(500).json({
-      status: "error",
+      status: 'error',
       message:
-        "MEMBER_INVITE_JWT_SECRET (or CHECKIN_JWT_SECRET) environment variable is not configured.",
-    });
+        'MEMBER_INVITE_JWT_SECRET (or CHECKIN_JWT_SECRET) environment variable is not configured.',
+    })
   }
 
-  const {
-    token,
-    firstName,
-    lastName,
-    phone,
-    email,
-    status,
-    dateOfBirth,
-    photoDataUrl,
-  } = request.body || {};
+  const { churchId, baseUrl } = request.body || {}
 
-  if (!token) {
+  if (!churchId) {
     return response.status(400).json({
-      status: "error",
-      message: "Invite token is required.",
-    });
+      status: 'error',
+      message: 'churchId is required to issue an invite link.',
+    })
   }
 
-  const trimmedPhone = (phone || "").trim();
-  const trimmedFirst = (firstName || "").trim();
-  const trimmedLast = (lastName || "").trim();
-  const trimmedEmail = (email || "").trim().toLowerCase();
-  const trimmedDob = typeof dateOfBirth === "string" ? dateOfBirth.trim() : "";
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const expiresAt = issuedAt + inviteTtlMinutes * 60
 
-  if (!trimmedFirst && !trimmedLast) {
-    return response.status(400).json({
-      status: "error",
-      message: "Please enter at least a first or last name.",
-    });
-  }
-
-  if (!trimmedPhone && !trimmedEmail) {
-    return response.status(400).json({
-      status: "error",
-      message: "Please enter a phone number or email so we can contact you.",
-    });
-  }
-
-  let safePhoto = "";
-  try {
-    safePhoto = photoDataUrl ? sanitizePhotoDataUrl(photoDataUrl) : "";
-  } catch (err) {
-    return response.status(400).json({
-      status: "error",
-      message: err.message || "Photo is invalid.",
-    });
+  const payload = {
+    churchId,
+    type: 'member-invite',
+    iat: issuedAt,
+    exp: expiresAt,
   }
 
   try {
-    const payload = verifyJwt(token, jwtSecret);
+    const token = signJwt(payload, jwtSecret)
+    const link = buildInviteLink(token, baseUrl)
 
-    if (payload.type !== "member-invite") {
-      return response.status(400).json({
-        status: "error",
-        message: "This invite token is not valid for member signup.",
-      });
+    if (!link) {
+      throw new Error('Unable to build invite link. Please provide a base URL.')
     }
 
-    const churchId = payload.churchId;
-
-    const existing = await findExistingMember({
-      churchId,
-      phone: trimmedPhone,
-      email: trimmedEmail,
-    });
-
-    // If they already exist, optionally attach the photo if they didn't have one.
-    if (existing) {
-      if (safePhoto && !existing.data?.photoDataUrl) {
-        await db
-          .collection("members")
-          .doc(existing.id)
-          .set(
-            {
-              photoDataUrl: safePhoto,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
-            { merge: true }
-          );
-      }
-
-      return response.status(200).json({
-        status: "success",
-        ok: true,
-        memberId: existing.id,
-        message: "You are already on the list. Thank you for staying connected.",
-      });
-    }
-
-    const payloadToSave = {
-      churchId,
-      firstName: trimmedFirst,
-      lastName: trimmedLast,
-      phone: trimmedPhone,
-      email: trimmedEmail,
-      status: status || "VISITOR",
-      ...(trimmedDob ? { dateOfBirth: trimmedDob } : {}),
-      ...(safePhoto ? { photoDataUrl: safePhoto } : {}),
-      source: "INVITE",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    const docRef = await db.collection("members").add(payloadToSave);
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+      link
+    )}`
 
     return response.status(200).json({
-      status: "success",
-      ok: true,
-      memberId: docRef.id,
-      message: "Your details were received. Welcome!",
-    });
+      status: 'success',
+      token,
+      link,
+      qrImageUrl,
+      expiresAt,
+      message: 'Invite link issued successfully.',
+    })
   } catch (error) {
-    const message = error.message || "Unable to process invite.";
-    const statusCode = message.includes("expired") ? 410 : 400;
-    return response.status(statusCode).json({
-      status: "error",
-      message,
-    });
+    return response.status(500).json({
+      status: 'error',
+      message: error.message || 'Unable to issue invite link.',
+    })
   }
-};
+}
