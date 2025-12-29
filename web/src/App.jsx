@@ -33,74 +33,22 @@ import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
 import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
-
-const PAYSTACK_BANK_OPTIONS = [
-  { code: "MTN", name: "MTN Mobile Money" },
-  { code: "VOD", name: "Vodafone Cash" },
-  { code: "TIGO", name: "AirtelTigo Money" },
-  { code: "ACCESS", name: "Access Bank Ghana" },
-  { code: "CAL", name: "CAL Bank" },
-  { code: "ECOBANK", name: "Ecobank Ghana" },
-  { code: "FIDELITY", name: "Fidelity Bank Ghana" },
-  { code: "FAB", name: "First Atlantic Bank" },
-  { code: "FBNGH", name: "FirstBank Ghana" },
-  { code: "GCB", name: "GCB Bank" },
-  { code: "GTB", name: "GTBank Ghana" },
-  { code: "RBBA", name: "Republic Bank Ghana" },
-  { code: "SBGH", name: "Stanbic Bank Ghana" },
-  { code: "SCB", name: "Standard Chartered Ghana" },
-  { code: "UBAGH", name: "UBA Ghana" },
-];
-
-const memberAgeGroupOptions = [
-  { value: "UNDER_18", label: "Under 18" },
-  { value: "18_TO_39", label: "18 - 39" },
-  { value: "40_TO_70", label: "40 - 70" },
-  { value: "OVER_70", label: "Over 70" },
-];
-
-const memberStatusOptions = [
-  { value: "VISITOR", label: "Visitors", helper: "First-time guests and newcomers" },
-  { value: "NEW_CONVERT", label: "New converts", helper: "Recently committed" },
-  { value: "REGULAR", label: "Regulars", helper: "Consistently attending" },
-  { value: "WORKER", label: "Workers", helper: "Serving team members" },
-  { value: "PASTOR", label: "Pastors", helper: "Pastoral staff" },
-  { value: "ELDER", label: "Elders", helper: "Leadership team" },
-  { value: "OTHER", label: "Other", helper: "Custom status" },
-  { value: "INACTIVE", label: "Inactive", helper: "Needs engagement" },
-];
-
-const memberAgeGroupDescriptions = {
-  UNDER_18: "Kids and teens",
-  "18_TO_39": "Young adults",
-  "40_TO_70": "Adults",
-  OVER_70: "Seniors",
-};
-
-const parseDateValue = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === "object" && typeof value.toDate === "function") {
-    const parsed = value.toDate();
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const formatDateOfBirth = (value) => {
-  if (!value) return "-";
-  const parsed = parseDateValue(value);
-  if (!parsed) return typeof value === "string" ? value : "-";
-  return parsed.toLocaleDateString();
-};
-
-const getMemberInitials = (member) => {
-  const firstInitial = (member?.firstName || "").trim().charAt(0);
-  const lastInitial = (member?.lastName || "").trim().charAt(0);
-  const initials = `${firstInitial}${lastInitial}`.trim();
-  return initials ? initials.toUpperCase() : "?";
-};
+import {
+  memberAgeGroupDescriptions,
+  memberAgeGroupOptions,
+  memberStatusOptions,
+} from "./constants/memberOptions";
+import { PAYSTACK_BANK_OPTIONS } from "./constants/paystackOptions";
+import {
+  formatDateOfBirth,
+  formatUpcomingBirthday,
+  getAgeGroupFromDob,
+  getMemberInitials,
+  getUpcomingBirthdayDate,
+  parseDateValue,
+} from "./utils/memberUtils";
+import { evaluateAccessStatus } from "./utils/subscriptionUtils";
+import { isValidEmail } from "./utils/validation";
 
 const readImageAsDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -109,45 +57,6 @@ const readImageAsDataUrl = (file) =>
     reader.onerror = () => reject(new Error("Unable to read image."));
     reader.readAsDataURL(file);
   });
-
-const getAgeGroupFromDob = (dateOfBirth) => {
-  if (!dateOfBirth) return null;
-  const dob = parseDateValue(dateOfBirth);
-  if (!dob) return null;
-  const today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const hasBirthdayPassed =
-    today.getMonth() > dob.getMonth() ||
-    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
-  if (!hasBirthdayPassed) {
-    age -= 1;
-  }
-  if (age < 0) return null;
-  if (age < 18) return "UNDER_18";
-  if (age <= 39) return "18_TO_39";
-  if (age <= 70) return "40_TO_70";
-  return "OVER_70";
-};
-
-const getUpcomingBirthdayDate = (dateOfBirth, startDate = new Date()) => {
-  const dob = parseDateValue(dateOfBirth);
-  if (!dob) return null;
-  const base = parseDateValue(startDate) || new Date();
-  const year = base.getFullYear();
-  const month = dob.getMonth();
-  const day = dob.getDate();
-  let nextBirthday = new Date(year, month, day);
-  if (nextBirthday < base) {
-    nextBirthday = new Date(year + 1, month, day);
-  }
-  return nextBirthday;
-};
-
-const formatUpcomingBirthday = (value) => {
-  const parsed = parseDateValue(value);
-  if (!parsed) return "-";
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
 
 function AppContent() {
   const {
@@ -393,82 +302,6 @@ function AppContent() {
   // Follow-up
   const [followupAudience, setFollowupAudience] = useState("VISITOR");
   const [followupPastorName, setFollowupPastorName] = useState("");
-
-  const TRIAL_LENGTH_DAYS = 14;
-  const EXPIRY_SOON_THRESHOLD_DAYS = 3;
-
-  const addDays = (date, days) => {
-    const copy = new Date(date);
-    copy.setDate(copy.getDate() + days);
-    return copy;
-  };
-
-  const parseDate = (value) => {
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  };
-
-  const daysUntil = (date) => {
-    if (!date) return null;
-    const msInDay = 1000 * 60 * 60 * 24;
-    return Math.ceil((date.getTime() - Date.now()) / msInDay);
-  };
-
-  const evaluateAccessStatus = (plan) => {
-    if (!plan) {
-      return {
-        state: "pending",
-        headline: "",
-        detail: "",
-        deadline: null,
-        daysRemaining: null,
-      };
-    }
-
-    const nowDate = new Date();
-    const subscriptionExpiresAt = parseDate(plan.subscriptionExpiresAt);
-    const trialEndsAt =
-      parseDate(plan.trialEndsAt) ||
-      (plan.createdAt ? addDays(new Date(plan.createdAt), TRIAL_LENGTH_DAYS) : null);
-    const expiryDate = subscriptionExpiresAt || trialEndsAt;
-
-    if (!expiryDate) {
-      return {
-        state: "active",
-        headline: "Subscription status",
-        detail: "Your plan is active.",
-        deadline: null,
-        daysRemaining: null,
-      };
-    }
-
-    if (expiryDate <= nowDate) {
-      const modeLabel = subscriptionExpiresAt ? "subscription" : "trial";
-      return {
-        state: "expired",
-        headline: "Access unavailable",
-        detail: `Your ${modeLabel} ended on ${expiryDate.toLocaleDateString()}. Please renew to continue.`,
-        deadline: expiryDate,
-        daysRemaining: 0,
-      };
-    }
-
-    const remaining = daysUntil(expiryDate);
-    const state = remaining !== null && remaining <= EXPIRY_SOON_THRESHOLD_DAYS
-      ? "expiring"
-      : "active";
-
-    const modeLabel = subscriptionExpiresAt ? "paid plan" : "trial";
-
-    return {
-      state,
-      headline: subscriptionExpiresAt ? "Subscription active" : "Trial active",
-      detail: `${remaining} day${remaining === 1 ? "" : "s"} left on your ${modeLabel} (ends ${expiryDate.toLocaleDateString()}).`,
-      deadline: expiryDate,
-      daysRemaining: remaining,
-    };
-  };
 
   const showToast = (message, variant = "info") => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
@@ -2659,9 +2492,6 @@ function AppContent() {
       monthlyMemberAttendance.add(entry.memberId);
     }
   });
-
-  const isValidEmail = (value) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value || "").trim());
 
   const authValidationMessage = validateAuthInputs();
   const accessStatus = evaluateAccessStatus(churchPlan);
