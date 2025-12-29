@@ -36,6 +36,22 @@ function sanitizePhotoDataUrl(photoDataUrlRaw) {
   return raw;
 }
 
+function normalizeText(value) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function sanitizeFamilyMembers(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((member) => ({
+      firstName: normalizeText(member?.firstName),
+      lastName: normalizeText(member?.lastName),
+      relationship: normalizeText(member?.relationship) || "CHILD",
+    }))
+    .filter((member) => member.firstName || member.lastName);
+}
+
 async function findExistingMember({ churchId, phone, email }) {
   if (!churchId) return null;
 
@@ -112,6 +128,15 @@ module.exports = async function handler(request, response) {
     status,
     dateOfBirth,
     photoDataUrl,
+    hearAboutUs,
+    hearAboutUsOther,
+    visitReason,
+    visitReasonPrivate,
+    wantsLeaderCall,
+    preferredCallTime,
+    familyMembers,
+    journeyStatus,
+    journeyNote,
   } = request.body || {};
 
   if (!token) {
@@ -126,6 +151,15 @@ module.exports = async function handler(request, response) {
   const trimmedLast = (lastName || "").trim();
   const trimmedEmail = (email || "").trim().toLowerCase();
   const trimmedDob = typeof dateOfBirth === "string" ? dateOfBirth.trim() : "";
+  const normalizedHearAbout = normalizeText(hearAboutUs);
+  const normalizedHearAboutOther = normalizeText(hearAboutUsOther);
+  const normalizedVisitReason = normalizeText(visitReason);
+  const normalizedPreferredCallTime = normalizeText(preferredCallTime);
+  const normalizedJourneyNote = normalizeText(journeyNote);
+  const journeyStatusProvided = normalizeText(journeyStatus);
+  const normalizedJourneyStatus = journeyStatusProvided || "VISITOR";
+  const normalizedFamilyMembers = sanitizeFamilyMembers(familyMembers);
+  const callRequest = Boolean(wantsLeaderCall);
 
   if (!trimmedFirst && !trimmedLast) {
     return response.status(400).json({
@@ -169,8 +203,39 @@ module.exports = async function handler(request, response) {
       email: trimmedEmail,
     });
 
+    const followupPayload = {
+      ...(normalizedHearAbout ? { hearAboutUs: normalizedHearAbout } : {}),
+      ...(normalizedHearAboutOther ? { hearAboutUsOther: normalizedHearAboutOther } : {}),
+      ...(normalizedVisitReason ? { visitReason: normalizedVisitReason } : {}),
+      ...(typeof visitReasonPrivate === "boolean"
+        ? { visitReasonPrivate }
+        : {}),
+      ...(callRequest ? { wantsLeaderCall: true } : {}),
+      ...(callRequest && normalizedPreferredCallTime
+        ? { preferredCallTime: normalizedPreferredCallTime }
+        : {}),
+      ...(normalizedFamilyMembers.length ? { familyMembers: normalizedFamilyMembers } : {}),
+    };
+
     // If they already exist, optionally attach the photo if they didn't have one.
     if (existing) {
+      const journeyUpdates = {};
+      if (journeyStatusProvided || normalizedJourneyNote) {
+        const existingHistory = Array.isArray(existing.data?.journeyHistory)
+          ? existing.data.journeyHistory
+          : [];
+        journeyUpdates.journeyStatus = normalizedJourneyStatus;
+        journeyUpdates.journeyStatusAt = admin.firestore.FieldValue.serverTimestamp();
+        journeyUpdates.journeyHistory = [
+          ...existingHistory,
+          {
+            status: normalizedJourneyStatus,
+            note: normalizedJourneyNote,
+            timestamp: new Date().toISOString(),
+          },
+        ];
+      }
+
       if (safePhoto && !existing.data?.photoDataUrl) {
         await db
           .collection("members")
@@ -178,6 +243,23 @@ module.exports = async function handler(request, response) {
           .set(
             {
               photoDataUrl: safePhoto,
+              ...followupPayload,
+              ...journeyUpdates,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+      } else if (
+        Object.keys(followupPayload).length > 0 ||
+        Object.keys(journeyUpdates).length > 0
+      ) {
+        await db
+          .collection("members")
+          .doc(existing.id)
+          .set(
+            {
+              ...followupPayload,
+              ...journeyUpdates,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             },
             { merge: true }
@@ -199,8 +281,28 @@ module.exports = async function handler(request, response) {
       phone: trimmedPhone,
       email: trimmedEmail,
       status: status || "VISITOR",
+      journeyStatus: normalizedJourneyStatus,
+      journeyStatusAt: admin.firestore.FieldValue.serverTimestamp(),
+      journeyHistory: [
+        {
+          status: normalizedJourneyStatus,
+          note: normalizedJourneyNote,
+          timestamp: new Date().toISOString(),
+        },
+      ],
       ...(trimmedDob ? { dateOfBirth: trimmedDob } : {}),
       ...(safePhoto ? { photoDataUrl: safePhoto } : {}),
+      ...(normalizedHearAbout ? { hearAboutUs: normalizedHearAbout } : {}),
+      ...(normalizedHearAboutOther ? { hearAboutUsOther: normalizedHearAboutOther } : {}),
+      ...(normalizedVisitReason ? { visitReason: normalizedVisitReason } : {}),
+      ...(typeof visitReasonPrivate === "boolean"
+        ? { visitReasonPrivate }
+        : {}),
+      ...(callRequest ? { wantsLeaderCall: true } : {}),
+      ...(callRequest && normalizedPreferredCallTime
+        ? { preferredCallTime: normalizedPreferredCallTime }
+        : {}),
+      ...(normalizedFamilyMembers.length ? { familyMembers: normalizedFamilyMembers } : {}),
       source: "INVITE",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };

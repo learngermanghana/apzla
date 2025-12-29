@@ -12,6 +12,16 @@ const statusOptions = [
   { value: "OTHER", label: "Other" },
 ];
 
+const hearAboutOptions = [
+  { value: "", label: "Select one" },
+  { value: "FRIEND", label: "Friend / family" },
+  { value: "SOCIAL_MEDIA", label: "Social media" },
+  { value: "STREET_OUTREACH", label: "Street outreach" },
+  { value: "ONLINE_SEARCH", label: "Online search" },
+  { value: "EVENT", label: "Church event" },
+  { value: "OTHER", label: "Other" },
+];
+
 const readFileAsDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -64,6 +74,13 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     status: "VISITOR",
     dateOfBirth: "",
     photoDataUrl: "",
+    hearAboutUs: "",
+    hearAboutUsOther: "",
+    visitReason: "",
+    visitReasonPrivate: true,
+    wantsLeaderCall: "NO",
+    preferredCallTime: "",
+    familyMembers: [],
   });
 
   const [token, setToken] = useState(initialToken || "");
@@ -100,6 +117,32 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const addFamilyMember = () => {
+    setForm((prev) => ({
+      ...prev,
+      familyMembers: [
+        ...(prev.familyMembers || []),
+        { firstName: "", lastName: "", relationship: "CHILD" },
+      ],
+    }));
+  };
+
+  const updateFamilyMember = (index, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      familyMembers: (prev.familyMembers || []).map((member, idx) =>
+        idx === index ? { ...member, [key]: value } : member
+      ),
+    }));
+  };
+
+  const removeFamilyMember = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      familyMembers: (prev.familyMembers || []).filter((_, idx) => idx !== index),
+    }));
   };
 
   const handlePhotoChange = async (e) => {
@@ -191,6 +234,11 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          wantsLeaderCall: form.wantsLeaderCall === "YES",
+          preferredCallTime:
+            form.wantsLeaderCall === "YES" ? form.preferredCallTime.trim() : "",
+          hearAboutUsOther:
+            form.hearAboutUs === "OTHER" ? form.hearAboutUsOther.trim() : "",
           phone: trimmedPhone,
           email: trimmedEmail,
           firstName: trimmedFirst,
@@ -219,6 +267,13 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         status: form.status,
         dateOfBirth: "",
         photoDataUrl: "",
+        hearAboutUs: "",
+        hearAboutUsOther: "",
+        visitReason: "",
+        visitReasonPrivate: true,
+        wantsLeaderCall: "NO",
+        preferredCallTime: "",
+        familyMembers: [],
       });
 
       // reset input (so selecting same file again triggers onChange)
@@ -309,6 +364,136 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
               />
               <div className="checkin-help-text">We use this to place you in the right age group.</div>
             </label>
+
+            <label className="checkin-field">
+              <span>How did you hear about us?</span>
+              <select
+                value={form.hearAboutUs}
+                onChange={(e) => updateField("hearAboutUs", e.target.value)}
+              >
+                {hearAboutOptions.map((opt) => (
+                  <option key={opt.value || "none"} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {form.hearAboutUs === "OTHER" && (
+                <input
+                  type="text"
+                  value={form.hearAboutUsOther}
+                  onChange={(e) => updateField("hearAboutUsOther", e.target.value)}
+                  placeholder="Share details"
+                  style={{ marginTop: "8px" }}
+                />
+              )}
+            </label>
+
+            <label className="checkin-field">
+              <span>Reason for visit / prayer request</span>
+              <textarea
+                value={form.visitReason}
+                onChange={(e) => updateField("visitReason", e.target.value)}
+                placeholder="Share what brought you today or how we can pray."
+                rows={3}
+              />
+              <label style={{ marginTop: "6px", display: "flex", gap: "6px", fontSize: "12px" }}>
+                <input
+                  type="checkbox"
+                  checked={form.visitReasonPrivate}
+                  onChange={(e) => updateField("visitReasonPrivate", e.target.checked)}
+                />
+                Keep this private to leaders only
+              </label>
+            </label>
+
+            <label className="checkin-field">
+              <span>Want a call from a leader?</span>
+              <select
+                value={form.wantsLeaderCall}
+                onChange={(e) => updateField("wantsLeaderCall", e.target.value)}
+              >
+                <option value="NO">No, thank you</option>
+                <option value="YES">Yes, please</option>
+              </select>
+              {form.wantsLeaderCall === "YES" && (
+                <input
+                  type="text"
+                  value={form.preferredCallTime}
+                  onChange={(e) => updateField("preferredCallTime", e.target.value)}
+                  placeholder="Best time to reach me"
+                  style={{ marginTop: "8px" }}
+                />
+              )}
+            </label>
+
+            <div className="checkin-field">
+              <span>Family mode</span>
+              <div className="checkin-help-text" style={{ marginBottom: "6px" }}>
+                Add spouse or children to share the same invite.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {(form.familyMembers || []).map((member, index) => (
+                  <div
+                    key={`family-${index}`}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                      gap: "6px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={member.firstName}
+                      onChange={(e) => updateFamilyMember(index, "firstName", e.target.value)}
+                      placeholder="First name"
+                    />
+                    <input
+                      type="text"
+                      value={member.lastName}
+                      onChange={(e) => updateFamilyMember(index, "lastName", e.target.value)}
+                      placeholder="Last name"
+                    />
+                    <select
+                      value={member.relationship || "CHILD"}
+                      onChange={(e) => updateFamilyMember(index, "relationship", e.target.value)}
+                    >
+                      <option value="SPOUSE">Spouse</option>
+                      <option value="CHILD">Child</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeFamilyMember(index)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid #e5e7eb",
+                        background: "white",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addFamilyMember}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    background: "white",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    alignSelf: "flex-start",
+                  }}
+                >
+                  Add family member
+                </button>
+              </div>
+            </div>
 
             {/* NEW: Photo upload */}
             <label className="checkin-field">
