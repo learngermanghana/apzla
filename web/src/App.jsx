@@ -95,6 +95,21 @@ const formatDateOfBirth = (value) => {
   return parsed.toLocaleDateString();
 };
 
+const getMemberInitials = (member) => {
+  const firstInitial = (member?.firstName || "").trim().charAt(0);
+  const lastInitial = (member?.lastName || "").trim().charAt(0);
+  const initials = `${firstInitial}${lastInitial}`.trim();
+  return initials ? initials.toUpperCase() : "?";
+};
+
+const readImageAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Unable to read image."));
+    reader.readAsDataURL(file);
+  });
+
 const getAgeGroupFromDob = (dateOfBirth) => {
   if (!dateOfBirth) return null;
   const dob = parseDateValue(dateOfBirth);
@@ -204,6 +219,7 @@ function AppContent() {
     lastName: "",
     phone: "",
     email: "",
+    photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
   });
@@ -213,6 +229,7 @@ function AppContent() {
     lastName: "",
     phone: "",
     email: "",
+    photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
   });
@@ -1143,6 +1160,24 @@ function AppContent() {
     }
   };
 
+  const handleMemberPhotoFile = async (file, setForm) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Please choose an image file.", "error");
+      return;
+    }
+    try {
+      const dataUrl = await readImageAsDataUrl(file);
+      setForm((form) => ({
+        ...form,
+        photoDataUrl: dataUrl,
+      }));
+    } catch (err) {
+      console.error("Member photo load error:", err);
+      showToast(err.message || "Unable to read that photo.", "error");
+    }
+  };
+
   const handleCreateMember = async () => {
     if (!userProfile?.churchId) return;
 
@@ -1159,6 +1194,7 @@ function AppContent() {
         lastName: memberForm.lastName.trim(),
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
+        photoDataUrl: memberForm.photoDataUrl,
         status: memberForm.status,
         dateOfBirth: memberForm.dateOfBirth,
         createdAt: new Date().toISOString(),
@@ -1169,6 +1205,7 @@ function AppContent() {
         lastName: "",
         phone: "",
         email: "",
+        photoDataUrl: "",
         status: "VISITOR",
         dateOfBirth: "",
       });
@@ -1190,6 +1227,7 @@ function AppContent() {
       lastName: member.lastName || "",
       phone: member.phone || "",
       email: member.email || "",
+      photoDataUrl: member.photoDataUrl || member.photoUrl || "",
       status: (member.status || "VISITOR").toUpperCase(),
       dateOfBirth: member.dateOfBirth || "",
     });
@@ -1202,6 +1240,7 @@ function AppContent() {
       lastName: "",
       phone: "",
       email: "",
+      photoDataUrl: "",
       status: "VISITOR",
       dateOfBirth: "",
     });
@@ -1223,6 +1262,7 @@ function AppContent() {
         lastName: editingMemberForm.lastName.trim(),
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
+        photoDataUrl: editingMemberForm.photoDataUrl,
         status: editingMemberForm.status,
         dateOfBirth: editingMemberForm.dateOfBirth,
         updatedAt: new Date().toISOString(),
@@ -4174,6 +4214,90 @@ function AppContent() {
                   fontSize: "14px",
                 }}
               />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div
+                  style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "999px",
+                    border: "1px solid #e5e7eb",
+                    background: "#f9fafb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                  }}
+                >
+                  {memberForm.photoDataUrl ? (
+                    <img
+                      src={memberForm.photoDataUrl}
+                      alt="New member photo preview"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    getMemberInitials(memberForm)
+                  )}
+                </div>
+                <input
+                  id="member-photo-input"
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  onChange={(e) => {
+                    const [file] = e.target.files || [];
+                    if (file) {
+                      handleMemberPhotoFile(file, setMemberForm);
+                    }
+                    e.target.value = "";
+                  }}
+                  style={{ display: "none" }}
+                />
+                <label
+                  htmlFor="member-photo-input"
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    background: "white",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Take photo
+                </label>
+                {memberForm.photoDataUrl && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMemberForm((f) => ({
+                        ...f,
+                        photoDataUrl: "",
+                      }))
+                    }
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #e5e7eb",
+                      background: "white",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
               <select
                 value={memberForm.status}
                 onChange={(e) =>
@@ -4318,6 +4442,7 @@ function AppContent() {
                           }}
                         >
                           <th style={{ padding: "6px 4px" }}>Name</th>
+                          <th style={{ padding: "6px 4px" }}>Photo</th>
                           <th style={{ padding: "6px 4px" }}>Phone</th>
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
@@ -4328,6 +4453,8 @@ function AppContent() {
                       <tbody>
                         {filteredMembers.map((m) => {
                           const isEditing = editingMemberId === m.id;
+                          const memberPhotoSrc = m.photoDataUrl || m.photoUrl || "";
+                          const photoInputId = `member-photo-${m.id}`;
                           return (
                             <tr
                               key={m.id}
@@ -4381,6 +4508,121 @@ function AppContent() {
                                   </div>
                                 ) : (
                                   <>{m.firstName} {m.lastName}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <div
+                                      style={{
+                                        width: "34px",
+                                        height: "34px",
+                                        borderRadius: "999px",
+                                        border: "1px solid #e5e7eb",
+                                        background: "#f9fafb",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        overflow: "hidden",
+                                        fontSize: "12px",
+                                        fontWeight: 600,
+                                        color: "#6b7280",
+                                      }}
+                                    >
+                                      {editingMemberForm.photoDataUrl ? (
+                                        <img
+                                          src={editingMemberForm.photoDataUrl}
+                                          alt="Member photo preview"
+                                          style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                          }}
+                                        />
+                                      ) : (
+                                        getMemberInitials(editingMemberForm)
+                                      )}
+                                    </div>
+                                    <input
+                                      id={photoInputId}
+                                      type="file"
+                                      accept="image/*"
+                                      capture="user"
+                                      onChange={(e) => {
+                                        const [file] = e.target.files || [];
+                                        if (file) {
+                                          handleMemberPhotoFile(file, setEditingMemberForm);
+                                        }
+                                        e.target.value = "";
+                                      }}
+                                      style={{ display: "none" }}
+                                    />
+                                    <label
+                                      htmlFor={photoInputId}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        background: "white",
+                                        cursor: "pointer",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      Take photo
+                                    </label>
+                                    {editingMemberForm.photoDataUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            photoDataUrl: "",
+                                          }))
+                                        }
+                                        style={{
+                                          padding: "6px 10px",
+                                          borderRadius: "6px",
+                                          border: "1px solid #e5e7eb",
+                                          background: "white",
+                                          cursor: "pointer",
+                                          fontSize: "12px",
+                                        }}
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div
+                                    style={{
+                                      width: "34px",
+                                      height: "34px",
+                                      borderRadius: "999px",
+                                      border: "1px solid #e5e7eb",
+                                      background: "#f9fafb",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      overflow: "hidden",
+                                      fontSize: "12px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                    }}
+                                  >
+                                    {memberPhotoSrc ? (
+                                      <img
+                                        src={memberPhotoSrc}
+                                        alt={`${m.firstName || ""} ${m.lastName || ""}`.trim() || "Member photo"}
+                                        style={{
+                                          width: "100%",
+                                          height: "100%",
+                                          objectFit: "cover",
+                                        }}
+                                      />
+                                    ) : (
+                                      getMemberInitials(m)
+                                    )}
+                                  </div>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
