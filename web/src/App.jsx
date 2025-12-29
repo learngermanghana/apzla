@@ -179,6 +179,9 @@ function AppContent() {
     journeyNote: "",
   });
   const [memberSearch, setMemberSearch] = useState("");
+  const [memberStatusFilter, setMemberStatusFilter] = useState("ALL");
+  const [memberJourneyFilter, setMemberJourneyFilter] = useState("ALL");
+  const [memberSmartFilter, setMemberSmartFilter] = useState("");
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -3010,9 +3013,68 @@ function AppContent() {
     );
   };
 
-  const filteredMembers = members.filter((m) =>
-    memberMatchesSearch(m, memberSearch)
-  );
+  const formatMemberDate = (value) => {
+    if (!value) return "—";
+    const rawDate = value?.toDate ? value.toDate() : new Date(value);
+    if (Number.isNaN(rawDate.getTime())) return "—";
+    return rawDate.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const getMemberTagFlags = (member) => {
+    const now = Date.now();
+    const createdAtDate = member?.createdAt
+      ? new Date(member.createdAt)
+      : null;
+    const createdAtTime = createdAtDate ? createdAtDate.getTime() : NaN;
+    const isRecent =
+      !Number.isNaN(createdAtTime) &&
+      now - createdAtTime <= 1000 * 60 * 60 * 24 * 30;
+    const isNew =
+      member.status === "NEW_CONVERT" || member.journeyStatus === "FIRST_TIMER" || isRecent;
+    const isWorker =
+      member.status === "WORKER" || member.journeyStatus === "WORKER";
+    const needsFollowup =
+      member.wantsLeaderCall === "YES" ||
+      member.status === "VISITOR" ||
+      ["VISITOR", "FIRST_TIMER", "RETURNING"].includes(member.journeyStatus || "");
+
+    return { isNew, isWorker, needsFollowup };
+  };
+
+  const memberMatchesSmartFilter = (member, filterValue) => {
+    if (!filterValue) return true;
+    const { isNew, isWorker, needsFollowup } = getMemberTagFlags(member);
+    if (filterValue === "NEW") return isNew;
+    if (filterValue === "WORKER") return isWorker;
+    if (filterValue === "FOLLOW_UP") return needsFollowup;
+    return true;
+  };
+
+  const filteredMembers = members.filter((m) => {
+    if (!memberMatchesSearch(m, memberSearch)) return false;
+    if (memberStatusFilter !== "ALL" && m.status !== memberStatusFilter) return false;
+    if (memberJourneyFilter !== "ALL") {
+      const journeyValue = m.journeyStatus || "VISITOR";
+      if (journeyValue !== memberJourneyFilter) return false;
+    }
+    if (memberSmartFilter && !memberMatchesSmartFilter(m, memberSmartFilter)) return false;
+    return true;
+  });
+
+  const memberTagCounts = useMemo(() => {
+    const counts = { NEW: 0, WORKER: 0, FOLLOW_UP: 0 };
+    members.forEach((member) => {
+      const { isNew, isWorker, needsFollowup } = getMemberTagFlags(member);
+      if (isNew) counts.NEW += 1;
+      if (isWorker) counts.WORKER += 1;
+      if (needsFollowup) counts.FOLLOW_UP += 1;
+    });
+    return counts;
+  }, [members]);
 
   const normalizedCheckinSearch = normalizeSearchValue(
     memberAttendanceForm.search
@@ -4649,109 +4711,144 @@ function AppContent() {
                 </p>
               ) : (
                 <>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "10px",
-                      alignItems: "center",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Search members by name, phone, or email"
-                      value={memberSearch}
-                      onChange={(e) => setMemberSearch(e.target.value)}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: "10px",
-                        border: "1px solid #d1d5db",
-                        fontSize: "14px",
-                        minWidth: "260px",
-                      }}
-                    />
-                    {memberSearch && (
-                      <button
-                        onClick={() => setMemberSearch("")}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "10px",
-                          border: "1px solid #e5e7eb",
-                          background: "white",
-                          cursor: "pointer",
-                          fontSize: "13px",
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <span style={{ color: "#6b7280", fontSize: "13px" }}>
-                      Showing {filteredMembers.length} of {members.length} members
-                    </span>
-                  </div>
-
-                  <div
-                    className="members-table-wrapper"
-                    style={{ overflowX: "auto" }}
-                  >
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "13px",
-                      }}
-                    >
-                      <thead>
-                        <tr
-                          style={{
-                            textAlign: "left",
-                            borderBottom: "1px solid #e5e7eb",
+                  <div className="member-directory">
+                    <div className="member-filter-bar">
+                      <div className="member-filter-row">
+                        <input
+                          type="text"
+                          placeholder="Search by name, phone, or email"
+                          value={memberSearch}
+                          onChange={(e) => setMemberSearch(e.target.value)}
+                          className="member-search-input"
+                        />
+                        {memberSearch && (
+                          <button
+                            onClick={() => setMemberSearch("")}
+                            type="button"
+                            className="chip-button chip-secondary"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="member-filter-row">
+                        <select
+                          value={memberStatusFilter}
+                          onChange={(e) => setMemberStatusFilter(e.target.value)}
+                          className="member-filter-select"
+                        >
+                          <option value="ALL">All statuses</option>
+                          {memberStatusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={memberJourneyFilter}
+                          onChange={(e) => setMemberJourneyFilter(e.target.value)}
+                          className="member-filter-select"
+                        >
+                          <option value="ALL">All journeys</option>
+                          {journeyStatusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="chip-button chip-secondary"
+                          onClick={() => {
+                            setMemberStatusFilter("ALL");
+                            setMemberJourneyFilter("ALL");
+                            setMemberSmartFilter("");
                           }}
                         >
-                          <th style={{ padding: "6px 4px" }}>Name</th>
-                          <th style={{ padding: "6px 4px" }}>Photo</th>
-                          <th style={{ padding: "6px 4px" }}>Phone</th>
-                          <th style={{ padding: "6px 4px" }}>Email</th>
-                          <th style={{ padding: "6px 4px" }}>Status</th>
-                          <th style={{ padding: "6px 4px" }}>Date of birth</th>
-                          <th style={{ padding: "6px 4px" }}>Journey</th>
-                          <th style={{ padding: "6px 4px" }}>Follow-up</th>
-                          <th style={{ padding: "6px 4px" }}>Family</th>
-                          <th style={{ padding: "6px 4px" }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredMembers.map((m) => {
-                          const isEditing = editingMemberId === m.id;
-                          const memberPhotoSrc = m.photoDataUrl || m.photoUrl || "";
-                          const photoInputId = `member-photo-${m.id}`;
-                          const journeyStatusValue = m.journeyStatus || "VISITOR";
-                          const journeyStatusLabel =
-                            journeyStatusOptions.find((option) => option.value === journeyStatusValue)
-                              ?.label || journeyStatusValue;
-                          const familyMembers = Array.isArray(m.familyMembers) ? m.familyMembers : [];
-                          const journeyStatusDate = m.journeyStatusAt?.toDate
-                            ? m.journeyStatusAt.toDate()
-                            : m.journeyStatusAt
-                            ? new Date(m.journeyStatusAt)
-                            : null;
+                          Reset filters
+                        </button>
+                      </div>
+                      <div className="member-chip-row">
+                        {[
+                          { value: "NEW", label: "New", count: memberTagCounts.NEW },
+                          { value: "WORKER", label: "Worker", count: memberTagCounts.WORKER },
+                          {
+                            value: "FOLLOW_UP",
+                            label: "Follow-up",
+                            count: memberTagCounts.FOLLOW_UP,
+                          },
+                        ].map((chip) => {
+                          const isActive = memberSmartFilter === chip.value;
                           return (
-                            <tr
-                              key={m.id}
-                              style={{
-                                borderBottom: "1px solid #f3f4f6",
-                              }}
+                            <button
+                              key={chip.value}
+                              type="button"
+                              className={`chip-button ${isActive ? "chip-primary" : "chip-ghost"}`}
+                              onClick={() =>
+                                setMemberSmartFilter(isActive ? "" : chip.value)
+                              }
                             >
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      gap: "6px",
-                                      flexWrap: "wrap",
-                                    }}
-                                  >
+                              {chip.label}
+                              <span className="chip-count">{chip.count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="member-count-row">
+                        Showing {filteredMembers.length} of {members.length} members
+                      </div>
+                    </div>
+
+                    <div className="member-card-grid">
+                      {filteredMembers.map((m) => {
+                        const isEditing = editingMemberId === m.id;
+                        const memberPhotoSrc = m.photoDataUrl || m.photoUrl || "";
+                        const photoInputId = `member-photo-${m.id}`;
+                        const journeyStatusValue = m.journeyStatus || "VISITOR";
+                        const journeyStatusLabel =
+                          journeyStatusOptions.find(
+                            (option) => option.value === journeyStatusValue
+                          )?.label || journeyStatusValue;
+                        const familyMembers = Array.isArray(m.familyMembers)
+                          ? m.familyMembers
+                          : [];
+                        const journeyStatusDate = m.journeyStatusAt?.toDate
+                          ? m.journeyStatusAt.toDate()
+                          : m.journeyStatusAt
+                          ? new Date(m.journeyStatusAt)
+                          : null;
+                        const { isNew, isWorker, needsFollowup } = getMemberTagFlags(m);
+                        const tags = [
+                          isNew && { label: "New", tone: "success" },
+                          isWorker && { label: "Worker", tone: "purple" },
+                          needsFollowup && { label: "Follow-up", tone: "warning" },
+                        ].filter(Boolean);
+                        const memberStatusLabel =
+                          memberStatusOptions.find((opt) => opt.value === m.status)?.label ||
+                          "—";
+                        const lastAttendance = memberLastAttendance.get(m.id);
+                        const notes =
+                          m.journeyNote ||
+                          m.visitReason ||
+                          m.hearAboutUsOther ||
+                          "No notes yet";
+
+                        if (isEditing) {
+                          return (
+                            <div key={m.id} className="member-card member-card-editing">
+                              <div className="member-card-header">
+                                <div className="member-photo">
+                                  {editingMemberForm.photoDataUrl ? (
+                                    <img
+                                      src={editingMemberForm.photoDataUrl}
+                                      alt="Member photo preview"
+                                    />
+                                  ) : (
+                                    <span>{getMemberInitials(editingMemberForm)}</span>
+                                  )}
+                                </div>
+                                <div className="member-header-info">
+                                  <div className="member-edit-name">
                                     <input
                                       type="text"
                                       value={editingMemberForm.firstName}
@@ -4762,12 +4859,6 @@ function AppContent() {
                                         }))
                                       }
                                       placeholder="First name"
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                        width: "120px",
-                                      }}
                                     />
                                     <input
                                       type="text"
@@ -4779,51 +4870,9 @@ function AppContent() {
                                         }))
                                       }
                                       placeholder="Last name"
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                        width: "120px",
-                                      }}
                                     />
                                   </div>
-                                ) : (
-                                  <>{m.firstName} {m.lastName}</>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
-                                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                    <div
-                                      style={{
-                                        width: "34px",
-                                        height: "34px",
-                                        borderRadius: "999px",
-                                        border: "1px solid #e5e7eb",
-                                        background: "#f9fafb",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        overflow: "hidden",
-                                        fontSize: "12px",
-                                        fontWeight: 600,
-                                        color: "#6b7280",
-                                      }}
-                                    >
-                                      {editingMemberForm.photoDataUrl ? (
-                                        <img
-                                          src={editingMemberForm.photoDataUrl}
-                                          alt="Member photo preview"
-                                          style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            objectFit: "cover",
-                                          }}
-                                        />
-                                      ) : (
-                                        getMemberInitials(editingMemberForm)
-                                      )}
-                                    </div>
+                                  <div className="member-photo-actions">
                                     <input
                                       id={photoInputId}
                                       type="file"
@@ -4838,17 +4887,7 @@ function AppContent() {
                                       }}
                                       style={{ display: "none" }}
                                     />
-                                    <label
-                                      htmlFor={photoInputId}
-                                      style={{
-                                        padding: "6px 10px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                        background: "white",
-                                        cursor: "pointer",
-                                        fontSize: "12px",
-                                      }}
-                                    >
+                                    <label htmlFor={photoInputId} className="chip-button chip-ghost">
                                       Take photo
                                     </label>
                                     {editingMemberForm.photoDataUrl && (
@@ -4860,54 +4899,17 @@ function AppContent() {
                                             photoDataUrl: "",
                                           }))
                                         }
-                                        style={{
-                                          padding: "6px 10px",
-                                          borderRadius: "6px",
-                                          border: "1px solid #e5e7eb",
-                                          background: "white",
-                                          cursor: "pointer",
-                                          fontSize: "12px",
-                                        }}
+                                        className="chip-button chip-secondary"
                                       >
                                         Remove
                                       </button>
                                     )}
                                   </div>
-                                ) : (
-                                  <div
-                                    style={{
-                                      width: "34px",
-                                      height: "34px",
-                                      borderRadius: "999px",
-                                      border: "1px solid #e5e7eb",
-                                      background: "#f9fafb",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      overflow: "hidden",
-                                      fontSize: "12px",
-                                      fontWeight: 600,
-                                      color: "#6b7280",
-                                    }}
-                                  >
-                                    {memberPhotoSrc ? (
-                                      <img
-                                        src={memberPhotoSrc}
-                                        alt={`${m.firstName || ""} ${m.lastName || ""}`.trim() || "Member photo"}
-                                        style={{
-                                          width: "100%",
-                                          height: "100%",
-                                          objectFit: "cover",
-                                        }}
-                                      />
-                                    ) : (
-                                      getMemberInitials(m)
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
+                                </div>
+                              </div>
+                              <div className="member-edit-grid">
+                                <label>
+                                  Phone
                                   <input
                                     type="text"
                                     value={editingMemberForm.phone}
@@ -4918,19 +4920,10 @@ function AppContent() {
                                       }))
                                     }
                                     placeholder="Phone"
-                                    style={{
-                                      padding: "6px 8px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d1d5db",
-                                      width: "140px",
-                                    }}
                                   />
-                                ) : (
-                                  <>{m.phone || "-"}</>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
+                                </label>
+                                <label>
+                                  Email
                                   <input
                                     type="email"
                                     value={editingMemberForm.email}
@@ -4941,19 +4934,10 @@ function AppContent() {
                                       }))
                                     }
                                     placeholder="Email"
-                                    style={{
-                                      padding: "6px 8px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d1d5db",
-                                      width: "200px",
-                                    }}
                                   />
-                                ) : (
-                                  <>{m.email || "-"}</>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
+                                </label>
+                                <label>
+                                  Status
                                   <select
                                     value={editingMemberForm.status}
                                     onChange={(e) =>
@@ -4962,27 +4946,16 @@ function AppContent() {
                                         status: e.target.value,
                                       }))
                                     }
-                                    style={{
-                                      padding: "6px 8px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d1d5db",
-                                    }}
                                   >
-                                    <option value="VISITOR">Visitor</option>
-                                    <option value="NEW_CONVERT">New Convert</option>
-                                    <option value="REGULAR">Regular</option>
-                                    <option value="WORKER">Worker</option>
-                                    <option value="PASTOR">Pastor</option>
-                                    <option value="ELDER">Elder</option>
-                                    <option value="OTHER">Other</option>
-                                    <option value="INACTIVE">Inactive</option>
+                                    {memberStatusOptions.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
                                   </select>
-                                ) : (
-                                  <>{m.status}</>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
+                                </label>
+                                <label>
+                                  Date of birth
                                   <input
                                     type="date"
                                     value={editingMemberForm.dateOfBirth}
@@ -4992,421 +4965,328 @@ function AppContent() {
                                         dateOfBirth: e.target.value,
                                       }))
                                     }
-                                    style={{
-                                      padding: "6px 8px",
-                                      borderRadius: "6px",
-                                      border: "1px solid #d1d5db",
-                                    }}
                                   />
-                                ) : (
-                                  <>{formatDateOfBirth(m.dateOfBirth)}</>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px", minWidth: "160px" }}>
-                                {isEditing ? (
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                    <select
-                                      value={editingMemberForm.journeyStatus}
-                                      onChange={(e) =>
-                                        setEditingMemberForm((f) => ({
-                                          ...f,
-                                          journeyStatus: e.target.value,
-                                        }))
-                                      }
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                      }}
-                                    >
-                                      {journeyStatusOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
+                                </label>
+                                <label>
+                                  Journey stage
+                                  <select
+                                    value={editingMemberForm.journeyStatus}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        journeyStatus: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    {journeyStatusOptions.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  Journey note
+                                  <input
+                                    type="text"
+                                    value={editingMemberForm.journeyNote}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        journeyNote: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Journey note"
+                                  />
+                                </label>
+                                <label>
+                                  Heard about us
+                                  <select
+                                    value={editingMemberForm.hearAboutUs}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        hearAboutUs: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    {hearAboutOptions.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                {editingMemberForm.hearAboutUs === "OTHER" && (
+                                  <label>
+                                    Please specify
                                     <input
                                       type="text"
-                                      value={editingMemberForm.journeyNote}
+                                      value={editingMemberForm.hearAboutUsOther}
                                       onChange={(e) =>
                                         setEditingMemberForm((f) => ({
                                           ...f,
-                                          journeyNote: e.target.value,
+                                          hearAboutUsOther: e.target.value,
                                         }))
                                       }
-                                      placeholder="Journey note"
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                      }}
                                     />
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: "12px", color: "#374151" }}>
-                                    <div style={{ fontWeight: 600 }}>{journeyStatusLabel}</div>
-                                    {journeyStatusDate && !Number.isNaN(journeyStatusDate.getTime()) && (
-                                      <div style={{ color: "#6b7280" }}>
-                                        {journeyStatusDate.toLocaleDateString()}
-                                      </div>
-                                    )}
-                                    {Array.isArray(m.journeyHistory) && m.journeyHistory.length > 0 && (
-                                      <div style={{ color: "#6b7280" }}>
-                                        {m.journeyHistory[m.journeyHistory.length - 1]?.note || "—"}
-                                      </div>
-                                    )}
-                                  </div>
+                                  </label>
                                 )}
-                              </td>
-                              <td style={{ padding: "6px 4px", minWidth: "220px" }}>
-                                {isEditing ? (
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                    <select
-                                      value={editingMemberForm.hearAboutUs}
+                                <label className="member-edit-full">
+                                  Prayer request / visit reason
+                                  <input
+                                    type="text"
+                                    value={editingMemberForm.visitReason}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        visitReason: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Reason"
+                                  />
+                                </label>
+                                <label className="member-edit-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingMemberForm.visitReasonPrivate}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        visitReasonPrivate: e.target.checked,
+                                      }))
+                                    }
+                                  />
+                                  Private to leaders
+                                </label>
+                                <label>
+                                  Leader call
+                                  <select
+                                    value={editingMemberForm.wantsLeaderCall}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        wantsLeaderCall: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    <option value="NO">No</option>
+                                    <option value="YES">Yes</option>
+                                  </select>
+                                </label>
+                                {editingMemberForm.wantsLeaderCall === "YES" && (
+                                  <label>
+                                    Preferred call time
+                                    <input
+                                      type="text"
+                                      value={editingMemberForm.preferredCallTime}
                                       onChange={(e) =>
                                         setEditingMemberForm((f) => ({
                                           ...f,
-                                          hearAboutUs: e.target.value,
+                                          preferredCallTime: e.target.value,
                                         }))
                                       }
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                      }}
-                                    >
-                                      {hearAboutOptions.map((option) => (
-                                        <option key={option.value || "none"} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    {editingMemberForm.hearAboutUs === "OTHER" && (
-                                      <input
-                                        type="text"
-                                        value={editingMemberForm.hearAboutUsOther}
-                                        onChange={(e) =>
-                                          setEditingMemberForm((f) => ({
-                                            ...f,
-                                            hearAboutUsOther: e.target.value,
-                                          }))
-                                        }
-                                        placeholder="Share details"
-                                        style={{
-                                          padding: "6px 8px",
-                                          borderRadius: "6px",
-                                          border: "1px solid #d1d5db",
-                                        }}
-                                      />
-                                    )}
-                                    <textarea
-                                      value={editingMemberForm.visitReason}
-                                      onChange={(e) =>
-                                        setEditingMemberForm((f) => ({
-                                          ...f,
-                                          visitReason: e.target.value,
-                                        }))
-                                      }
-                                      placeholder="Reason / prayer request"
-                                      rows={2}
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                        resize: "vertical",
-                                      }}
+                                      placeholder="Preferred time"
                                     />
-                                    <label
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        fontSize: "11px",
-                                        color: "#374151",
-                                      }}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={editingMemberForm.visitReasonPrivate}
-                                        onChange={(e) =>
-                                          setEditingMemberForm((f) => ({
-                                            ...f,
-                                            visitReasonPrivate: e.target.checked,
-                                          }))
-                                        }
-                                      />
-                                      Private to leaders
-                                    </label>
-                                    <select
-                                      value={editingMemberForm.wantsLeaderCall}
-                                      onChange={(e) =>
-                                        setEditingMemberForm((f) => ({
-                                          ...f,
-                                          wantsLeaderCall: e.target.value,
-                                        }))
-                                      }
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                      }}
-                                    >
-                                      <option value="NO">Leader call: No</option>
-                                      <option value="YES">Leader call: Yes</option>
-                                    </select>
-                                    {editingMemberForm.wantsLeaderCall === "YES" && (
-                                      <input
-                                        type="text"
-                                        value={editingMemberForm.preferredCallTime}
-                                        onChange={(e) =>
-                                          setEditingMemberForm((f) => ({
-                                            ...f,
-                                            preferredCallTime: e.target.value,
-                                          }))
-                                        }
-                                        placeholder="Preferred time"
-                                        style={{
-                                          padding: "6px 8px",
-                                          borderRadius: "6px",
-                                          border: "1px solid #d1d5db",
-                                        }}
-                                      />
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: "12px", color: "#374151" }}>
-                                    <div style={{ fontWeight: 600 }}>
-                                      {m.hearAboutUs
-                                        ? hearAboutOptions.find(
-                                            (option) => option.value === m.hearAboutUs
-                                          )?.label || m.hearAboutUs
-                                        : "—"}
-                                    </div>
-                                    {m.hearAboutUsOther && (
-                                      <div style={{ color: "#6b7280" }}>{m.hearAboutUsOther}</div>
-                                    )}
-                                    <div style={{ color: "#6b7280" }}>
-                                      {m.visitReason
-                                        ? `${m.visitReasonPrivate ? "Private" : "Shareable"}: ${
-                                            m.visitReason
-                                          }`
-                                        : "No prayer request"}
-                                    </div>
-                                    <div style={{ color: "#6b7280" }}>
-                                      {m.wantsLeaderCall
-                                        ? `Call: Yes${m.preferredCallTime ? ` (${m.preferredCallTime})` : ""}`
-                                        : "Call: No"}
-                                    </div>
-                                  </div>
+                                  </label>
                                 )}
-                              </td>
-                              <td style={{ padding: "6px 4px", minWidth: "180px" }}>
-                                {isEditing ? (
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                    {(editingMemberForm.familyMembers || []).map((member, index) => (
-                                      <div
-                                        key={`edit-family-${index}`}
-                                        style={{
-                                          display: "grid",
-                                          gridTemplateColumns:
-                                            "repeat(auto-fit, minmax(90px, 1fr))",
-                                          gap: "6px",
-                                          alignItems: "center",
-                                        }}
-                                      >
-                                        <input
-                                          type="text"
-                                          value={member.firstName || ""}
-                                          onChange={(e) =>
-                                            updateFamilyMember(
-                                              setEditingMemberForm,
-                                              index,
-                                              "firstName",
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder="First"
-                                          style={{
-                                            padding: "6px 8px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #d1d5db",
-                                          }}
-                                        />
-                                        <input
-                                          type="text"
-                                          value={member.lastName || ""}
-                                          onChange={(e) =>
-                                            updateFamilyMember(
-                                              setEditingMemberForm,
-                                              index,
-                                              "lastName",
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder="Last"
-                                          style={{
-                                            padding: "6px 8px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #d1d5db",
-                                          }}
-                                        />
-                                        <select
-                                          value={member.relationship || "CHILD"}
-                                          onChange={(e) =>
-                                            updateFamilyMember(
-                                              setEditingMemberForm,
-                                              index,
-                                              "relationship",
-                                              e.target.value
-                                            )
-                                          }
-                                          style={{
-                                            padding: "6px 8px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #d1d5db",
-                                          }}
-                                        >
-                                          <option value="SPOUSE">Spouse</option>
-                                          <option value="CHILD">Child</option>
-                                          <option value="OTHER">Other</option>
-                                        </select>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            removeFamilyMember(setEditingMemberForm, index)
-                                          }
-                                          style={{
-                                            padding: "6px 8px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #e5e7eb",
-                                            background: "white",
-                                            cursor: "pointer",
-                                            fontSize: "11px",
-                                          }}
-                                        >
-                                          Remove
-                                        </button>
-                                      </div>
-                                    ))}
+                              </div>
+                              <div className="member-edit-family">
+                                <div className="member-edit-section-title">Family</div>
+                                {(editingMemberForm.familyMembers || []).map((member, index) => (
+                                  <div key={`edit-family-${index}`} className="member-edit-family-row">
+                                    <input
+                                      type="text"
+                                      value={member.firstName || ""}
+                                      onChange={(e) =>
+                                        updateFamilyMember(
+                                          setEditingMemberForm,
+                                          index,
+                                          "firstName",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="First"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={member.lastName || ""}
+                                      onChange={(e) =>
+                                        updateFamilyMember(
+                                          setEditingMemberForm,
+                                          index,
+                                          "lastName",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Last"
+                                    />
+                                    <select
+                                      value={member.relationship || "CHILD"}
+                                      onChange={(e) =>
+                                        updateFamilyMember(
+                                          setEditingMemberForm,
+                                          index,
+                                          "relationship",
+                                          e.target.value
+                                        )
+                                      }
+                                    >
+                                      <option value="SPOUSE">Spouse</option>
+                                      <option value="CHILD">Child</option>
+                                      <option value="OTHER">Other</option>
+                                    </select>
                                     <button
                                       type="button"
-                                      onClick={() => addFamilyMember(setEditingMemberForm)}
-                                      style={{
-                                        alignSelf: "flex-start",
-                                        padding: "6px 10px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #d1d5db",
-                                        background: "white",
-                                        cursor: "pointer",
-                                        fontSize: "11px",
-                                      }}
+                                      onClick={() =>
+                                        removeFamilyMember(setEditingMemberForm, index)
+                                      }
+                                      className="chip-button chip-secondary"
                                     >
-                                      Add family
+                                      Remove
                                     </button>
                                   </div>
-                                ) : (
-                                  <div style={{ fontSize: "12px", color: "#374151" }}>
-                                    {familyMembers.length === 0 ? (
-                                      "—"
-                                    ) : (
-                                      <>
-                                        <div style={{ fontWeight: 600 }}>
-                                          {familyMembers.length} family member
-                                          {familyMembers.length > 1 ? "s" : ""}
-                                        </div>
-                                        <div style={{ color: "#6b7280" }}>
-                                          {familyMembers
-                                            .slice(0, 2)
-                                            .map((member) =>
-                                              `${member.firstName || ""} ${member.lastName || ""}`.trim()
-                                            )
-                                            .filter(Boolean)
-                                            .join(", ")}
-                                          {familyMembers.length > 2 ? "…" : ""}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ padding: "6px 4px" }}>
-                                {isEditing ? (
-                                  <div
-                                    style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
-                                  >
-                                    <button
-                                      onClick={handleUpdateMember}
-                                      disabled={memberActionLoading}
-                                      style={{
-                                        padding: "6px 10px",
-                                        borderRadius: "6px",
-                                        border: "none",
-                                        background: "#111827",
-                                        color: "white",
-                                        cursor: memberActionLoading ? "default" : "pointer",
-                                        fontSize: "12px",
-                                      }}
-                                    >
-                                      {memberActionLoading ? "Saving..." : "Save"}
-                                    </button>
-                                    <button
-                                      onClick={cancelEditingMember}
-                                      disabled={memberActionLoading}
-                                      style={{
-                                        padding: "6px 10px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #e5e7eb",
-                                        background: "white",
-                                        color: "#111827",
-                                        cursor: memberActionLoading ? "default" : "pointer",
-                                        fontSize: "12px",
-                                      }}
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div
-                                    style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
-                                  >
-                                    <button
-                                      onClick={() => startEditingMember(m)}
-                                      disabled={memberActionLoading}
-                                      style={{
-                                        padding: "6px 10px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #e5e7eb",
-                                        background: "white",
-                                        color: "#111827",
-                                        cursor: memberActionLoading ? "default" : "pointer",
-                                        fontSize: "12px",
-                                      }}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteMember(m.id)}
-                                      disabled={memberActionLoading}
-                                      style={{
-                                        padding: "6px 10px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #ef4444",
-                                        background: memberActionLoading ? "#fee2e2" : "#fef2f2",
-                                        color: "#b91c1c",
-                                        cursor: memberActionLoading ? "default" : "pointer",
-                                        fontSize: "12px",
-                                      }}
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => addFamilyMember(setEditingMemberForm)}
+                                  className="chip-button chip-ghost"
+                                >
+                                  Add family member
+                                </button>
+                              </div>
+                              <div className="member-card-actions">
+                                <button
+                                  onClick={handleUpdateMember}
+                                  disabled={memberActionLoading}
+                                  className="primary-action"
+                                >
+                                  {memberActionLoading ? "Saving..." : "Save changes"}
+                                </button>
+                                <button
+                                  onClick={cancelEditingMember}
+                                  disabled={memberActionLoading}
+                                  className="secondary-action"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
                           );
-                        })}
-                      </tbody>
-                    </table>
+                        }
+
+                        return (
+                          <div key={m.id} className="member-card">
+                            <div className="member-card-header">
+                              <div className="member-photo">
+                                {memberPhotoSrc ? (
+                                  <img
+                                    src={memberPhotoSrc}
+                                    alt={`${m.firstName || ""} ${m.lastName || ""}`.trim() || "Member photo"}
+                                  />
+                                ) : (
+                                  <span>{getMemberInitials(m)}</span>
+                                )}
+                              </div>
+                              <div className="member-header-info">
+                                <div className="member-name">
+                                  {m.firstName} {m.lastName}
+                                </div>
+                                <div className="member-contact">
+                                  <span>{m.phone || "Phone unlisted"}</span>
+                                  <span>{m.email || "Email unlisted"}</span>
+                                </div>
+                                <div className="member-tags">
+                                  {tags.length === 0 ? (
+                                    <span className="member-tag muted">No tags</span>
+                                  ) : (
+                                    tags.map((tag) => (
+                                      <span
+                                        key={tag.label}
+                                        className={`member-tag member-tag-${tag.tone}`}
+                                      >
+                                        {tag.label}
+                                      </span>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                              <div className="member-card-actions">
+                                <button
+                                  onClick={() => startEditingMember(m)}
+                                  disabled={memberActionLoading}
+                                  className="secondary-action"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMember(m.id)}
+                                  disabled={memberActionLoading}
+                                  className="danger-action"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                            <div className="member-card-body">
+                              <div className="member-timeline">
+                                <div className="timeline-item">
+                                  <span className="timeline-label">Joined</span>
+                                  <span>{formatMemberDate(m.createdAt)}</span>
+                                </div>
+                                <div className="timeline-item">
+                                  <span className="timeline-label">Last attendance</span>
+                                  <span>{formatMemberDate(lastAttendance)}</span>
+                                </div>
+                                <div className="timeline-item">
+                                  <span className="timeline-label">Notes</span>
+                                  <span>{notes}</span>
+                                </div>
+                              </div>
+                              <div className="member-detail-grid">
+                                <div>
+                                  <div className="detail-label">Status</div>
+                                  <div className="detail-value">{memberStatusLabel}</div>
+                                </div>
+                                <div>
+                                  <div className="detail-label">Journey</div>
+                                  <div className="detail-value">{journeyStatusLabel}</div>
+                                  {journeyStatusDate && (
+                                    <div className="detail-sub">
+                                      Updated {formatMemberDate(journeyStatusDate)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="detail-label">Follow-up</div>
+                                  <div className="detail-value">
+                                    {m.wantsLeaderCall === "YES"
+                                      ? "Leader call requested"
+                                      : "No call requested"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-label">Family</div>
+                                  <div className="detail-value">
+                                    {familyMembers.length === 0
+                                      ? "—"
+                                      : `${familyMembers.length} family member${
+                                          familyMembers.length > 1 ? "s" : ""
+                                        }`}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-label">Date of birth</div>
+                                  <div className="detail-value">
+                                    {formatDateOfBirth(m.dateOfBirth)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               )}
