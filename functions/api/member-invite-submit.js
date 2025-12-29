@@ -1,4 +1,5 @@
 const { admin, db, initError } = require("../lib/firestoreAdmin");
+const { randomUUID } = require("crypto");
 const { verifyJwt } = require("../lib/jwtHelpers");
 
 const jwtSecret =
@@ -34,6 +35,38 @@ function sanitizePhotoDataUrl(photoDataUrlRaw) {
   }
 
   return raw;
+}
+
+function parsePhotoDataUrl(photoDataUrl) {
+  const match = `${photoDataUrl}`.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+  if (!match) {
+    throw new Error("Photo format is invalid.");
+  }
+  return { contentType: match[1], base64: match[2] };
+}
+
+async function uploadMemberPhoto({ churchId, photoDataUrl }) {
+  if (!photoDataUrl) return "";
+  const bucket = admin.storage().bucket();
+  const { contentType, base64 } = parsePhotoDataUrl(photoDataUrl);
+  const buffer = Buffer.from(base64, "base64");
+  const extension = contentType.split("/")[1] || "jpg";
+  const fileName = `member-photos/${churchId}/${Date.now()}-${randomUUID()}.${extension}`;
+  const downloadToken = randomUUID();
+  const file = bucket.file(fileName);
+
+  await file.save(buffer, {
+    metadata: {
+      contentType,
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+      },
+    },
+  });
+
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
+    fileName
+  )}?alt=media&token=${downloadToken}`;
 }
 
 function normalizeText(value) {
@@ -203,6 +236,10 @@ module.exports = async function handler(request, response) {
       email: trimmedEmail,
     });
 
+    const photoUrl = safePhoto
+      ? await uploadMemberPhoto({ churchId, photoDataUrl: safePhoto })
+      : "";
+
     const followupPayload = {
       ...(normalizedHearAbout ? { hearAboutUs: normalizedHearAbout } : {}),
       ...(normalizedHearAboutOther ? { hearAboutUsOther: normalizedHearAboutOther } : {}),
@@ -236,13 +273,14 @@ module.exports = async function handler(request, response) {
         ];
       }
 
-      if (safePhoto && !existing.data?.photoDataUrl) {
+      if (photoUrl && !existing.data?.photoUrl) {
         await db
           .collection("members")
           .doc(existing.id)
           .set(
             {
-              photoDataUrl: safePhoto,
+              photoUrl,
+              photoDataUrl: admin.firestore.FieldValue.delete(),
               ...followupPayload,
               ...journeyUpdates,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -291,7 +329,7 @@ module.exports = async function handler(request, response) {
         },
       ],
       ...(trimmedDob ? { dateOfBirth: trimmedDob } : {}),
-      ...(safePhoto ? { photoDataUrl: safePhoto } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
       ...(normalizedHearAbout ? { hearAboutUs: normalizedHearAbout } : {}),
       ...(normalizedHearAboutOther ? { hearAboutUsOther: normalizedHearAboutOther } : {}),
       ...(normalizedVisitReason ? { visitReason: normalizedVisitReason } : {}),
