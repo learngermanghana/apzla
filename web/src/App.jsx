@@ -142,6 +142,7 @@ function AppContent() {
     prayerRequestPrivate: true,
     wantsLeaderCall: false,
     preferredCallTime: "",
+    departments: [],
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -160,8 +161,17 @@ function AppContent() {
     prayerRequestPrivate: true,
     wantsLeaderCall: false,
     preferredCallTime: "",
+    departments: [],
   });
   const [memberSearch, setMemberSearch] = useState("");
+
+  const DEFAULT_DEPARTMENTS = [
+    { slug: "choir", name: "Choir" },
+    { slug: "media", name: "Media" },
+    { slug: "ushers", name: "Ushers" },
+    { slug: "youth", name: "Youth" },
+    { slug: "men-women-ministry", name: "Men/Women Ministry" },
+  ];
 
   const referralSourceOptions = [
     { value: "", label: "Select..." },
@@ -190,6 +200,19 @@ function AppContent() {
     });
     return map;
   }, [members]);
+
+  const departmentLookup = useMemo(() => {
+    const map = new Map();
+    departments.forEach((department) => {
+      map.set(department.id, department.name);
+    });
+    return map;
+  }, [departments]);
+
+  const resolveMemberDepartments = (member) =>
+    (member.departments || [])
+      .map((deptId) => departmentLookup.get(deptId))
+      .filter(Boolean);
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -258,6 +281,23 @@ function AppContent() {
   const [memberInviteLoading, setMemberInviteLoading] = useState(false);
   const [memberInviteError, setMemberInviteError] = useState("");
   const [memberInviteBaseUrl, setMemberInviteBaseUrl] = useState(defaultBaseUrl);
+
+  // Departments
+  const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [activeDepartmentId, setActiveDepartmentId] = useState("");
+  const [departmentAttendanceRecords, setDepartmentAttendanceRecords] = useState([]);
+  const [departmentAttendanceLoading, setDepartmentAttendanceLoading] = useState(false);
+  const [departmentAttendanceSaving, setDepartmentAttendanceSaving] = useState(false);
+  const [departmentAttendanceForm, setDepartmentAttendanceForm] = useState({
+    departmentId: "",
+    date: todayStr,
+    memberIds: [],
+  });
+  const [departmentAttendanceRecordId, setDepartmentAttendanceRecordId] = useState(null);
+  const [departmentMessage, setDepartmentMessage] = useState(
+    "Hi team! Just a quick reminder about our upcoming department gathering."
+  );
 
   // Giving (collections & tithes)
   const [giving, setGiving] = useState([]);
@@ -1089,6 +1129,9 @@ function AppContent() {
         preferredCallTime: memberForm.wantsLeaderCall
           ? memberForm.preferredCallTime.trim()
           : "",
+        departments: Array.isArray(memberForm.departments)
+          ? memberForm.departments
+          : [],
         createdAt: now,
       });
 
@@ -1108,6 +1151,7 @@ function AppContent() {
         prayerRequestPrivate: true,
         wantsLeaderCall: false,
         preferredCallTime: "",
+        departments: [],
       });
 
       await loadMembers();
@@ -1140,6 +1184,7 @@ function AppContent() {
       prayerRequestPrivate: member.prayerRequestPrivate ?? true,
       wantsLeaderCall: Boolean(member.wantsLeaderCall),
       preferredCallTime: member.preferredCallTime || "",
+      departments: Array.isArray(member.departments) ? member.departments : [],
     });
   };
 
@@ -1163,6 +1208,7 @@ function AppContent() {
       prayerRequestPrivate: true,
       wantsLeaderCall: false,
       preferredCallTime: "",
+      departments: [],
     });
   };
 
@@ -1208,6 +1254,9 @@ function AppContent() {
         preferredCallTime: editingMemberForm.wantsLeaderCall
           ? editingMemberForm.preferredCallTime.trim()
           : "",
+        departments: Array.isArray(editingMemberForm.departments)
+          ? editingMemberForm.departments
+          : [],
         updatedAt: now,
       };
 
@@ -1257,6 +1306,215 @@ function AppContent() {
     }
   };
 
+  // ---------- Departments ----------
+  const loadDepartments = async () => {
+    if (!userProfile?.churchId) return;
+    setDepartmentsLoading(true);
+
+    try {
+      const colRef = collection(db, "departments");
+      const qDepartments = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId)
+      );
+      const snapshot = await getDocs(qDepartments);
+      const existing = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      const existingSlugs = new Set(existing.map((dept) => dept.slug));
+      const missing = DEFAULT_DEPARTMENTS.filter(
+        (dept) => !existingSlugs.has(dept.slug)
+      );
+      const now = new Date().toISOString();
+      let created = [];
+
+      if (missing.length > 0) {
+        created = await Promise.all(
+          missing.map(async (dept) => {
+            const payload = {
+              churchId: userProfile.churchId,
+              name: dept.name,
+              slug: dept.slug,
+              leaderMemberId: "",
+              leaderName: "",
+              leaderEmail: "",
+              createdAt: now,
+            };
+            const docRef = await addDoc(collection(db, "departments"), payload);
+            return { id: docRef.id, ...payload };
+          })
+        );
+      }
+
+      const merged = [...existing, ...created].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+      );
+      setDepartments(merged);
+
+      if (!activeDepartmentId && merged.length > 0) {
+        setActiveDepartmentId(merged[0].id);
+        setDepartmentAttendanceForm((prev) => ({
+          ...prev,
+          departmentId: merged[0].id,
+        }));
+      }
+    } catch (err) {
+      console.error("Load departments error:", err);
+      showToast(err.message || "Unable to load departments.", "error");
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
+
+  const handleUpdateDepartmentLeader = async (departmentId, leaderMemberId) => {
+    if (!departmentId) return;
+    const leader = members.find((member) => member.id === leaderMemberId);
+    const payload = {
+      leaderMemberId: leaderMemberId || "",
+      leaderName: leader
+        ? `${leader.firstName || ""} ${leader.lastName || ""}`.trim()
+        : "",
+      leaderEmail: leader?.email || "",
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await updateDoc(doc(db, "departments", departmentId), payload);
+      setDepartments((prev) =>
+        prev.map((dept) =>
+          dept.id === departmentId ? { ...dept, ...payload } : dept
+        )
+      );
+      showToast("Department leader updated.", "success");
+    } catch (err) {
+      console.error("Update department leader error:", err);
+      showToast(err.message || "Unable to update leader.", "error");
+    }
+  };
+
+  const loadDepartmentAttendanceRecords = async (departmentId) => {
+    if (!userProfile?.churchId || !departmentId) {
+      setDepartmentAttendanceRecords([]);
+      return;
+    }
+
+    setDepartmentAttendanceLoading(true);
+    try {
+      const colRef = collection(db, "departmentAttendance");
+      const qAttendance = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId),
+        where("departmentId", "==", departmentId),
+        orderBy("date", "desc")
+      );
+      const snapshot = await getDocs(qAttendance);
+      const records = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setDepartmentAttendanceRecords(records);
+    } catch (err) {
+      console.error("Load department attendance error:", err);
+      showToast(err.message || "Unable to load department attendance.", "error");
+    } finally {
+      setDepartmentAttendanceLoading(false);
+    }
+  };
+
+  const loadDepartmentAttendanceForDate = async (departmentId, date) => {
+    if (!userProfile?.churchId || !departmentId || !date) {
+      setDepartmentAttendanceRecordId(null);
+      setDepartmentAttendanceForm((prev) => ({ ...prev, memberIds: [] }));
+      return;
+    }
+
+    try {
+      const colRef = collection(db, "departmentAttendance");
+      const qAttendance = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId),
+        where("departmentId", "==", departmentId),
+        where("date", "==", date),
+        limit(1)
+      );
+      const snapshot = await getDocs(qAttendance);
+      if (snapshot.empty) {
+        setDepartmentAttendanceRecordId(null);
+        setDepartmentAttendanceForm((prev) => ({ ...prev, memberIds: [] }));
+        return;
+      }
+
+      const recordDoc = snapshot.docs[0];
+      const data = recordDoc.data();
+      setDepartmentAttendanceRecordId(recordDoc.id);
+      setDepartmentAttendanceForm((prev) => ({
+        ...prev,
+        memberIds: Array.isArray(data.memberIds) ? data.memberIds : [],
+      }));
+    } catch (err) {
+      console.error("Load department attendance record error:", err);
+      showToast(err.message || "Unable to load attendance record.", "error");
+    }
+  };
+
+  const handleSaveDepartmentAttendance = async () => {
+    if (!userProfile?.churchId) return;
+    if (!departmentAttendanceForm.departmentId) {
+      showToast("Select a department first.", "error");
+      return;
+    }
+
+    const department = departments.find(
+      (dept) => dept.id === departmentAttendanceForm.departmentId
+    );
+
+    if (!department) {
+      showToast("Selected department not found.", "error");
+      return;
+    }
+
+    try {
+      setDepartmentAttendanceSaving(true);
+      const now = new Date().toISOString();
+      const payload = {
+        churchId: userProfile.churchId,
+        departmentId: department.id,
+        departmentName: department.name,
+        date: departmentAttendanceForm.date,
+        memberIds: departmentAttendanceForm.memberIds,
+        total: departmentAttendanceForm.memberIds.length,
+        updatedAt: now,
+      };
+
+      if (departmentAttendanceRecordId) {
+        await updateDoc(
+          doc(db, "departmentAttendance", departmentAttendanceRecordId),
+          payload
+        );
+        showToast("Department attendance updated.", "success");
+      } else {
+        const docRef = await addDoc(
+          collection(db, "departmentAttendance"),
+          {
+            ...payload,
+            createdAt: now,
+          }
+        );
+        setDepartmentAttendanceRecordId(docRef.id);
+        showToast("Department attendance saved.", "success");
+      }
+
+      await loadDepartmentAttendanceRecords(department.id);
+    } catch (err) {
+      console.error("Save department attendance error:", err);
+      showToast(err.message || "Unable to save department attendance.", "error");
+    } finally {
+      setDepartmentAttendanceSaving(false);
+    }
+  };
+
   useEffect(() => {
     setMemberPageCursor(null);
     setMembersHasMore(true);
@@ -1272,6 +1530,41 @@ function AppContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
+
+  useEffect(() => {
+    if (!userProfile?.churchId) return;
+    loadDepartments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.churchId]);
+
+  useEffect(() => {
+    if (!activeDepartmentId) return;
+    setDepartmentAttendanceForm((prev) => ({
+      ...prev,
+      departmentId: activeDepartmentId,
+    }));
+  }, [activeDepartmentId]);
+
+  useEffect(() => {
+    if (activeTab !== "departments") return;
+    if (!userProfile?.churchId || !departmentAttendanceForm.departmentId) return;
+    loadDepartmentAttendanceRecords(departmentAttendanceForm.departmentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId, departmentAttendanceForm.departmentId]);
+
+  useEffect(() => {
+    if (activeTab !== "departments") return;
+    loadDepartmentAttendanceForDate(
+      departmentAttendanceForm.departmentId,
+      departmentAttendanceForm.date
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeTab,
+    departmentAttendanceForm.departmentId,
+    departmentAttendanceForm.date,
+    userProfile?.churchId,
+  ]);
 
   const loadMoreMembers = () => {
     if (!membersHasMore || membersLoading) return;
@@ -2954,17 +3247,77 @@ function AppContent() {
       .trim();
     const phone = (member.phone || "").toLowerCase();
     const email = (member.email || "").toLowerCase();
+    const departmentsText = resolveMemberDepartments(member)
+      .join(" ")
+      .toLowerCase();
 
     return (
       fullName.includes(normalized) ||
       phone.includes(normalized) ||
-      email.includes(normalized)
+      email.includes(normalized) ||
+      departmentsText.includes(normalized)
     );
   };
 
   const filteredMembers = members.filter((m) =>
     memberMatchesSearch(m, memberSearch)
   );
+
+  const selectedDepartmentId =
+    departmentAttendanceForm.departmentId || activeDepartmentId;
+  const selectedDepartment = departments.find(
+    (dept) => dept.id === selectedDepartmentId
+  );
+  const selectedDepartmentMembers = useMemo(() => {
+    if (!selectedDepartment) return [];
+    return members.filter((member) =>
+      (member.departments || []).includes(selectedDepartment.id)
+    );
+  }, [members, selectedDepartment]);
+
+  const canMessageSelectedDepartment = Boolean(
+    selectedDepartment &&
+      (userProfile?.role?.includes("ADMIN") ||
+        (user?.email &&
+          selectedDepartment.leaderEmail &&
+          user.email.toLowerCase() ===
+            selectedDepartment.leaderEmail.toLowerCase()))
+  );
+
+  const departmentEmailList = useMemo(
+    () =>
+      selectedDepartmentMembers
+        .map((member) => (member.email || "").trim())
+        .filter(Boolean)
+        .join(","),
+    [selectedDepartmentMembers]
+  );
+
+  const departmentPhoneList = useMemo(
+    () =>
+      selectedDepartmentMembers
+        .map((member) => (member.phone || "").trim())
+        .filter(Boolean)
+        .join(", "),
+    [selectedDepartmentMembers]
+  );
+
+  const departmentMemberCounts = useMemo(() => {
+    const counts = new Map();
+    departments.forEach((dept) => counts.set(dept.id, 0));
+    members.forEach((member) => {
+      (member.departments || []).forEach((deptId) => {
+        counts.set(deptId, (counts.get(deptId) || 0) + 1);
+      });
+    });
+    return counts;
+  }, [departments, members]);
+
+  const departmentMailtoLink = selectedDepartment
+    ? `mailto:?bcc=${encodeURIComponent(departmentEmailList)}&subject=${encodeURIComponent(
+        `${selectedDepartment.name} update`
+      )}&body=${encodeURIComponent(departmentMessage)}`
+    : "";
 
   const normalizedCheckinSearch = normalizeSearchValue(
     memberAttendanceForm.search
@@ -4297,6 +4650,67 @@ function AppContent() {
                   </option>
                 ))}
               </select>
+              <div
+                style={{
+                  gridColumn: "span 2",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "10px",
+                  background: "white",
+                }}
+              >
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>
+                  Departments
+                </div>
+                {departments.length === 0 ? (
+                  <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#6b7280" }}>
+                    Department list is loading...
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "8px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    {departments.map((dept) => {
+                      const isChecked = memberForm.departments.includes(dept.id);
+                      return (
+                        <label
+                          key={dept.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            fontSize: "12px",
+                            color: "#374151",
+                            padding: "6px 8px",
+                            borderRadius: "999px",
+                            border: "1px solid #e5e7eb",
+                            background: isChecked ? "#eef2ff" : "#f9fafb",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() =>
+                              setMemberForm((f) => ({
+                                ...f,
+                                departments: isChecked
+                                  ? f.departments.filter((id) => id !== dept.id)
+                                  : [...f.departments, dept.id],
+                              }))
+                            }
+                          />
+                          {dept.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <textarea
                 placeholder="Journey notes (optional)"
                 value={memberForm.journeyNotes}
@@ -4566,6 +4980,7 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
                           <th style={{ padding: "6px 4px" }}>Journey</th>
+                          <th style={{ padding: "6px 4px" }}>Departments</th>
                           <th style={{ padding: "6px 4px" }}>Follow-up</th>
                           <th style={{ padding: "6px 4px" }}>Date of birth</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
@@ -4876,6 +5291,85 @@ function AppContent() {
                                   </div>
                                 )}
                               </td>
+                              <td style={{ padding: "6px 4px", minWidth: "200px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {departments.length === 0 ? (
+                                      <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+                                        No departments yet.
+                                      </span>
+                                    ) : (
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          flexWrap: "wrap",
+                                          gap: "6px",
+                                        }}
+                                      >
+                                        {departments.map((dept) => {
+                                          const isChecked = editingMemberForm.departments.includes(
+                                            dept.id
+                                          );
+                                          return (
+                                            <label
+                                              key={dept.id}
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "4px",
+                                                fontSize: "11px",
+                                                color: "#374151",
+                                                padding: "4px 6px",
+                                                borderRadius: "999px",
+                                                border: "1px solid #e5e7eb",
+                                                background: isChecked ? "#eef2ff" : "#f9fafb",
+                                              }}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() =>
+                                                  setEditingMemberForm((f) => ({
+                                                    ...f,
+                                                    departments: isChecked
+                                                      ? f.departments.filter(
+                                                          (id) => id !== dept.id
+                                                        )
+                                                      : [...f.departments, dept.id],
+                                                  }))
+                                                }
+                                              />
+                                              {dept.name}
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                    {resolveMemberDepartments(m).length > 0 ? (
+                                      resolveMemberDepartments(m).map((name) => (
+                                        <span
+                                          key={`${m.id}-${name}`}
+                                          style={{
+                                            padding: "4px 8px",
+                                            borderRadius: "999px",
+                                            background: "#eef2ff",
+                                            color: "#3730a3",
+                                            fontSize: "11px",
+                                            fontWeight: 600,
+                                          }}
+                                        >
+                                          {name}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span style={{ fontSize: "12px", color: "#9ca3af" }}>—</span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
                               <td style={{ padding: "6px 4px", minWidth: "220px" }}>
                                 {isEditing ? (
                                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -5139,6 +5633,396 @@ function AppContent() {
                   {membersLoading ? "Loading..." : "Load more members"}
                 </button>
               )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "departments" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Organize your small groups and departments, assign leaders, track
+              attendance, and share updates with members.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(220px, 1fr) minmax(0, 2fr)",
+                gap: "16px",
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  background: "#f9fafb",
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: "8px" }}>
+                  Departments
+                </div>
+                {departmentsLoading ? (
+                  <p style={{ fontSize: "13px", color: "#6b7280" }}>
+                    Loading departments...
+                  </p>
+                ) : departments.length === 0 ? (
+                  <p style={{ fontSize: "13px", color: "#9ca3af" }}>
+                    No departments yet.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {departments.map((dept) => {
+                      const isSelected = selectedDepartmentId === dept.id;
+                      const memberCount = departmentMemberCounts.get(dept.id) || 0;
+                      return (
+                        <button
+                          key={dept.id}
+                          onClick={() => setActiveDepartmentId(dept.id)}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: "10px",
+                            border: isSelected
+                              ? "2px solid #4f46e5"
+                              : "1px solid #e5e7eb",
+                            background: isSelected ? "#eef2ff" : "white",
+                            textAlign: "left",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, color: "#111827" }}>
+                            {dept.name}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            Leader: {dept.leaderName || "Unassigned"}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            Members: {memberCount}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {selectedDepartment ? (
+                  <>
+                    <div
+                      style={{
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "16px",
+                        background: "white",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <div>
+                          <h2 style={{ margin: 0, fontSize: "18px" }}>
+                            {selectedDepartment.name}
+                          </h2>
+                          <p style={{ margin: "6px 0 0", color: "#6b7280", fontSize: "13px" }}>
+                            {selectedDepartmentMembers.length} members assigned
+                          </p>
+                        </div>
+                        <div style={{ minWidth: "220px" }}>
+                          <label
+                            style={{ display: "block", fontSize: "12px", color: "#6b7280" }}
+                          >
+                            Department leader
+                          </label>
+                          <select
+                            value={selectedDepartment.leaderMemberId || ""}
+                            onChange={(e) =>
+                              handleUpdateDepartmentLeader(selectedDepartment.id, e.target.value)
+                            }
+                            style={{
+                              marginTop: "4px",
+                              width: "100%",
+                              padding: "8px 10px",
+                              borderRadius: "8px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "13px",
+                            }}
+                          >
+                            <option value="">Unassigned</option>
+                            {members.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.firstName || ""} {member.lastName || ""}{" "}
+                                {member.email ? `(${member.email})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "16px",
+                        background: "#fff",
+                      }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>Attendance tracking</h3>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "10px",
+                          alignItems: "center",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <label style={{ fontSize: "13px", color: "#374151" }}>
+                          Service date
+                          <input
+                            type="date"
+                            value={departmentAttendanceForm.date}
+                            onChange={(e) =>
+                              setDepartmentAttendanceForm((prev) => ({
+                                ...prev,
+                                date: e.target.value,
+                              }))
+                            }
+                            style={{
+                              marginLeft: "8px",
+                              padding: "6px 8px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                            }}
+                          />
+                        </label>
+                        <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                          Present: {departmentAttendanceForm.memberIds.length} /{" "}
+                          {selectedDepartmentMembers.length}
+                        </span>
+                      </div>
+
+                      {selectedDepartmentMembers.length === 0 ? (
+                        <p style={{ fontSize: "13px", color: "#9ca3af" }}>
+                          No members assigned to this department yet.
+                        </p>
+                      ) : (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                            gap: "8px",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          {selectedDepartmentMembers.map((member) => {
+                            const isPresent = departmentAttendanceForm.memberIds.includes(
+                              member.id
+                            );
+                            return (
+                              <label
+                                key={member.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  fontSize: "12px",
+                                  padding: "6px 8px",
+                                  borderRadius: "8px",
+                                  border: "1px solid #e5e7eb",
+                                  background: isPresent ? "#ecfeff" : "#f9fafb",
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isPresent}
+                                  onChange={() =>
+                                    setDepartmentAttendanceForm((prev) => ({
+                                      ...prev,
+                                      memberIds: isPresent
+                                        ? prev.memberIds.filter((id) => id !== member.id)
+                                        : [...prev.memberIds, member.id],
+                                    }))
+                                  }
+                                />
+                                {member.firstName || ""} {member.lastName || ""}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={handleSaveDepartmentAttendance}
+                        disabled={departmentAttendanceSaving}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: departmentAttendanceSaving ? "#9ca3af" : "#111827",
+                          color: "white",
+                          cursor: departmentAttendanceSaving ? "default" : "pointer",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {departmentAttendanceSaving ? "Saving..." : "Save attendance"}
+                      </button>
+
+                      <div style={{ marginTop: "16px" }}>
+                        <h4 style={{ margin: "0 0 8px" }}>Recent attendance</h4>
+                        {departmentAttendanceLoading ? (
+                          <p style={{ fontSize: "13px", color: "#6b7280" }}>
+                            Loading attendance history...
+                          </p>
+                        ) : departmentAttendanceRecords.length === 0 ? (
+                          <p style={{ fontSize: "13px", color: "#9ca3af" }}>
+                            No attendance records yet.
+                          </p>
+                        ) : (
+                          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                            {departmentAttendanceRecords.slice(0, 6).map((record) => (
+                              <li
+                                key={record.id}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  padding: "6px 0",
+                                  borderBottom: "1px solid #f3f4f6",
+                                  fontSize: "13px",
+                                }}
+                              >
+                                <span>{record.date}</span>
+                                <span style={{ fontWeight: 600 }}>{record.total || 0}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "16px",
+                        background: "#fff",
+                      }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>Message members</h3>
+                      {canMessageSelectedDepartment ? (
+                        <>
+                          <textarea
+                            value={departmentMessage}
+                            onChange={(e) => setDepartmentMessage(e.target.value)}
+                            rows={4}
+                            style={{
+                              width: "100%",
+                              padding: "8px 10px",
+                              borderRadius: "8px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "13px",
+                              resize: "vertical",
+                            }}
+                          />
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "10px" }}>
+                            <a
+                              href={departmentMailtoLink || "#"}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: "8px",
+                                border: "1px solid #e5e7eb",
+                                background: departmentEmailList ? "#111827" : "#e5e7eb",
+                                color: departmentEmailList ? "white" : "#9ca3af",
+                                textDecoration: "none",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                pointerEvents: departmentEmailList ? "auto" : "none",
+                              }}
+                            >
+                              Email members
+                            </a>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!departmentPhoneList) {
+                                  showToast("No phone numbers available.", "error");
+                                  return;
+                                }
+                                await navigator.clipboard.writeText(departmentPhoneList);
+                                showToast("Phone numbers copied.", "success");
+                              }}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: "8px",
+                                border: "1px solid #e5e7eb",
+                                background: "white",
+                                cursor: "pointer",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Copy phone list
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await navigator.clipboard.writeText(departmentMessage);
+                                showToast("Message copied.", "success");
+                              }}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: "8px",
+                                border: "1px solid #e5e7eb",
+                                background: "#f3f4f6",
+                                cursor: "pointer",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Copy message
+                            </button>
+                          </div>
+                          <p style={{ marginTop: "8px", fontSize: "12px", color: "#6b7280" }}>
+                            {departmentEmailList
+                              ? `Emails found: ${departmentEmailList.split(",").length}`
+                              : "No emails available yet."}
+                          </p>
+                        </>
+                      ) : (
+                        <p style={{ fontSize: "13px", color: "#9ca3af" }}>
+                          Only the department leader or a church admin can message members in
+                          this group.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    style={{
+                      border: "1px dashed #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "16px",
+                      background: "white",
+                      color: "#9ca3af",
+                    }}
+                  >
+                    Select a department to see members, attendance, and messaging tools.
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

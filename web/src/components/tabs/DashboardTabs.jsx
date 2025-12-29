@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 export const DASHBOARD_TABS = [
   { id: "overview", label: "Overview" },
   { id: "members", label: "Members (CRM)" },
+  { id: "departments", label: "Departments" },
   { id: "attendance", label: "Attendance" },
   { id: "checkin", label: "Check-in (Per Member)" },
   { id: "giving", label: "Giving (Tithes & Offerings)" },
