@@ -58,6 +58,24 @@ const readImageAsDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+const journeyStatusOptions = [
+  { value: "VISITOR", label: "Visitor" },
+  { value: "FIRST_TIMER", label: "First-timer" },
+  { value: "RETURNING", label: "Returning" },
+  { value: "MEMBER", label: "Member" },
+  { value: "WORKER", label: "Worker" },
+];
+
+const hearAboutOptions = [
+  { value: "", label: "How did they hear about us?" },
+  { value: "FRIEND", label: "Friend / family" },
+  { value: "SOCIAL_MEDIA", label: "Social media" },
+  { value: "STREET_OUTREACH", label: "Street outreach" },
+  { value: "ONLINE_SEARCH", label: "Online search" },
+  { value: "EVENT", label: "Church event" },
+  { value: "OTHER", label: "Other" },
+];
+
 function AppContent() {
   const {
     user,
@@ -131,6 +149,15 @@ function AppContent() {
     photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
+    hearAboutUs: "",
+    hearAboutUsOther: "",
+    visitReason: "",
+    visitReasonPrivate: true,
+    wantsLeaderCall: "NO",
+    preferredCallTime: "",
+    familyMembers: [],
+    journeyStatus: "VISITOR",
+    journeyNote: "",
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -141,6 +168,15 @@ function AppContent() {
     photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
+    hearAboutUs: "",
+    hearAboutUsOther: "",
+    visitReason: "",
+    visitReasonPrivate: true,
+    wantsLeaderCall: "NO",
+    preferredCallTime: "",
+    familyMembers: [],
+    journeyStatus: "VISITOR",
+    journeyNote: "",
   });
   const [memberSearch, setMemberSearch] = useState("");
 
@@ -1011,6 +1047,32 @@ function AppContent() {
     }
   };
 
+  const addFamilyMember = (setForm) => {
+    setForm((prev) => ({
+      ...prev,
+      familyMembers: [
+        ...(prev.familyMembers || []),
+        { firstName: "", lastName: "", relationship: "CHILD" },
+      ],
+    }));
+  };
+
+  const updateFamilyMember = (setForm, index, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      familyMembers: (prev.familyMembers || []).map((member, idx) =>
+        idx === index ? { ...member, [key]: value } : member
+      ),
+    }));
+  };
+
+  const removeFamilyMember = (setForm, index) => {
+    setForm((prev) => ({
+      ...prev,
+      familyMembers: (prev.familyMembers || []).filter((_, idx) => idx !== index),
+    }));
+  };
+
   const handleCreateMember = async () => {
     if (!userProfile?.churchId) return;
 
@@ -1021,6 +1083,19 @@ function AppContent() {
 
     try {
       setLoading(true);
+      const journeyStatus = memberForm.journeyStatus || "VISITOR";
+      const journeyNote = memberForm.journeyNote.trim();
+      const wantsLeaderCall = memberForm.wantsLeaderCall === "YES";
+      const preferredCallTime = wantsLeaderCall ? memberForm.preferredCallTime.trim() : "";
+      const hearAboutUsOther =
+        memberForm.hearAboutUs === "OTHER" ? memberForm.hearAboutUsOther.trim() : "";
+      const familyMembers = (memberForm.familyMembers || [])
+        .map((member) => ({
+          firstName: member.firstName?.trim() || "",
+          lastName: member.lastName?.trim() || "",
+          relationship: member.relationship || "CHILD",
+        }))
+        .filter((member) => member.firstName || member.lastName);
       await addDoc(collection(db, "members"), {
         churchId: userProfile.churchId,
         firstName: memberForm.firstName.trim(),
@@ -1030,6 +1105,22 @@ function AppContent() {
         photoDataUrl: memberForm.photoDataUrl,
         status: memberForm.status,
         dateOfBirth: memberForm.dateOfBirth,
+        hearAboutUs: memberForm.hearAboutUs,
+        ...(hearAboutUsOther ? { hearAboutUsOther } : {}),
+        visitReason: memberForm.visitReason.trim(),
+        visitReasonPrivate: memberForm.visitReasonPrivate,
+        wantsLeaderCall,
+        ...(preferredCallTime ? { preferredCallTime } : {}),
+        ...(familyMembers.length ? { familyMembers } : {}),
+        journeyStatus,
+        journeyStatusAt: new Date().toISOString(),
+        journeyHistory: [
+          {
+            status: journeyStatus,
+            note: journeyNote,
+            timestamp: new Date().toISOString(),
+          },
+        ],
         createdAt: new Date().toISOString(),
       });
 
@@ -1041,6 +1132,15 @@ function AppContent() {
         photoDataUrl: "",
         status: "VISITOR",
         dateOfBirth: "",
+        hearAboutUs: "",
+        hearAboutUsOther: "",
+        visitReason: "",
+        visitReasonPrivate: true,
+        wantsLeaderCall: "NO",
+        preferredCallTime: "",
+        familyMembers: [],
+        journeyStatus: "VISITOR",
+        journeyNote: "",
       });
 
       await loadMembers();
@@ -1063,6 +1163,15 @@ function AppContent() {
       photoDataUrl: member.photoDataUrl || member.photoUrl || "",
       status: (member.status || "VISITOR").toUpperCase(),
       dateOfBirth: member.dateOfBirth || "",
+      hearAboutUs: member.hearAboutUs || "",
+      hearAboutUsOther: member.hearAboutUsOther || "",
+      visitReason: member.visitReason || "",
+      visitReasonPrivate: member.visitReasonPrivate ?? true,
+      wantsLeaderCall: member.wantsLeaderCall ? "YES" : "NO",
+      preferredCallTime: member.preferredCallTime || "",
+      familyMembers: Array.isArray(member.familyMembers) ? member.familyMembers : [],
+      journeyStatus: member.journeyStatus || "VISITOR",
+      journeyNote: "",
     });
   };
 
@@ -1076,6 +1185,15 @@ function AppContent() {
       photoDataUrl: "",
       status: "VISITOR",
       dateOfBirth: "",
+      hearAboutUs: "",
+      hearAboutUsOther: "",
+      visitReason: "",
+      visitReasonPrivate: true,
+      wantsLeaderCall: "NO",
+      preferredCallTime: "",
+      familyMembers: [],
+      journeyStatus: "VISITOR",
+      journeyNote: "",
     });
   };
 
@@ -1090,6 +1208,36 @@ function AppContent() {
     try {
       setMemberActionLoading(true);
       const docRef = doc(db, "members", editingMemberId);
+      const existingMember = members.find((member) => member.id === editingMemberId);
+      const journeyStatus = editingMemberForm.journeyStatus || "VISITOR";
+      const journeyNote = editingMemberForm.journeyNote.trim();
+      const journeyStatusChanged =
+        journeyStatus !== (existingMember?.journeyStatus || "VISITOR");
+      const journeyHistory = Array.isArray(existingMember?.journeyHistory)
+        ? [...existingMember.journeyHistory]
+        : [];
+      if (journeyStatusChanged || journeyNote) {
+        journeyHistory.push({
+          status: journeyStatus,
+          note: journeyNote,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      const wantsLeaderCall = editingMemberForm.wantsLeaderCall === "YES";
+      const preferredCallTime = wantsLeaderCall
+        ? editingMemberForm.preferredCallTime.trim()
+        : "";
+      const hearAboutUsOther =
+        editingMemberForm.hearAboutUs === "OTHER"
+          ? editingMemberForm.hearAboutUsOther.trim()
+          : "";
+      const familyMembers = (editingMemberForm.familyMembers || [])
+        .map((member) => ({
+          firstName: member.firstName?.trim() || "",
+          lastName: member.lastName?.trim() || "",
+          relationship: member.relationship || "CHILD",
+        }))
+        .filter((member) => member.firstName || member.lastName);
       const payload = {
         firstName: editingMemberForm.firstName.trim(),
         lastName: editingMemberForm.lastName.trim(),
@@ -1098,6 +1246,17 @@ function AppContent() {
         photoDataUrl: editingMemberForm.photoDataUrl,
         status: editingMemberForm.status,
         dateOfBirth: editingMemberForm.dateOfBirth,
+        hearAboutUs: editingMemberForm.hearAboutUs,
+        ...(hearAboutUsOther ? { hearAboutUsOther } : {}),
+        visitReason: editingMemberForm.visitReason.trim(),
+        visitReasonPrivate: editingMemberForm.visitReasonPrivate,
+        wantsLeaderCall,
+        ...(preferredCallTime ? { preferredCallTime } : {}),
+        familyMembers,
+        journeyStatus,
+        ...(journeyStatusChanged || journeyNote
+          ? { journeyStatusAt: new Date().toISOString(), journeyHistory }
+          : {}),
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(docRef, payload);
@@ -4179,6 +4338,276 @@ function AppContent() {
                   fontSize: "14px",
                 }}
               />
+              <select
+                value={memberForm.journeyStatus}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    journeyStatus: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {journeyStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    Journey: {option.label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                placeholder="Journey note"
+                value={memberForm.journeyNote}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    journeyNote: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <select
+                value={memberForm.hearAboutUs}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    hearAboutUs: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {hearAboutOptions.map((option) => (
+                  <option key={option.value || "none"} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {memberForm.hearAboutUs === "OTHER" && (
+                <input
+                  type="text"
+                  placeholder="Share details"
+                  value={memberForm.hearAboutUsOther}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      hearAboutUsOther: e.target.value,
+                    }))
+                  }
+                  style={{
+                    gridColumn: "span 2",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "14px",
+                  }}
+                />
+              )}
+              <textarea
+                placeholder="Reason for visit / prayer request"
+                value={memberForm.visitReason}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    visitReason: e.target.value,
+                  }))
+                }
+                rows={3}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <label
+                style={{
+                  gridColumn: "span 2",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12px",
+                  color: "#374151",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={memberForm.visitReasonPrivate}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      visitReasonPrivate: e.target.checked,
+                    }))
+                  }
+                />
+                Keep reason/prayer request private to leaders
+              </label>
+              <select
+                value={memberForm.wantsLeaderCall}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    wantsLeaderCall: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="NO">Leader call: No</option>
+                <option value="YES">Leader call: Yes</option>
+              </select>
+              {memberForm.wantsLeaderCall === "YES" && (
+                <input
+                  type="text"
+                  placeholder="Preferred call time"
+                  value={memberForm.preferredCallTime}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      preferredCallTime: e.target.value,
+                    }))
+                  }
+                  style={{
+                    gridColumn: "span 2",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "14px",
+                  }}
+                />
+              )}
+              <div
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: "6px" }}>Family mode</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {(memberForm.familyMembers || []).map((member, index) => (
+                    <div
+                      key={`member-family-${index}`}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                        gap: "6px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="First name"
+                        value={member.firstName || ""}
+                        onChange={(e) =>
+                          updateFamilyMember(
+                            setMemberForm,
+                            index,
+                            "firstName",
+                            e.target.value
+                          )
+                        }
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #d1d5db",
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Last name"
+                        value={member.lastName || ""}
+                        onChange={(e) =>
+                          updateFamilyMember(
+                            setMemberForm,
+                            index,
+                            "lastName",
+                            e.target.value
+                          )
+                        }
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #d1d5db",
+                        }}
+                      />
+                      <select
+                        value={member.relationship || "CHILD"}
+                        onChange={(e) =>
+                          updateFamilyMember(
+                            setMemberForm,
+                            index,
+                            "relationship",
+                            e.target.value
+                          )
+                        }
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #d1d5db",
+                        }}
+                      >
+                        <option value="SPOUSE">Spouse</option>
+                        <option value="CHILD">Child</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeFamilyMember(setMemberForm, index)}
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #e5e7eb",
+                          background: "white",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addFamilyMember(setMemberForm)}
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "6px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                    }}
+                  >
+                    Add family member
+                  </button>
+                </div>
+              </div>
             </div>
 
             <button
@@ -4286,6 +4715,9 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
                           <th style={{ padding: "6px 4px" }}>Date of birth</th>
+                          <th style={{ padding: "6px 4px" }}>Journey</th>
+                          <th style={{ padding: "6px 4px" }}>Follow-up</th>
+                          <th style={{ padding: "6px 4px" }}>Family</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
                         </tr>
                       </thead>
@@ -4294,6 +4726,16 @@ function AppContent() {
                           const isEditing = editingMemberId === m.id;
                           const memberPhotoSrc = m.photoDataUrl || m.photoUrl || "";
                           const photoInputId = `member-photo-${m.id}`;
+                          const journeyStatusValue = m.journeyStatus || "VISITOR";
+                          const journeyStatusLabel =
+                            journeyStatusOptions.find((option) => option.value === journeyStatusValue)
+                              ?.label || journeyStatusValue;
+                          const familyMembers = Array.isArray(m.familyMembers) ? m.familyMembers : [];
+                          const journeyStatusDate = m.journeyStatusAt?.toDate
+                            ? m.journeyStatusAt.toDate()
+                            : m.journeyStatusAt
+                            ? new Date(m.journeyStatusAt)
+                            : null;
                           return (
                             <tr
                               key={m.id}
@@ -4558,6 +5000,333 @@ function AppContent() {
                                   />
                                 ) : (
                                   <>{formatDateOfBirth(m.dateOfBirth)}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px", minWidth: "160px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <select
+                                      value={editingMemberForm.journeyStatus}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          journeyStatus: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    >
+                                      {journeyStatusOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      type="text"
+                                      value={editingMemberForm.journeyNote}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          journeyNote: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Journey note"
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: "12px", color: "#374151" }}>
+                                    <div style={{ fontWeight: 600 }}>{journeyStatusLabel}</div>
+                                    {journeyStatusDate && !Number.isNaN(journeyStatusDate.getTime()) && (
+                                      <div style={{ color: "#6b7280" }}>
+                                        {journeyStatusDate.toLocaleDateString()}
+                                      </div>
+                                    )}
+                                    {Array.isArray(m.journeyHistory) && m.journeyHistory.length > 0 && (
+                                      <div style={{ color: "#6b7280" }}>
+                                        {m.journeyHistory[m.journeyHistory.length - 1]?.note || "—"}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px", minWidth: "220px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <select
+                                      value={editingMemberForm.hearAboutUs}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          hearAboutUs: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    >
+                                      {hearAboutOptions.map((option) => (
+                                        <option key={option.value || "none"} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {editingMemberForm.hearAboutUs === "OTHER" && (
+                                      <input
+                                        type="text"
+                                        value={editingMemberForm.hearAboutUsOther}
+                                        onChange={(e) =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            hearAboutUsOther: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Share details"
+                                        style={{
+                                          padding: "6px 8px",
+                                          borderRadius: "6px",
+                                          border: "1px solid #d1d5db",
+                                        }}
+                                      />
+                                    )}
+                                    <textarea
+                                      value={editingMemberForm.visitReason}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          visitReason: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Reason / prayer request"
+                                      rows={2}
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        resize: "vertical",
+                                      }}
+                                    />
+                                    <label
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        fontSize: "11px",
+                                        color: "#374151",
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={editingMemberForm.visitReasonPrivate}
+                                        onChange={(e) =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            visitReasonPrivate: e.target.checked,
+                                          }))
+                                        }
+                                      />
+                                      Private to leaders
+                                    </label>
+                                    <select
+                                      value={editingMemberForm.wantsLeaderCall}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          wantsLeaderCall: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    >
+                                      <option value="NO">Leader call: No</option>
+                                      <option value="YES">Leader call: Yes</option>
+                                    </select>
+                                    {editingMemberForm.wantsLeaderCall === "YES" && (
+                                      <input
+                                        type="text"
+                                        value={editingMemberForm.preferredCallTime}
+                                        onChange={(e) =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            preferredCallTime: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Preferred time"
+                                        style={{
+                                          padding: "6px 8px",
+                                          borderRadius: "6px",
+                                          border: "1px solid #d1d5db",
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: "12px", color: "#374151" }}>
+                                    <div style={{ fontWeight: 600 }}>
+                                      {m.hearAboutUs
+                                        ? hearAboutOptions.find(
+                                            (option) => option.value === m.hearAboutUs
+                                          )?.label || m.hearAboutUs
+                                        : "—"}
+                                    </div>
+                                    {m.hearAboutUsOther && (
+                                      <div style={{ color: "#6b7280" }}>{m.hearAboutUsOther}</div>
+                                    )}
+                                    <div style={{ color: "#6b7280" }}>
+                                      {m.visitReason
+                                        ? `${m.visitReasonPrivate ? "Private" : "Shareable"}: ${
+                                            m.visitReason
+                                          }`
+                                        : "No prayer request"}
+                                    </div>
+                                    <div style={{ color: "#6b7280" }}>
+                                      {m.wantsLeaderCall
+                                        ? `Call: Yes${m.preferredCallTime ? ` (${m.preferredCallTime})` : ""}`
+                                        : "Call: No"}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px", minWidth: "180px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {(editingMemberForm.familyMembers || []).map((member, index) => (
+                                      <div
+                                        key={`edit-family-${index}`}
+                                        style={{
+                                          display: "grid",
+                                          gridTemplateColumns:
+                                            "repeat(auto-fit, minmax(90px, 1fr))",
+                                          gap: "6px",
+                                          alignItems: "center",
+                                        }}
+                                      >
+                                        <input
+                                          type="text"
+                                          value={member.firstName || ""}
+                                          onChange={(e) =>
+                                            updateFamilyMember(
+                                              setEditingMemberForm,
+                                              index,
+                                              "firstName",
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder="First"
+                                          style={{
+                                            padding: "6px 8px",
+                                            borderRadius: "6px",
+                                            border: "1px solid #d1d5db",
+                                          }}
+                                        />
+                                        <input
+                                          type="text"
+                                          value={member.lastName || ""}
+                                          onChange={(e) =>
+                                            updateFamilyMember(
+                                              setEditingMemberForm,
+                                              index,
+                                              "lastName",
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder="Last"
+                                          style={{
+                                            padding: "6px 8px",
+                                            borderRadius: "6px",
+                                            border: "1px solid #d1d5db",
+                                          }}
+                                        />
+                                        <select
+                                          value={member.relationship || "CHILD"}
+                                          onChange={(e) =>
+                                            updateFamilyMember(
+                                              setEditingMemberForm,
+                                              index,
+                                              "relationship",
+                                              e.target.value
+                                            )
+                                          }
+                                          style={{
+                                            padding: "6px 8px",
+                                            borderRadius: "6px",
+                                            border: "1px solid #d1d5db",
+                                          }}
+                                        >
+                                          <option value="SPOUSE">Spouse</option>
+                                          <option value="CHILD">Child</option>
+                                          <option value="OTHER">Other</option>
+                                        </select>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removeFamilyMember(setEditingMemberForm, index)
+                                          }
+                                          style={{
+                                            padding: "6px 8px",
+                                            borderRadius: "6px",
+                                            border: "1px solid #e5e7eb",
+                                            background: "white",
+                                            cursor: "pointer",
+                                            fontSize: "11px",
+                                          }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => addFamilyMember(setEditingMemberForm)}
+                                      style={{
+                                        alignSelf: "flex-start",
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        background: "white",
+                                        cursor: "pointer",
+                                        fontSize: "11px",
+                                      }}
+                                    >
+                                      Add family
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: "12px", color: "#374151" }}>
+                                    {familyMembers.length === 0 ? (
+                                      "—"
+                                    ) : (
+                                      <>
+                                        <div style={{ fontWeight: 600 }}>
+                                          {familyMembers.length} family member
+                                          {familyMembers.length > 1 ? "s" : ""}
+                                        </div>
+                                        <div style={{ color: "#6b7280" }}>
+                                          {familyMembers
+                                            .slice(0, 2)
+                                            .map((member) =>
+                                              `${member.firstName || ""} ${member.lastName || ""}`.trim()
+                                            )
+                                            .filter(Boolean)
+                                            .join(", ")}
+                                          {familyMembers.length > 2 ? "…" : ""}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
