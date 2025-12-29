@@ -76,6 +76,17 @@ const hearAboutOptions = [
   { value: "OTHER", label: "Other" },
 ];
 
+const photoVisibilityOptions = [
+  { value: "PRIVATE", label: "Photo is private" },
+  { value: "LEADERS_ONLY", label: "Leaders only" },
+  { value: "PUBLIC_DIRECTORY", label: "Public directory" },
+];
+
+const communityTypeOptions = [
+  { value: "TESTIMONY", label: "Testimony" },
+  { value: "ANNOUNCEMENT", label: "Announcement" },
+];
+
 function AppContent() {
   const {
     user,
@@ -147,6 +158,8 @@ function AppContent() {
     phone: "",
     email: "",
     photoDataUrl: "",
+    photoConsent: false,
+    photoVisibility: "PRIVATE",
     status: "VISITOR",
     dateOfBirth: "",
     hearAboutUs: "",
@@ -166,6 +179,8 @@ function AppContent() {
     phone: "",
     email: "",
     photoDataUrl: "",
+    photoConsent: false,
+    photoVisibility: "PRIVATE",
     status: "VISITOR",
     dateOfBirth: "",
     hearAboutUs: "",
@@ -338,6 +353,17 @@ function AppContent() {
     link: "",
   });
 
+  // Community (testimonies/announcements)
+  const [communityPosts, setCommunityPosts] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityForm, setCommunityForm] = useState({
+    type: "TESTIMONY",
+    title: "",
+    message: "",
+    authorName: "",
+    isPinned: false,
+  });
+
   // Follow-up
   const [followupAudience, setFollowupAudience] = useState("VISITOR");
   const [followupPastorName, setFollowupPastorName] = useState("");
@@ -409,6 +435,7 @@ function AppContent() {
     setGiving([]);
     setGivingMemberFilter("");
     setSermons([]);
+    setCommunityPosts([]);
     setMemberAttendanceHistory([]);
   }, [user?.uid]);
 
@@ -1106,6 +1133,8 @@ function AppContent() {
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
         photoDataUrl: memberForm.photoDataUrl,
+        photoConsent: memberForm.photoConsent,
+        photoVisibility: memberForm.photoVisibility,
         status: memberForm.status,
         dateOfBirth: memberForm.dateOfBirth,
         hearAboutUs: memberForm.hearAboutUs,
@@ -1133,6 +1162,8 @@ function AppContent() {
         phone: "",
         email: "",
         photoDataUrl: "",
+        photoConsent: false,
+        photoVisibility: "PRIVATE",
         status: "VISITOR",
         dateOfBirth: "",
         hearAboutUs: "",
@@ -1164,6 +1195,8 @@ function AppContent() {
       phone: member.phone || "",
       email: member.email || "",
       photoDataUrl: member.photoDataUrl || member.photoUrl || "",
+      photoConsent: member.photoConsent ?? false,
+      photoVisibility: member.photoVisibility || "PRIVATE",
       status: (member.status || "VISITOR").toUpperCase(),
       dateOfBirth: member.dateOfBirth || "",
       hearAboutUs: member.hearAboutUs || "",
@@ -1186,6 +1219,8 @@ function AppContent() {
       phone: "",
       email: "",
       photoDataUrl: "",
+      photoConsent: false,
+      photoVisibility: "PRIVATE",
       status: "VISITOR",
       dateOfBirth: "",
       hearAboutUs: "",
@@ -1247,6 +1282,8 @@ function AppContent() {
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
         photoDataUrl: editingMemberForm.photoDataUrl,
+        photoConsent: editingMemberForm.photoConsent,
+        photoVisibility: editingMemberForm.photoVisibility,
         status: editingMemberForm.status,
         dateOfBirth: editingMemberForm.dateOfBirth,
         hearAboutUs: editingMemberForm.hearAboutUs,
@@ -1675,6 +1712,17 @@ function AppContent() {
       showToast("Link copied to clipboard.", "success");
     } catch (err) {
       console.error("Copy member check-in link error:", err);
+      showToast("Unable to copy link.", "error");
+    }
+  };
+
+  const copyMemberCardLink = async (link) => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast("Membership card link copied.", "success");
+    } catch (err) {
+      console.error("Copy member card link error:", err);
       showToast("Unable to copy link.", "error");
     }
   };
@@ -2281,6 +2329,76 @@ function AppContent() {
   useEffect(() => {
     if (activeTab === "sermons" && userProfile?.churchId) {
       loadSermons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userProfile?.churchId]);
+
+  // ---------- Community ----------
+  const loadCommunityPosts = async () => {
+    if (!userProfile?.churchId) return;
+    try {
+      setCommunityLoading(true);
+      const colRef = collection(db, "communityPosts");
+      const qPosts = query(
+        colRef,
+        where("churchId", "==", userProfile.churchId),
+        orderBy("createdAt", "desc")
+      );
+      const snapshot = await getDocs(qPosts);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setCommunityPosts(data);
+    } catch (err) {
+      console.error("Load community posts error:", err);
+      showToast("Error loading community posts.", "error");
+    } finally {
+      setCommunityLoading(false);
+    }
+  };
+
+  const handleCreateCommunityPost = async () => {
+    if (!userProfile?.churchId) return;
+
+    if (!communityForm.title.trim() || !communityForm.message.trim()) {
+      showToast("Please enter a title and message.", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addDoc(collection(db, "communityPosts"), {
+        churchId: userProfile.churchId,
+        type: communityForm.type,
+        title: communityForm.title.trim(),
+        message: communityForm.message.trim(),
+        authorName: communityForm.authorName.trim(),
+        isPinned: communityForm.isPinned,
+        createdAt: new Date().toISOString(),
+      });
+
+      setCommunityForm({
+        type: "TESTIMONY",
+        title: "",
+        message: "",
+        authorName: "",
+        isPinned: false,
+      });
+
+      await loadCommunityPosts();
+      showToast("Community post published.", "success");
+    } catch (err) {
+      console.error("Create community post error:", err);
+      showToast(err.message || "Unable to publish post.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "community" && userProfile?.churchId) {
+      loadCommunityPosts();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userProfile?.churchId]);
@@ -3119,6 +3237,18 @@ function AppContent() {
       (value || "").toLowerCase().includes(normalizedSermonSearch)
     );
   });
+
+  const orderedCommunityPosts = useMemo(() => {
+    const posts = [...communityPosts];
+    posts.sort((a, b) => {
+      const pinnedScore = Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
+      if (pinnedScore !== 0) return pinnedScore;
+      const aDate = new Date(a.createdAt || 0).getTime();
+      const bDate = new Date(b.createdAt || 0).getTime();
+      return bDate - aDate;
+    });
+    return posts;
+  }, [communityPosts]);
 
   // Follow-up templates
   const visitorTemplate = `Hi, thank you for worshipping with us at ${
@@ -4358,6 +4488,50 @@ function AppContent() {
                   </button>
                 )}
               </div>
+              <label
+                style={{
+                  gridColumn: "span 2",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12px",
+                  color: "#374151",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={memberForm.photoConsent}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      photoConsent: e.target.checked,
+                    }))
+                  }
+                />
+                Photo consent received
+              </label>
+              <select
+                value={memberForm.photoVisibility}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    photoVisibility: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {photoVisibilityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               <select
                 value={memberForm.status}
                 onChange={(e) =>
@@ -4803,6 +4977,15 @@ function AppContent() {
                       {filteredMembers.map((m) => {
                         const isEditing = editingMemberId === m.id;
                         const memberPhotoSrc = m.photoDataUrl || m.photoUrl || "";
+                        const photoVisibilityValue = m.photoVisibility || "PRIVATE";
+                        const photoVisibilityLabel =
+                          photoVisibilityOptions.find(
+                            (option) => option.value === photoVisibilityValue
+                          )?.label || "Photo is private";
+                        const canShowMemberPhoto =
+                          Boolean(memberPhotoSrc) &&
+                          Boolean(m.photoConsent) &&
+                          photoVisibilityValue !== "PRIVATE";
                         const photoInputId = `member-photo-${m.id}`;
                         const journeyStatusValue = m.journeyStatus || "VISITOR";
                         const journeyStatusLabel =
@@ -4832,6 +5015,14 @@ function AppContent() {
                           m.visitReason ||
                           m.hearAboutUsOther ||
                           "No notes yet";
+                        const membershipCardLink = `${defaultBaseUrl}/member/${m.id}?churchId=${
+                          userProfile?.churchId || ""
+                        }`;
+                        const membershipCardQr = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+                          membershipCardLink
+                        )}`;
+                        const churchInitial =
+                          (userProfile?.churchName || "Church").charAt(0) || "C";
 
                         if (isEditing) {
                           return (
@@ -4935,6 +5126,37 @@ function AppContent() {
                                     }
                                     placeholder="Email"
                                   />
+                                </label>
+                                <label className="member-edit-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingMemberForm.photoConsent}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        photoConsent: e.target.checked,
+                                      }))
+                                    }
+                                  />
+                                  Photo consent received
+                                </label>
+                                <label>
+                                  Photo visibility
+                                  <select
+                                    value={editingMemberForm.photoVisibility}
+                                    onChange={(e) =>
+                                      setEditingMemberForm((f) => ({
+                                        ...f,
+                                        photoVisibility: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    {photoVisibilityOptions.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </label>
                                 <label>
                                   Status
@@ -5179,7 +5401,7 @@ function AppContent() {
                           <div key={m.id} className="member-card">
                             <div className="member-card-header">
                               <div className="member-photo">
-                                {memberPhotoSrc ? (
+                                {canShowMemberPhoto ? (
                                   <img
                                     src={memberPhotoSrc}
                                     alt={`${m.firstName || ""} ${m.lastName || ""}`.trim() || "Member photo"}
@@ -5279,6 +5501,65 @@ function AppContent() {
                                   <div className="detail-label">Date of birth</div>
                                   <div className="detail-value">
                                     {formatDateOfBirth(m.dateOfBirth)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-label">Photo consent</div>
+                                  <div className="detail-value">
+                                    {m.photoConsent ? "Yes" : "No"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="detail-label">Photo visibility</div>
+                                  <div className="detail-value">{photoVisibilityLabel}</div>
+                                </div>
+                              </div>
+                              <div className="member-card-membership">
+                                <div className="membership-card">
+                                  <div className="membership-card-header">
+                                    <div className="membership-logo">{churchInitial}</div>
+                                    <div className="membership-card-title">
+                                      <span className="membership-card-church">
+                                        {userProfile?.churchName || "Church"}
+                                      </span>
+                                      <span className="membership-card-label">
+                                        Digital membership card
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="membership-card-body">
+                                    <div className="membership-card-name">
+                                      {m.firstName} {m.lastName}
+                                    </div>
+                                    <img
+                                      src={membershipCardQr}
+                                      alt={`QR code for ${m.firstName} ${m.lastName}`.trim()}
+                                      className="membership-card-qr"
+                                    />
+                                    <div className="membership-card-actions">
+                                      <button
+                                        type="button"
+                                        className="chip-button chip-secondary"
+                                        onClick={() => copyMemberCardLink(membershipCardLink)}
+                                      >
+                                        Copy link
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="chip-button chip-ghost"
+                                        onClick={() =>
+                                          downloadQrImage(
+                                            membershipCardQr,
+                                            `${m.firstName || "member"}-${m.lastName || ""}-card.png`
+                                              .trim()
+                                              .replace(/\s+/g, "-")
+                                              .toLowerCase()
+                                          )
+                                        }
+                                      >
+                                        Download QR
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -7032,6 +7313,161 @@ function AppContent() {
                   {givingLoading ? "Loading..." : "Load more giving records"}
                 </button>
               )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "community" && (
+          <>
+            <p
+              style={{
+                marginBottom: "16px",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Share testimonies and announcements with the church family. This mini
+              community page can be used for highlights, celebrations, and upcoming
+              reminders.
+            </p>
+
+            <div className="community-grid">
+              <div className="community-card">
+                <div className="community-card-header">
+                  <div>
+                    <div className="community-card-title">Publish update</div>
+                    <div className="community-card-subtitle">
+                      Add a testimony or announcement to share on the community page.
+                    </div>
+                  </div>
+                </div>
+                <div className="community-form">
+                  <label>
+                    Post type
+                    <select
+                      value={communityForm.type}
+                      onChange={(e) =>
+                        setCommunityForm((f) => ({ ...f, type: e.target.value }))
+                      }
+                    >
+                      {communityTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Title
+                    <input
+                      type="text"
+                      placeholder="e.g. Healing testimony"
+                      value={communityForm.title}
+                      onChange={(e) =>
+                        setCommunityForm((f) => ({ ...f, title: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Message
+                    <textarea
+                      rows={4}
+                      placeholder="Share the story or announcement details..."
+                      value={communityForm.message}
+                      onChange={(e) =>
+                        setCommunityForm((f) => ({ ...f, message: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Author / contact (optional)
+                    <input
+                      type="text"
+                      placeholder="e.g. Sister Mary"
+                      value={communityForm.authorName}
+                      onChange={(e) =>
+                        setCommunityForm((f) => ({
+                          ...f,
+                          authorName: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="community-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={communityForm.isPinned}
+                      onChange={(e) =>
+                        setCommunityForm((f) => ({
+                          ...f,
+                          isPinned: e.target.checked,
+                        }))
+                      }
+                    />
+                    Pin this post to the top of the community page
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCreateCommunityPost}
+                  disabled={loading}
+                  className="community-primary"
+                >
+                  {loading ? "Publishing..." : "Publish post"}
+                </button>
+              </div>
+
+              <div className="community-card">
+                <div className="community-card-header">
+                  <div>
+                    <div className="community-card-title">Community feed</div>
+                    <div className="community-card-subtitle">
+                      Latest stories, announcements, and highlights.
+                    </div>
+                  </div>
+                </div>
+                {communityLoading ? (
+                  <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                    Loading community posts…
+                  </p>
+                ) : orderedCommunityPosts.length === 0 ? (
+                  <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                    No posts yet. Publish the first testimony or announcement.
+                  </p>
+                ) : (
+                  <div className="community-feed">
+                    {orderedCommunityPosts.map((post) => {
+                      const typeLabel =
+                        communityTypeOptions.find((option) => option.value === post.type)
+                          ?.label || "Update";
+                      return (
+                        <div key={post.id} className="community-post">
+                          <div className="community-post-header">
+                            <div className="community-post-title">{post.title}</div>
+                            <div className="community-post-meta">
+                              <span className="community-chip">{typeLabel}</span>
+                              {post.isPinned && (
+                                <span className="community-chip community-chip-pinned">
+                                  Pinned
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="community-post-body">{post.message}</div>
+                          <div className="community-post-footer">
+                            <span>
+                              {post.authorName
+                                ? `Shared by ${post.authorName}`
+                                : "Shared with the church"}
+                            </span>
+                            <span>{formatMemberDate(post.createdAt)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

@@ -404,6 +404,87 @@
   gap: 16px;
 }
 
+.member-card-membership {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 14px;
+}
+
+.membership-card {
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.membership-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.membership-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #111827;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.membership-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.membership-card-church {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.membership-card-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.membership-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.membership-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.membership-card-qr {
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  padding: 6px;
+}
+
+.membership-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .member-timeline {
   display: grid;
   gap: 10px;
@@ -523,6 +604,143 @@
   font-size: 12px;
   font-weight: 600;
   color: #111827;
+}
+
+.community-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.community-card {
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.community-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.community-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.community-card-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.community-form {
+  display: grid;
+  gap: 12px;
+}
+
+.community-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.community-form input,
+.community-form select,
+.community-form textarea {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.community-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.community-primary {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #111827;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.community-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.community-post {
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.community-post-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.community-post-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.community-post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.community-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.community-chip-pinned {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.community-post-body {
+  font-size: 13px;
+  color: #374151;
+  white-space: pre-wrap;
+}
+
+.community-post-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #6b7280;
 }
 
 @media (min-width: 720px) {
