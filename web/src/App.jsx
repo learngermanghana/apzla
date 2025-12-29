@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { auth, db, firebaseConfigError, isFirebaseConfigured } from "./firebase";
+import { auth, db, firebaseConfigError, isFirebaseConfigured, storage } from "./firebase";
 import {
   collection,
   addDoc,
@@ -14,7 +14,9 @@ import {
   orderBy,
   startAfter,
   where,
+  deleteField,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -57,6 +59,41 @@ const readImageAsDataUrl = (file) =>
     reader.onerror = () => reject(new Error("Unable to read image."));
     reader.readAsDataURL(file);
   });
+
+const isImageDataUrl = (value = "") => `${value}`.startsWith("data:image/");
+
+const getImageContentType = (dataUrl = "") => {
+  const match = `${dataUrl}`.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+  return match?.[1] || "image/jpeg";
+};
+
+const buildMemberPhotoPath = (churchId, contentType = "image/jpeg") => {
+  const ext = contentType.split("/")[1] || "jpg";
+  const uniqueId = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+  return `member-photos/${churchId}/${Date.now()}-${uniqueId}.${ext}`;
+};
+
+const uploadMemberPhoto = async (dataUrl, churchId) => {
+  if (!storage) {
+    throw new Error("Firebase Storage is not configured.");
+  }
+
+  const contentType = getImageContentType(dataUrl);
+  const photoPath = buildMemberPhotoPath(churchId, contentType);
+  const storageRef = ref(storage, photoPath);
+  await uploadString(storageRef, dataUrl, "data_url", { contentType });
+  return getDownloadURL(storageRef);
+};
+
+const resolveMemberPhotoUrl = async (photoValue, churchId) => {
+  if (!photoValue) return "";
+  if (isImageDataUrl(photoValue)) {
+    return uploadMemberPhoto(photoValue, churchId);
+  }
+  return photoValue;
+};
 
 const journeyStatusOptions = [
   { value: "VISITOR", label: "Visitor" },
@@ -1126,13 +1163,18 @@ function AppContent() {
           relationship: member.relationship || "CHILD",
         }))
         .filter((member) => member.firstName || member.lastName);
+      const photoUrl = await resolveMemberPhotoUrl(
+        memberForm.photoDataUrl,
+        userProfile.churchId
+      );
+
       await addDoc(collection(db, "members"), {
         churchId: userProfile.churchId,
         firstName: memberForm.firstName.trim(),
         lastName: memberForm.lastName.trim(),
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
-        photoDataUrl: memberForm.photoDataUrl,
+        ...(photoUrl ? { photoUrl } : {}),
         photoConsent: memberForm.photoConsent,
         photoVisibility: memberForm.photoVisibility,
         status: memberForm.status,
@@ -1194,7 +1236,7 @@ function AppContent() {
       lastName: member.lastName || "",
       phone: member.phone || "",
       email: member.email || "",
-      photoDataUrl: member.photoDataUrl || member.photoUrl || "",
+      photoDataUrl: member.photoUrl || member.photoDataUrl || "",
       photoConsent: member.photoConsent ?? false,
       photoVisibility: member.photoVisibility || "PRIVATE",
       status: (member.status || "VISITOR").toUpperCase(),
@@ -1276,12 +1318,17 @@ function AppContent() {
           relationship: member.relationship || "CHILD",
         }))
         .filter((member) => member.firstName || member.lastName);
-      const payload = {
+      const photoUrl = await resolveMemberPhotoUrl(
+        editingMemberForm.photoDataUrl,
+        userProfile.churchId
+      );
+      const firestorePayload = {
         firstName: editingMemberForm.firstName.trim(),
         lastName: editingMemberForm.lastName.trim(),
         phone: editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
-        photoDataUrl: editingMemberForm.photoDataUrl,
+        photoUrl: photoUrl ? photoUrl : deleteField(),
+        photoDataUrl: deleteField(),
         photoConsent: editingMemberForm.photoConsent,
         photoVisibility: editingMemberForm.photoVisibility,
         status: editingMemberForm.status,
@@ -1299,10 +1346,15 @@ function AppContent() {
           : {}),
         updatedAt: new Date().toISOString(),
       };
-      await updateDoc(docRef, payload);
+      const localPayload = {
+        ...firestorePayload,
+        photoUrl: photoUrl || "",
+        photoDataUrl: "",
+      };
+      await updateDoc(docRef, firestorePayload);
 
       setMembers((prev) =>
-        prev.map((m) => (m.id === editingMemberId ? { ...m, ...payload } : m))
+        prev.map((m) => (m.id === editingMemberId ? { ...m, ...localPayload } : m))
       );
       showToast("Member updated.", "success");
       cancelEditingMember();
@@ -4976,7 +5028,7 @@ function AppContent() {
                     <div className="member-card-grid">
                       {filteredMembers.map((m) => {
                         const isEditing = editingMemberId === m.id;
-                        const memberPhotoSrc = m.photoDataUrl || m.photoUrl || "";
+                        const memberPhotoSrc = m.photoUrl || m.photoDataUrl || "";
                         const photoVisibilityValue = m.photoVisibility || "PRIVATE";
                         const photoVisibilityLabel =
                           photoVisibilityOptions.find(
