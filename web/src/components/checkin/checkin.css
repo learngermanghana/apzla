@@ -1,0 +1,307 @@
+/* web/src/components/checkin/checkin.css */
+
+:root {
+  --bg1: #eef2ff;
+  --bg2: #f9fafb;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --muted: #6b7280;
+  --text: #111827;
+  --soft: #f8fafc;
+  --focus: #4f46e5;
+}
+
+.checkin-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 20% 20%, var(--bg1), var(--bg2));
+  padding: 28px;
+}
+
+/* Bigger, cleaner container on desktop */
+.checkin-card {
+  width: min(980px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+/* Desktop layout: left info + right form */
+@media (min-width: 900px) {
+  .checkin-card {
+    padding: 34px;
+  }
+
+  /* Turn the card into a 2-column layout */
+  .checkin-card {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  /* Put the form on the right */
+  .checkin-form {
+    margin-top: 0;
+  }
+
+  /* Make summary + banner align nicely in left column */
+  .checkin-summary,
+  .checkin-helper,
+  .checkin-service-meta,
+  .checkin-footer-help,
+  .checkin-title,
+  .checkin-subtitle {
+    max-width: 520px;
+  }
+
+  /* Footer help should sit under the form on desktop */
+  .checkin-footer-help {
+    grid-column: 2;
+    margin-top: 12px;
+    text-align: left;
+  }
+}
+
+/* Title area */
+.checkin-title {
+  margin: 0 0 8px;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.checkin-subtitle {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Helper box */
+.checkin-helper {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: var(--soft);
+  margin-bottom: 14px;
+}
+
+.checkin-helper-title {
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.checkin-helper-body {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Service meta chips */
+.checkin-service-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.checkin-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid rgba(55, 48, 163, 0.12);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Banner (StatusBanner wrapper styles) */
+.checkin-banner {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 650;
+  margin: 14px 0 18px;
+  border: 1px solid transparent;
+  line-height: 1.35;
+}
+
+.checkin-banner-info {
+  background: #e0f2fe;
+  color: #075985;
+  border-color: #bae6fd;
+}
+
+.checkin-banner-success {
+  background: #ecfdf3;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.checkin-banner-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecdd3;
+}
+
+/* Summary card */
+.checkin-summary {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+  background: #f9fafb;
+}
+
+.checkin-summary-header {
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.checkin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .checkin-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkin-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.checkin-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.checkin-subvalue {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+/* Form */
+.checkin-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+/* On desktop, make phone + code side-by-side, token full width */
+@media (min-width: 900px) {
+  .checkin-form {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 14px;
+    align-items: start;
+  }
+
+  /* Make token + button full width */
+  .checkin-field:nth-of-type(3) {
+    grid-column: 1 / -1;
+  }
+
+  .checkin-button {
+    grid-column: 1 / -1;
+  }
+}
+
+.checkin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.checkin-input,
+.checkin-textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  padding: 11px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease;
+  background-color: #ffffff;
+}
+
+.checkin-input:focus,
+.checkin-textarea:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
+
+.checkin-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+/* Button */
+.checkin-button {
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 14px; /* less “pill”, more modern */
+  border: none;
+  font-size: 14px;
+  font-weight: 750;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.05s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
+}
+
+.checkin-button:hover:not(:disabled) {
+  background: #020617;
+  transform: translateY(-1px);
+}
+
+.checkin-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.26);
+}
+
+.checkin-button:disabled {
+  background: #9ca3af;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* Footer help */
+.checkin-footer-help {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.4;
+}
