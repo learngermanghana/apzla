@@ -12,6 +12,49 @@ const statusOptions = [
   { value: "OTHER", label: "Other" },
 ];
 
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Unable to read image."));
+    reader.readAsDataURL(file);
+  });
+
+const loadImage = (src) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Unable to load image."));
+    img.src = src;
+  });
+
+function estimateDataUrlBytes(dataUrl = "") {
+  const base64 = `${dataUrl}`.split(",")[1] || "";
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
+
+async function compressImageToJpegDataUrl(file, { maxDim = 640, quality = 0.78 } = {}) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const img = await loadImage(dataUrl);
+
+  const srcW = img.naturalWidth || img.width;
+  const srcH = img.naturalHeight || img.height;
+
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const dstW = Math.max(1, Math.round(srcW * scale));
+  const dstH = Math.max(1, Math.round(srcH * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = dstW;
+  canvas.height = dstH;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, dstW, dstH);
+
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 export default function MemberInvitePage({ token: initialToken = "" }) {
   const [form, setForm] = useState({
     firstName: "",
@@ -20,11 +63,18 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     email: "",
     status: "VISITOR",
     dateOfBirth: "",
+    photoDataUrl: "",
   });
+
   const [token, setToken] = useState(initialToken || "");
   const [feedback, setFeedback] = useState({ ok: false, message: "" });
   const [statusTone, setStatusTone] = useState("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+
+  // Keep this comfortably below Firestore doc limit (1 MiB) and typical serverless body limits.
+  // With compression, most photos will land ~40–200 KB.
+  const MAX_PHOTO_BYTES = 650 * 1024; // 650 KB
 
   const tokenFromUrl = useMemo(() => {
     try {
@@ -50,6 +100,48 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    setPhotoError("");
+
+    if (!file) {
+      updateField("photoDataUrl", "");
+      return;
+    }
+
+    if (!file.type?.startsWith("image/")) {
+      setPhotoError("Please choose an image file (JPG/PNG/WebP).");
+      updateField("photoDataUrl", "");
+      return;
+    }
+
+    // Optional: prevent massive uploads before we compress
+    if (file.size > 6 * 1024 * 1024) {
+      setPhotoError("That photo is too large. Please choose an image under 6MB.");
+      updateField("photoDataUrl", "");
+      return;
+    }
+
+    try {
+      const compressed = await compressImageToJpegDataUrl(file, { maxDim: 640, quality: 0.78 });
+      const bytes = estimateDataUrlBytes(compressed);
+
+      if (bytes > MAX_PHOTO_BYTES) {
+        setPhotoError(
+          "Photo is still too large after compression. Please use a smaller photo."
+        );
+        updateField("photoDataUrl", "");
+        return;
+      }
+
+      updateField("photoDataUrl", compressed);
+    } catch (err) {
+      console.error("Photo processing error:", err);
+      setPhotoError(err.message || "Unable to process photo.");
+      updateField("photoDataUrl", "");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -86,6 +178,12 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
       return;
     }
 
+    if (photoError) {
+      setFeedback({ ok: false, message: photoError });
+      setStatusTone("error");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const res = await fetch("/api/member-invite-submit", {
@@ -112,6 +210,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
 
       setFeedback({ ok: true, message: data.message || "You are all set. Thank you!" });
       setStatusTone("success");
+
       setForm({
         firstName: "",
         lastName: "",
@@ -119,7 +218,12 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         email: trimmedEmail,
         status: form.status,
         dateOfBirth: "",
+        photoDataUrl: "",
       });
+
+      // reset input (so selecting same file again triggers onChange)
+      const photoInput = document.getElementById("invite-photo-input");
+      if (photoInput) photoInput.value = "";
     } catch (err) {
       console.error("Invite submit error", err);
       setFeedback({ ok: false, message: err.message || "Unable to submit right now." });
@@ -187,10 +291,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
 
             <label className="checkin-field">
               <span>Status</span>
-              <select
-                value={form.status}
-                onChange={(e) => updateField("status", e.target.value)}
-              >
+              <select value={form.status} onChange={(e) => updateField("status", e.target.value)}>
                 {statusOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
@@ -206,9 +307,51 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
                 value={form.dateOfBirth}
                 onChange={(e) => updateField("dateOfBirth", e.target.value)}
               />
+              <div className="checkin-help-text">We use this to place you in the right age group.</div>
+            </label>
+
+            {/* NEW: Photo upload */}
+            <label className="checkin-field">
+              <span>Photo (optional)</span>
+              <input
+                id="invite-photo-input"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+              />
               <div className="checkin-help-text">
-                We use this to place you in the right age group.
+                Optional profile photo (compressed before uploading).
               </div>
+              {photoError && (
+                <div className="checkin-help-text" style={{ color: "#b91c1c" }}>
+                  {photoError}
+                </div>
+              )}
+              {form.photoDataUrl ? (
+                <div style={{ marginTop: 10 }}>
+                  <img
+                    src={form.photoDataUrl}
+                    alt="Selected"
+                    style={{ width: 92, height: 92, objectFit: "cover", borderRadius: 12 }}
+                  />
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => updateField("photoDataUrl", "")}
+                      style={{
+                        marginTop: 8,
+                        padding: "6px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #e5e7eb",
+                        background: "white",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Remove photo
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </label>
 
             <label className="checkin-field">
