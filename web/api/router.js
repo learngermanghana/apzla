@@ -19,6 +19,9 @@ const selfCheckinToken = require('../server/handlers/self-checkin-token')
 const verifyCheckin = require('../server/handlers/verify-checkin')
 const selfCheckinVerify = require('../server/handlers/self-checkin-verify')
 const createChurchSubaccount = require('../server/handlers/create-church-subaccount')
+const memberInvite = require('../../functions/api/member-invite')
+const memberInviteInfo = require('../../functions/api/member-invite-info')
+const memberInviteSubmit = require('../../functions/api/member-invite-submit')
 
 const transactionInitialize = require('../server/handlers/transaction/initialize')
 const transactionVerify = require('../server/handlers/transaction/verify-reference')
@@ -105,6 +108,9 @@ module.exports = async function handler(req, res) {
     }
     return transactionVerify(req, res)
   }
+  if (path === 'member-invite') return memberInvite(req, res)
+  if (path === 'member-invite-info') return memberInviteInfo(req, res)
+  if (path === 'member-invite-submit') return memberInviteSubmit(req, res)
 
   return res.status(404).json({
     status: 'error',
