@@ -16,6 +16,14 @@ export const memberStatusOptions = [
   { value: "INACTIVE", label: "Inactive", helper: "Needs engagement" },
 ];
 
+export const memberJourneyStatusOptions = [
+  { value: "VISITOR", label: "Visitor" },
+  { value: "FIRST_TIMER", label: "First-timer" },
+  { value: "RETURNING", label: "Returning" },
+  { value: "MEMBER", label: "Member" },
+  { value: "WORKER", label: "Worker" },
+];
+
 export const memberAgeGroupDescriptions = {
   UNDER_18: "Kids and teens",
   "18_TO_39": "Young adults",
