@@ -179,6 +179,375 @@
   overflow-x: auto;
 }
 
+.member-directory {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.member-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.member-filter-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.member-search-input,
+.member-filter-select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: white;
+  width: 100%;
+}
+
+.member-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: white;
+  font-size: 12px;
+  cursor: pointer;
+  color: #111827;
+}
+
+.chip-primary {
+  background: #111827;
+  color: white;
+  border-color: #111827;
+}
+
+.chip-secondary {
+  border-color: #e5e7eb;
+  color: #111827;
+  background: #f9fafb;
+}
+
+.chip-ghost {
+  border-color: #e5e7eb;
+  background: white;
+  color: #374151;
+}
+
+.chip-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.1);
+  color: inherit;
+}
+
+.member-count-row {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.member-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.member-card {
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  padding: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.member-card-editing {
+  background: #fdfdfd;
+}
+
+.member-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-photo {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+.member-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.member-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.member-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.member-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.member-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.member-tag-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.member-tag-purple {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.member-tag-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.member-tag.muted {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.member-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.primary-action,
+.secondary-action,
+.danger-action {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.primary-action {
+  background: #111827;
+  color: white;
+}
+
+.secondary-action {
+  border-color: #e5e7eb;
+  background: white;
+  color: #111827;
+}
+
+.danger-action {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.member-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.member-timeline {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeline-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ca3af;
+}
+
+.member-detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  font-size: 13px;
+  color: #374151;
+}
+
+.detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.detail-value {
+  font-weight: 600;
+  color: #111827;
+}
+
+.detail-sub {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.member-edit-name {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.member-edit-name input,
+.member-edit-grid input,
+.member-edit-grid select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+}
+
+.member-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.member-edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.member-edit-full {
+  grid-column: 1 / -1;
+}
+
+.member-edit-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.member-edit-family {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+}
+
+.member-edit-family-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.member-edit-family-row input,
+.member-edit-family-row select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+}
+
+.member-edit-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+@media (min-width: 720px) {
+  .member-filter-row {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .member-card-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .member-header-info {
+    flex: 1;
+  }
+}
+
+@media (min-width: 960px) {
+  .member-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .checkin-card {
   display: flex;
   justify-content: space-between;
