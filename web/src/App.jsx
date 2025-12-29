@@ -1661,9 +1661,18 @@ function AppContent() {
         body: JSON.stringify({ churchId: userProfile.churchId, baseUrl }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      let data = null;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        if (!res.ok) {
+          console.error("Invite API failed: invalid JSON response", parseError);
+        }
+      }
 
       if (!res.ok) {
+        console.error("Invite API failed:", res.status, data || text);
         const message = data?.message || "Unable to issue invite link.";
         throw new Error(message);
       }
