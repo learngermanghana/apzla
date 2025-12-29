@@ -48,6 +48,16 @@ async function findExistingMember({ churchId, phone, email }) {
   return null
 }
 
+function splitName(name = '') {
+  const trimmed = name.trim()
+  if (!trimmed) return { firstName: '', lastName: '' }
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '' }
+  }
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
+}
+
 module.exports = async function handler(request, response) {
   if (request.method !== 'POST') {
     return response.status(405).json({
@@ -71,8 +81,24 @@ module.exports = async function handler(request, response) {
     })
   }
 
-  const { token, firstName, lastName, phone, email, status, dateOfBirth } =
-    request.body || {}
+  const {
+    token,
+    firstName,
+    lastName,
+    phone,
+    email,
+    status,
+    dateOfBirth,
+    referralSource,
+    referralSourceOther,
+    reasonForVisit,
+    prayerRequestPrivate,
+    wantsLeaderCall,
+    preferredCallTime,
+    journeyStatus,
+    journeyNotes,
+    familyMembers,
+  } = request.body || {}
 
   if (!token) {
     return response.status(400).json({
@@ -86,6 +112,42 @@ module.exports = async function handler(request, response) {
   const trimmedLast = (lastName || '').trim()
   const trimmedEmail = (email || '').trim().toLowerCase()
   const trimmedDob = typeof dateOfBirth === 'string' ? dateOfBirth.trim() : ''
+  const trimmedReferralSource =
+    typeof referralSource === 'string' ? referralSource.trim().toUpperCase() : ''
+  const trimmedReferralOther =
+    typeof referralSourceOther === 'string' ? referralSourceOther.trim() : ''
+  const trimmedReasonForVisit =
+    typeof reasonForVisit === 'string' ? reasonForVisit.trim() : ''
+  const wantsCall =
+    wantsLeaderCall === true ||
+    wantsLeaderCall === 'true' ||
+    wantsLeaderCall === 'YES'
+  const trimmedPreferredCallTime = wantsCall
+    ? typeof preferredCallTime === 'string'
+      ? preferredCallTime.trim()
+      : ''
+    : ''
+  const journeyStatusValue =
+    typeof journeyStatus === 'string' && journeyStatus.trim()
+      ? journeyStatus.trim().toUpperCase()
+      : status || 'VISITOR'
+  const trimmedJourneyNotes =
+    typeof journeyNotes === 'string' ? journeyNotes.trim() : ''
+  const wantsPrivatePrayer = prayerRequestPrivate !== false
+
+  const normalizedFamilyMembers = Array.isArray(familyMembers)
+    ? familyMembers
+        .map((member) => ({
+          relation:
+            typeof member?.relation === 'string'
+              ? member.relation.trim().toUpperCase()
+              : '',
+          name: typeof member?.name === 'string' ? member.name.trim() : '',
+        }))
+        .filter(
+          (member) => ['SPOUSE', 'CHILD'].includes(member.relation) && member.name
+        )
+    : []
 
   if (!trimmedFirst && !trimmedLast) {
     return response.status(400).json({
@@ -128,7 +190,15 @@ module.exports = async function handler(request, response) {
       })
     }
 
-    const docRef = await db.collection('members').add({
+    const memberRef = db.collection('members').doc()
+    const now = admin.firestore.Timestamp.now()
+    const journeyEntry = {
+      status: journeyStatusValue,
+      notes: trimmedJourneyNotes,
+      timestamp: now,
+    }
+
+    await memberRef.set({
       churchId,
       firstName: trimmedFirst,
       lastName: trimmedLast,
@@ -136,14 +206,57 @@ module.exports = async function handler(request, response) {
       email: trimmedEmail,
       status: status || 'VISITOR',
       ...(trimmedDob ? { dateOfBirth: trimmedDob } : {}),
+      journeyStatus: journeyStatusValue,
+      journeyNotes: trimmedJourneyNotes,
+      journeyUpdatedAt: now,
+      journeyHistory: [journeyEntry],
+      referralSource: trimmedReferralSource,
+      referralSourceOther:
+        trimmedReferralSource === 'OTHER' ? trimmedReferralOther : '',
+      reasonForVisit: trimmedReasonForVisit,
+      prayerRequestPrivate: wantsPrivatePrayer,
+      wantsLeaderCall: wantsCall,
+      preferredCallTime: trimmedPreferredCallTime,
+      familyGroupId: memberRef.id,
+      familyRole: 'PRIMARY',
       source: 'INVITE',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: now,
     })
+
+    if (normalizedFamilyMembers.length > 0) {
+      const familyWrites = normalizedFamilyMembers.map((member) => {
+        const { firstName: familyFirst, lastName: familyLast } = splitName(member.name)
+        const familyRef = db.collection('members').doc()
+        return familyRef.set({
+          churchId,
+          firstName: familyFirst,
+          lastName: familyLast,
+          phone: '',
+          email: '',
+          status: 'VISITOR',
+          journeyStatus: journeyStatusValue,
+          journeyNotes: '',
+          journeyUpdatedAt: now,
+          journeyHistory: [
+            {
+              status: journeyStatusValue,
+              notes: '',
+              timestamp: now,
+            },
+          ],
+          familyGroupId: memberRef.id,
+          familyRole: member.relation,
+          source: 'INVITE',
+          createdAt: now,
+        })
+      })
+      await Promise.all(familyWrites)
+    }
 
     return response.status(200).json({
       status: 'success',
       ok: true,
-      memberId: docRef.id,
+      memberId: memberRef.id,
       message: 'Your details were received. Welcome!',
     })
   } catch (error) {

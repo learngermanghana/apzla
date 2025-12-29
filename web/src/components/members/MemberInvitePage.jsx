@@ -12,6 +12,24 @@ const statusOptions = [
   { value: "OTHER", label: "Other" },
 ];
 
+const journeyStatusOptions = [
+  { value: "VISITOR", label: "Visitor" },
+  { value: "FIRST_TIMER", label: "First-timer" },
+  { value: "RETURNING", label: "Returning" },
+  { value: "MEMBER", label: "Member" },
+  { value: "WORKER", label: "Worker" },
+];
+
+const referralSourceOptions = [
+  { value: "", label: "Select..." },
+  { value: "FRIEND", label: "Friend" },
+  { value: "SOCIAL_MEDIA", label: "Social media" },
+  { value: "STREET_OUTREACH", label: "Street outreach" },
+  { value: "WEBSITE", label: "Website" },
+  { value: "FLYER", label: "Flyer or poster" },
+  { value: "OTHER", label: "Other" },
+];
+
 const readFileAsDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -53,6 +71,21 @@ const translations = {
     aboutYou: "About you",
     contact: "Contact",
     optionalDetails: "Optional details",
+    journeyStatus: "Membership journey status",
+    journeyNotes: "Journey notes (optional)",
+    referralSource: "How did you hear about us?",
+    referralSourceOther: "Share the source (optional)",
+    reasonForVisit: "Reason for visit / prayer request",
+    prayerPrivate: "Keep this private (leaders only)",
+    leaderCall: "Want a call from a leader?",
+    callYes: "Yes, please call me",
+    callNo: "No call needed",
+    preferredCallTime: "Preferred time to call",
+    familyMode: "Add spouse / children",
+    spouseName: "Spouse name (optional)",
+    childName: "Child name",
+    addChild: "Add another child",
+    remove: "Remove",
     firstName: "First name",
     lastName: "Last name",
     phone: "Phone",
@@ -282,6 +315,16 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     status: "VISITOR",
     dateOfBirth: "",
     photoDataUrl: "",
+    journeyStatus: "VISITOR",
+    journeyNotes: "",
+    referralSource: "",
+    referralSourceOther: "",
+    reasonForVisit: "",
+    prayerRequestPrivate: true,
+    wantsLeaderCall: false,
+    preferredCallTime: "",
+    spouseName: "",
+    childrenNames: [],
   });
 
   const [token, setToken] = useState(initialToken || "");
@@ -290,6 +333,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
   const [statusTone, setStatusTone] = useState("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [familyMode, setFamilyMode] = useState(false);
   const [churchInfo, setChurchInfo] = useState({
     name: "",
     pastorName: "",
@@ -388,6 +432,27 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const addChildField = () => {
+    setForm((prev) => ({
+      ...prev,
+      childrenNames: [...(prev.childrenNames || []), ""],
+    }));
+  };
+
+  const updateChildName = (index, value) => {
+    setForm((prev) => ({
+      ...prev,
+      childrenNames: prev.childrenNames.map((name, idx) => (idx === index ? value : name)),
+    }));
+  };
+
+  const removeChildField = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      childrenNames: prev.childrenNames.filter((_, idx) => idx !== index),
+    }));
+  };
+
   const handleNext = () => {
     setCurrentStep((prev) => Math.min(prev + 1, 2));
   };
@@ -482,6 +547,16 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     const trimmedLast = form.lastName.trim();
     const trimmedPhone = normalizePhone(form.phone);
     const trimmedEmail = form.email.trim();
+    const trimmedReasonForVisit = form.reasonForVisit.trim();
+    const trimmedReferralOther = form.referralSourceOther.trim();
+    const wantsLeaderCall = Boolean(form.wantsLeaderCall);
+    const trimmedPreferredCallTime = wantsLeaderCall ? form.preferredCallTime.trim() : "";
+    const trimmedSpouseName = form.spouseName.trim();
+    const trimmedChildren = (form.childrenNames || []).map((name) => name.trim()).filter(Boolean);
+    const familyMembers = [
+      ...(trimmedSpouseName ? [{ relation: "SPOUSE", name: trimmedSpouseName }] : []),
+      ...trimmedChildren.map((name) => ({ relation: "CHILD", name })),
+    ];
 
     if (!trimmedToken) {
       setFeedback({ ok: false, message: "This invite link is missing its token." });
@@ -530,6 +605,12 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
           email: trimmedEmail,
           firstName: trimmedFirst,
           lastName: trimmedLast,
+          referralSourceOther:
+            form.referralSource === "OTHER" ? trimmedReferralOther : "",
+          reasonForVisit: trimmedReasonForVisit,
+          wantsLeaderCall,
+          preferredCallTime: trimmedPreferredCallTime,
+          familyMembers,
           token: trimmedToken,
         }),
       });
@@ -554,7 +635,18 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         status: form.status,
         dateOfBirth: "",
         photoDataUrl: "",
+        journeyStatus: "VISITOR",
+        journeyNotes: "",
+        referralSource: "",
+        referralSourceOther: "",
+        reasonForVisit: "",
+        prayerRequestPrivate: true,
+        wantsLeaderCall: false,
+        preferredCallTime: "",
+        spouseName: "",
+        childrenNames: [],
       });
+      setFamilyMode(false);
 
       // reset input (so selecting same file again triggers onChange)
       const photoInput = document.getElementById("invite-photo-input");
@@ -779,6 +871,32 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
               </label>
 
               <label className="checkin-field">
+                <span>{t("journeyStatus")}</span>
+                <select
+                  className="checkin-input"
+                  value={form.journeyStatus}
+                  onChange={(e) => updateField("journeyStatus", e.target.value)}
+                >
+                  {journeyStatusOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="checkin-field">
+                <span>{t("journeyNotes")}</span>
+                <textarea
+                  className="checkin-input"
+                  value={form.journeyNotes}
+                  onChange={(e) => updateField("journeyNotes", e.target.value)}
+                  rows={2}
+                  placeholder={t("journeyNotes")}
+                />
+              </label>
+
+              <label className="checkin-field">
                 <span>{t("dob")}</span>
                 <input
                   className="checkin-input"
@@ -790,6 +908,151 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
                   We use this to place you in the right age group.
                 </div>
               </label>
+
+              <label className="checkin-field">
+                <span>{t("referralSource")}</span>
+                <select
+                  className="checkin-input"
+                  value={form.referralSource}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    updateField("referralSource", value);
+                    if (value !== "OTHER") {
+                      updateField("referralSourceOther", "");
+                    }
+                  }}
+                >
+                  {referralSourceOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {form.referralSource === "OTHER" && (
+                <label className="checkin-field">
+                  <span>{t("referralSourceOther")}</span>
+                  <input
+                    className="checkin-input"
+                    type="text"
+                    value={form.referralSourceOther}
+                    onChange={(e) => updateField("referralSourceOther", e.target.value)}
+                  />
+                </label>
+              )}
+
+              <label className="checkin-field">
+                <span>{t("reasonForVisit")}</span>
+                <textarea
+                  className="checkin-input"
+                  value={form.reasonForVisit}
+                  onChange={(e) => updateField("reasonForVisit", e.target.value)}
+                  rows={3}
+                  placeholder={t("reasonForVisit")}
+                />
+                <div className="checkin-help-text">
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="checkbox"
+                      checked={form.prayerRequestPrivate}
+                      onChange={(e) => updateField("prayerRequestPrivate", e.target.checked)}
+                    />
+                    {t("prayerPrivate")}
+                  </label>
+                </div>
+              </label>
+
+              <label className="checkin-field">
+                <span>{t("leaderCall")}</span>
+                <select
+                  className="checkin-input"
+                  value={form.wantsLeaderCall ? "YES" : "NO"}
+                  onChange={(e) => updateField("wantsLeaderCall", e.target.value === "YES")}
+                >
+                  <option value="NO">{t("callNo")}</option>
+                  <option value="YES">{t("callYes")}</option>
+                </select>
+              </label>
+
+              {form.wantsLeaderCall && (
+                <label className="checkin-field">
+                  <span>{t("preferredCallTime")}</span>
+                  <input
+                    className="checkin-input"
+                    type="text"
+                    value={form.preferredCallTime}
+                    onChange={(e) => updateField("preferredCallTime", e.target.value)}
+                    placeholder="e.g. Weekday evenings"
+                  />
+                </label>
+              )}
+
+              <label className="checkin-field">
+                <span>{t("familyMode")}</span>
+                <div className="checkin-help-text">
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="checkbox"
+                      checked={familyMode}
+                      onChange={(e) => {
+                        const isEnabled = e.target.checked;
+                        setFamilyMode(isEnabled);
+                        if (!isEnabled) {
+                          updateField("spouseName", "");
+                          updateField("childrenNames", []);
+                        }
+                      }}
+                    />
+                    {t("familyMode")}
+                  </label>
+                </div>
+              </label>
+
+              {familyMode && (
+                <>
+                  <label className="checkin-field">
+                    <span>{t("spouseName")}</span>
+                    <input
+                      className="checkin-input"
+                      type="text"
+                      value={form.spouseName}
+                      onChange={(e) => updateField("spouseName", e.target.value)}
+                      placeholder="e.g. Kwame Mensah"
+                    />
+                  </label>
+
+                  {(form.childrenNames || []).map((childName, index) => (
+                    <label className="checkin-field" key={`child-${index}`}>
+                      <span>{t("childName")} {index + 1}</span>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input
+                          className="checkin-input"
+                          type="text"
+                          value={childName}
+                          onChange={(e) => updateChildName(index, e.target.value)}
+                          placeholder="e.g. Nana Mensah"
+                        />
+                        <button
+                          type="button"
+                          className="invite-secondary"
+                          onClick={() => removeChildField(index)}
+                        >
+                          {t("remove")}
+                        </button>
+                      </div>
+                    </label>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="invite-secondary"
+                    onClick={addChildField}
+                  >
+                    {t("addChild")}
+                  </button>
+                </>
+              )}
 
               <label className="checkin-field">
                 <span>{t("photo")}</span>

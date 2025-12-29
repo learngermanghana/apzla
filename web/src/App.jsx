@@ -36,6 +36,7 @@ import { PREFERRED_BASE_URL, normalizeBaseUrl } from "./utils/baseUrl";
 import {
   memberAgeGroupDescriptions,
   memberAgeGroupOptions,
+  memberJourneyStatusOptions,
   memberStatusOptions,
 } from "./constants/memberOptions";
 import { PAYSTACK_BANK_OPTIONS } from "./constants/paystackOptions";
@@ -131,6 +132,16 @@ function AppContent() {
     photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
+    journeyStatus: "VISITOR",
+    journeyNotes: "",
+    journeyUpdatedAt: "",
+    journeyHistory: [],
+    referralSource: "",
+    referralSourceOther: "",
+    reasonForVisit: "",
+    prayerRequestPrivate: true,
+    wantsLeaderCall: false,
+    preferredCallTime: "",
   });
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -141,8 +152,34 @@ function AppContent() {
     photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
+    journeyStatus: "VISITOR",
+    journeyNotes: "",
+    referralSource: "",
+    referralSourceOther: "",
+    reasonForVisit: "",
+    prayerRequestPrivate: true,
+    wantsLeaderCall: false,
+    preferredCallTime: "",
   });
   const [memberSearch, setMemberSearch] = useState("");
+
+  const referralSourceOptions = [
+    { value: "", label: "Select..." },
+    { value: "FRIEND", label: "Friend" },
+    { value: "SOCIAL_MEDIA", label: "Social media" },
+    { value: "STREET_OUTREACH", label: "Street outreach" },
+    { value: "WEBSITE", label: "Website" },
+    { value: "FLYER", label: "Flyer or poster" },
+    { value: "OTHER", label: "Other" },
+  ];
+  const referralSourceLabel = (value) =>
+    referralSourceOptions.find((option) => option.value === value)?.label || value;
+
+  const formatJourneyUpdatedAt = (value) => {
+    const parsed = parseDateValue(value);
+    if (!parsed) return "-";
+    return parsed.toLocaleDateString();
+  };
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -1021,6 +1058,9 @@ function AppContent() {
 
     try {
       setLoading(true);
+      const now = new Date().toISOString();
+      const journeyStatus = memberForm.journeyStatus || "VISITOR";
+      const journeyNotes = memberForm.journeyNotes.trim();
       await addDoc(collection(db, "members"), {
         churchId: userProfile.churchId,
         firstName: memberForm.firstName.trim(),
@@ -1030,7 +1070,26 @@ function AppContent() {
         photoDataUrl: memberForm.photoDataUrl,
         status: memberForm.status,
         dateOfBirth: memberForm.dateOfBirth,
-        createdAt: new Date().toISOString(),
+        journeyStatus,
+        journeyNotes,
+        journeyUpdatedAt: now,
+        journeyHistory: [
+          {
+            status: journeyStatus,
+            notes: journeyNotes,
+            timestamp: now,
+          },
+        ],
+        referralSource: memberForm.referralSource,
+        referralSourceOther:
+          memberForm.referralSource === "OTHER" ? memberForm.referralSourceOther.trim() : "",
+        reasonForVisit: memberForm.reasonForVisit.trim(),
+        prayerRequestPrivate: memberForm.prayerRequestPrivate,
+        wantsLeaderCall: memberForm.wantsLeaderCall,
+        preferredCallTime: memberForm.wantsLeaderCall
+          ? memberForm.preferredCallTime.trim()
+          : "",
+        createdAt: now,
       });
 
       setMemberForm({
@@ -1041,6 +1100,14 @@ function AppContent() {
         photoDataUrl: "",
         status: "VISITOR",
         dateOfBirth: "",
+        journeyStatus: "VISITOR",
+        journeyNotes: "",
+        referralSource: "",
+        referralSourceOther: "",
+        reasonForVisit: "",
+        prayerRequestPrivate: true,
+        wantsLeaderCall: false,
+        preferredCallTime: "",
       });
 
       await loadMembers();
@@ -1063,6 +1130,16 @@ function AppContent() {
       photoDataUrl: member.photoDataUrl || member.photoUrl || "",
       status: (member.status || "VISITOR").toUpperCase(),
       dateOfBirth: member.dateOfBirth || "",
+      journeyStatus: (member.journeyStatus || "VISITOR").toUpperCase(),
+      journeyNotes: member.journeyNotes || "",
+      journeyUpdatedAt: member.journeyUpdatedAt || "",
+      journeyHistory: Array.isArray(member.journeyHistory) ? member.journeyHistory : [],
+      referralSource: member.referralSource || "",
+      referralSourceOther: member.referralSourceOther || "",
+      reasonForVisit: member.reasonForVisit || "",
+      prayerRequestPrivate: member.prayerRequestPrivate ?? true,
+      wantsLeaderCall: Boolean(member.wantsLeaderCall),
+      preferredCallTime: member.preferredCallTime || "",
     });
   };
 
@@ -1076,6 +1153,16 @@ function AppContent() {
       photoDataUrl: "",
       status: "VISITOR",
       dateOfBirth: "",
+      journeyStatus: "VISITOR",
+      journeyNotes: "",
+      journeyUpdatedAt: "",
+      journeyHistory: [],
+      referralSource: "",
+      referralSourceOther: "",
+      reasonForVisit: "",
+      prayerRequestPrivate: true,
+      wantsLeaderCall: false,
+      preferredCallTime: "",
     });
   };
 
@@ -1090,6 +1177,16 @@ function AppContent() {
     try {
       setMemberActionLoading(true);
       const docRef = doc(db, "members", editingMemberId);
+      const existingMember = members.find((m) => m.id === editingMemberId);
+      const nextJourneyStatus = editingMemberForm.journeyStatus || "VISITOR";
+      const nextJourneyNotes = editingMemberForm.journeyNotes.trim();
+      const journeyChanged =
+        nextJourneyStatus !== (existingMember?.journeyStatus || "VISITOR") ||
+        nextJourneyNotes !== (existingMember?.journeyNotes || "");
+      const journeyHistory = Array.isArray(existingMember?.journeyHistory)
+        ? [...existingMember.journeyHistory]
+        : [];
+      const now = new Date().toISOString();
       const payload = {
         firstName: editingMemberForm.firstName.trim(),
         lastName: editingMemberForm.lastName.trim(),
@@ -1098,8 +1195,31 @@ function AppContent() {
         photoDataUrl: editingMemberForm.photoDataUrl,
         status: editingMemberForm.status,
         dateOfBirth: editingMemberForm.dateOfBirth,
-        updatedAt: new Date().toISOString(),
+        journeyStatus: nextJourneyStatus,
+        journeyNotes: nextJourneyNotes,
+        referralSource: editingMemberForm.referralSource,
+        referralSourceOther:
+          editingMemberForm.referralSource === "OTHER"
+            ? editingMemberForm.referralSourceOther.trim()
+            : "",
+        reasonForVisit: editingMemberForm.reasonForVisit.trim(),
+        prayerRequestPrivate: editingMemberForm.prayerRequestPrivate,
+        wantsLeaderCall: editingMemberForm.wantsLeaderCall,
+        preferredCallTime: editingMemberForm.wantsLeaderCall
+          ? editingMemberForm.preferredCallTime.trim()
+          : "",
+        updatedAt: now,
       };
+
+      if (journeyChanged) {
+        const entry = {
+          status: nextJourneyStatus,
+          notes: nextJourneyNotes,
+          timestamp: now,
+        };
+        payload.journeyUpdatedAt = now;
+        payload.journeyHistory = [...journeyHistory, entry];
+      }
       await updateDoc(docRef, payload);
 
       setMembers((prev) =>
@@ -2920,9 +3040,11 @@ function AppContent() {
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
   const normalizePhone = (value = "") => value.replace(/\D/g, "");
 
-  const visitorMembers = members.filter(
-    (m) => (m.status || "").toUpperCase() === "VISITOR"
-  );
+  const visitorMembers = members.filter((m) => {
+    const journeyStatus = (m.journeyStatus || "").toUpperCase();
+    const status = (m.status || "").toUpperCase();
+    return ["VISITOR", "FIRST_TIMER"].includes(journeyStatus || status);
+  });
 
   const followupTargets =
     followupAudience === "VISITOR" ? visitorMembers : members;
@@ -4153,6 +4275,47 @@ function AppContent() {
                 <option value="OTHER">Other</option>
                 <option value="INACTIVE">Inactive</option>
               </select>
+              <select
+                value={memberForm.journeyStatus}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    journeyStatus: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {memberJourneyStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    Journey: {option.label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                placeholder="Journey notes (optional)"
+                value={memberForm.journeyNotes}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    journeyNotes: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  resize: "vertical",
+                }}
+              />
               <input
                 type="date"
                 value={memberForm.dateOfBirth}
@@ -4170,6 +4333,132 @@ function AppContent() {
                   fontSize: "14px",
                 }}
               />
+              <select
+                value={memberForm.referralSource}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setMemberForm((f) => ({
+                    ...f,
+                    referralSource: value,
+                    referralSourceOther: value === "OTHER" ? f.referralSourceOther : "",
+                  }));
+                }}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {referralSourceOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label === "Select..."
+                      ? "How did you hear about us?"
+                      : option.label}
+                  </option>
+                ))}
+              </select>
+              {memberForm.referralSource === "OTHER" && (
+                <input
+                  type="text"
+                  placeholder="How did they hear about us? (optional)"
+                  value={memberForm.referralSourceOther}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      referralSourceOther: e.target.value,
+                    }))
+                  }
+                  style={{
+                    gridColumn: "span 2",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "14px",
+                  }}
+                />
+              )}
+              <textarea
+                placeholder="Reason for visit / prayer request"
+                value={memberForm.reasonForVisit}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    reasonForVisit: e.target.value,
+                  }))
+                }
+                rows={3}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  resize: "vertical",
+                }}
+              />
+              <label
+                style={{
+                  gridColumn: "span 2",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "13px",
+                  color: "#374151",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={memberForm.prayerRequestPrivate}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      prayerRequestPrivate: e.target.checked,
+                    }))
+                  }
+                />
+                Keep prayer request private (leaders only)
+              </label>
+              <select
+                value={memberForm.wantsLeaderCall ? "YES" : "NO"}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    wantsLeaderCall: e.target.value === "YES",
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="NO">Want a call from a leader?</option>
+                <option value="YES">Yes, a call would be helpful</option>
+              </select>
+              {memberForm.wantsLeaderCall && (
+                <input
+                  type="text"
+                  placeholder="Preferred time to call"
+                  value={memberForm.preferredCallTime}
+                  onChange={(e) =>
+                    setMemberForm((f) => ({
+                      ...f,
+                      preferredCallTime: e.target.value,
+                    }))
+                  }
+                  style={{
+                    gridColumn: "span 2",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "14px",
+                  }}
+                />
+              )}
             </div>
 
             <button
@@ -4276,6 +4565,8 @@ function AppContent() {
                           <th style={{ padding: "6px 4px" }}>Phone</th>
                           <th style={{ padding: "6px 4px" }}>Email</th>
                           <th style={{ padding: "6px 4px" }}>Status</th>
+                          <th style={{ padding: "6px 4px" }}>Journey</th>
+                          <th style={{ padding: "6px 4px" }}>Follow-up</th>
                           <th style={{ padding: "6px 4px" }}>Date of birth</th>
                           <th style={{ padding: "6px 4px" }}>Actions</th>
                         </tr>
@@ -4528,6 +4819,202 @@ function AppContent() {
                                   </select>
                                 ) : (
                                   <>{m.status}</>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px", minWidth: "180px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <select
+                                      value={editingMemberForm.journeyStatus}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          journeyStatus: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    >
+                                      {memberJourneyStatusOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <textarea
+                                      value={editingMemberForm.journeyNotes}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          journeyNotes: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Journey notes"
+                                      rows={2}
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        resize: "vertical",
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    <strong>{m.journeyStatus || m.status || "VISITOR"}</strong>
+                                    <span style={{ color: "#6b7280", fontSize: "12px" }}>
+                                      Updated: {formatJourneyUpdatedAt(m.journeyUpdatedAt)}
+                                    </span>
+                                    {m.journeyNotes ? (
+                                      <span style={{ color: "#6b7280", fontSize: "12px" }}>
+                                        Notes: {m.journeyNotes}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: "6px 4px", minWidth: "220px" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <select
+                                      value={editingMemberForm.referralSource}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          referralSource: value,
+                                          referralSourceOther:
+                                            value === "OTHER" ? f.referralSourceOther : "",
+                                        }));
+                                      }}
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    >
+                                      {referralSourceOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label === "Select..."
+                                            ? "How did you hear about us?"
+                                            : option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {editingMemberForm.referralSource === "OTHER" && (
+                                      <input
+                                        type="text"
+                                        value={editingMemberForm.referralSourceOther}
+                                        onChange={(e) =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            referralSourceOther: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Other source"
+                                        style={{
+                                          padding: "6px 8px",
+                                          borderRadius: "6px",
+                                          border: "1px solid #d1d5db",
+                                        }}
+                                      />
+                                    )}
+                                    <textarea
+                                      value={editingMemberForm.reasonForVisit}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          reasonForVisit: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Reason for visit / prayer request"
+                                      rows={2}
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                        resize: "vertical",
+                                      }}
+                                    />
+                                    <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={editingMemberForm.prayerRequestPrivate}
+                                        onChange={(e) =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            prayerRequestPrivate: e.target.checked,
+                                          }))
+                                        }
+                                      />
+                                      <span style={{ fontSize: "12px", color: "#374151" }}>
+                                        Private request
+                                      </span>
+                                    </label>
+                                    <select
+                                      value={editingMemberForm.wantsLeaderCall ? "YES" : "NO"}
+                                      onChange={(e) =>
+                                        setEditingMemberForm((f) => ({
+                                          ...f,
+                                          wantsLeaderCall: e.target.value === "YES",
+                                        }))
+                                      }
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #d1d5db",
+                                      }}
+                                    >
+                                      <option value="NO">Call from leader?</option>
+                                      <option value="YES">Yes</option>
+                                    </select>
+                                    {editingMemberForm.wantsLeaderCall && (
+                                      <input
+                                        type="text"
+                                        value={editingMemberForm.preferredCallTime}
+                                        onChange={(e) =>
+                                          setEditingMemberForm((f) => ({
+                                            ...f,
+                                            preferredCallTime: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Preferred time"
+                                        style={{
+                                          padding: "6px 8px",
+                                          borderRadius: "6px",
+                                          border: "1px solid #d1d5db",
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    {m.referralSource ? (
+                                      <span>
+                                        Heard via:{" "}
+                                        {m.referralSource === "OTHER"
+                                          ? m.referralSourceOther || "Other"
+                                          : referralSourceLabel(m.referralSource)}
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: "#9ca3af" }}>No follow-up details</span>
+                                    )}
+                                    {m.reasonForVisit ? (
+                                      <span style={{ color: "#6b7280" }}>
+                                        {m.prayerRequestPrivate ? "Private: " : ""}
+                                        {m.reasonForVisit}
+                                      </span>
+                                    ) : null}
+                                    {m.wantsLeaderCall ? (
+                                      <span style={{ color: "#6b7280" }}>
+                                        Call requested
+                                        {m.preferredCallTime ? ` · ${m.preferredCallTime}` : ""}
+                                      </span>
+                                    ) : null}
+                                  </div>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
