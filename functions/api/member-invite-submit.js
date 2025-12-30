@@ -48,6 +48,15 @@ async function findExistingMember({ churchId, phone, email }) {
   return null
 }
 
+function isValidPhotoUrl(url) {
+  if (!url) return false
+
+  return (
+    url.startsWith('https://firebasestorage.googleapis.com/') ||
+    url.startsWith('gs://')
+  )
+}
+
 module.exports = async function handler(request, response) {
   if (request.method !== 'POST') {
     return response.status(405).json({
@@ -80,6 +89,7 @@ module.exports = async function handler(request, response) {
     status,
     dateOfBirth,
     photoUrl,
+    photoDataUrl,
   } = request.body || {}
 
   if (!token) {
@@ -95,6 +105,7 @@ module.exports = async function handler(request, response) {
   const trimmedEmail = (email || '').trim().toLowerCase()
   const trimmedDob = typeof dateOfBirth === 'string' ? dateOfBirth.trim() : ''
   const trimmedPhotoUrl = typeof photoUrl === 'string' ? photoUrl.trim() : ''
+  void photoDataUrl
 
   if (!trimmedFirst && !trimmedLast) {
     return response.status(400).json({
@@ -107,6 +118,13 @@ module.exports = async function handler(request, response) {
     return response.status(400).json({
       status: 'error',
       message: 'Please enter a phone number or email so we can contact you.',
+    })
+  }
+
+  if (trimmedPhotoUrl && !isValidPhotoUrl(trimmedPhotoUrl)) {
+    return response.status(400).json({
+      status: 'error',
+      message: 'Photo URL must be a Firebase Storage URL.',
     })
   }
 
