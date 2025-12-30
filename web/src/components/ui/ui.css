@@ -1,0 +1,140 @@
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  padding: 12px 16px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+  box-shadow: none;
+}
+
+.ui-button-primary {
+  background: linear-gradient(135deg, #4338ca, #2563eb);
+  color: white;
+  border-color: #4338ca;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.25);
+}
+
+.ui-button-secondary {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.ui-button-ghost {
+  background: transparent;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.ui-button-danger {
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+}
+
+.ui-button-toggle {
+  border-radius: 999px;
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.ui-button-full {
+  width: 100%;
+}
+
+.ui-button-active {
+  background: linear-gradient(135deg, #4338ca, #2563eb);
+  color: white;
+  border-color: #4338ca;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.25);
+}
+
+.ui-input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.ui-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.ui-card {
+  border-radius: 16px;
+  padding: 16px;
+  background: white;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.ui-card-frosted {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.ui-card-compact {
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.ui-card-dark {
+  background: #0f172a;
+  color: white;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.4);
+}
+
+.ui-card-gradient {
+  background: linear-gradient(145deg, #eef2ff, #e0f2fe);
+}
+
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.ui-pill-purple {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.ui-pill-white {
+  background: white;
+  color: #1f2937;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.ui-pill-muted {
+  background: rgba(255, 255, 255, 0.8);
+  color: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
