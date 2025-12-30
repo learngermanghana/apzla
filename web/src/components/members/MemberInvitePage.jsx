@@ -61,9 +61,9 @@ const translations = {
     gender: "Gender",
     maritalStatus: "Marital status",
     baptized: "Have you been baptized?",
-    familyTree: "Family tree & household",
+    familyTree: "Family & household names",
     familyTreeHelp:
-      "Tell us who else in your family attends, or the best way to connect with your household.",
+      "List anyone we should connect with your household (spouse, children, guardians). Separate names with commas.",
     photo: "Upload your picture",
     optionalTitle: "Optional questions",
     optionalHelp: "You can skip these for now.",
@@ -93,7 +93,7 @@ const translations = {
     baptized: "Avez-vous été baptisé(e) ?",
     familyTree: "Famille & foyer",
     familyTreeHelp:
-      "Indiquez qui d'autre dans votre famille participe ou comment contacter votre foyer.",
+      "Indiquez les personnes à relier à votre foyer (conjoint, enfants, tuteurs). Séparez les noms par des virgules.",
     photo: "Télécharger votre photo",
     optionalTitle: "Questions facultatives",
     optionalHelp: "Vous pouvez les ignorer pour l'instant.",
@@ -123,7 +123,7 @@ const translations = {
     baptized: "¿Has sido bautizado?",
     familyTree: "Familia y hogar",
     familyTreeHelp:
-      "Cuéntanos quién más asiste en tu familia o la mejor forma de contactar a tu hogar.",
+      "Indica a quién debemos conectar con tu hogar (pareja, hijos, tutores). Separa los nombres con comas.",
     photo: "Sube tu foto",
     optionalTitle: "Preguntas opcionales",
     optionalHelp: "Puedes omitirlas por ahora.",
@@ -151,7 +151,8 @@ const translations = {
     maritalStatus: "Marital status",
     baptized: "Wɔabɔ wo asuo mu?",
     familyTree: "Abusua & fie",
-    familyTreeHelp: "Ka abusuafo a wɔn nso ba asafo no mu anaa sɛnea yɛbɛtumi aka wo fie ho asɛm.",
+    familyTreeHelp:
+      "Ka wɔn a wɔwɔ wo fie mu (warefo, mma, wɔn a wɔhwɛ wo). Fa comma mfa wɔn din gu mu.",
     photo: "Fa wo mfonini to so",
     optionalTitle: "Nsɛmmisa a ɛyɛ ɔpɛ",
     optionalHelp: "Wubetumi agyae wɔn seesei.",
@@ -181,7 +182,7 @@ const translations = {
     baptized: "Wò ŋɔe dzi wɔ baptizm ɖe?",
     familyTree: "Ƒome & Aƒe",
     familyTreeHelp:
-      "Gblɔ ame siwo kple wò ƒome me vɔna hame, alo nɔnɔme si ɖe ɖo.",
+      "Gblɔ ame siwo míadɔ ɖe wò aƒe (srɔ̃, viwo, wɔn a wɔkpɔ wo). Fa comma tsɔ wɔn ŋkɔwo.",
     photo: "Tsɔ wò foto da ɖe",
     optionalTitle: "Nukpliwo",
     optionalHelp: "Àte ŋu anya asi le wò dzɔdzɔ me.",
@@ -211,7 +212,7 @@ const translations = {
     baptized: "Wɔabɔ wo asuo mu?",
     familyTree: "Abusua & fie",
     familyTreeHelp:
-      "Ka abusuafo a wɔn nso ba asafo no mu anaa sɛnea yɛbɛtumi aka wo fie ho asɛm.",
+      "Ka wɔn a wɔwɔ wo fie mu (warefo, mma, wɔn a wɔhwɛ wo). Fa comma mfa wɔn din gu mu.",
     photo: "Fa wo mfonini to so",
     optionalTitle: "Nsɛmmisa a ɛyɛ ɔpɛ",
     optionalHelp: "Wubetumi agyae wɔn seesei.",
@@ -241,7 +242,7 @@ const translations = {
     baptized: "Bist du getauft?",
     familyTree: "Familie & Haushalt",
     familyTreeHelp:
-      "Sag uns, wer aus deiner Familie auch kommt oder wie wir deinen Haushalt erreichen können.",
+      "Nenne Personen, die wir mit deinem Haushalt verbinden sollen (Partner, Kinder, Betreuer). Trenne Namen mit Kommas.",
     photo: "Foto hochladen",
     optionalTitle: "Optionale Fragen",
     optionalHelp: "Du kannst sie vorerst überspringen.",
@@ -254,6 +255,8 @@ const translations = {
     submitting: "Senden…",
   },
 };
+
+const PHOTO_UPLOAD_TIMEOUT_MS = 15000;
 
 export default function MemberInvitePage({ token: initialToken = "" }) {
   const [language, setLanguage] = useState("en");
@@ -384,16 +387,35 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     try {
       setIsSubmitting(true);
       let photoUrl = "";
+      let photoUploadWarning = "";
       if (form.photoFile && storage) {
         const timestamp = Date.now();
         const fileRef = storageRef(
           storage,
           `member-invites/${trimmedToken}/${timestamp}.jpg`
         );
-        await uploadBytes(fileRef, form.photoFile, {
-          contentType: form.photoFile.type || "image/jpeg",
-        });
-        photoUrl = await getDownloadURL(fileRef);
+        try {
+          const uploadTask = (async () => {
+            await uploadBytes(fileRef, form.photoFile, {
+              contentType: form.photoFile.type || "image/jpeg",
+            });
+            return getDownloadURL(fileRef);
+          })();
+          photoUrl = await Promise.race([
+            uploadTask,
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Photo upload timed out.")),
+                PHOTO_UPLOAD_TIMEOUT_MS
+              )
+            ),
+          ]);
+        } catch (err) {
+          console.error("Invite photo upload error", err);
+          photoUploadWarning =
+            err?.message ||
+            "We could not upload your photo. We'll save the rest of your details.";
+        }
       }
       const res = await fetch("/api/member-invite-submit", {
         method: "POST",
@@ -427,8 +449,14 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         return;
       }
 
-      setFeedback({ ok: true, message: data.message || "You are all set. Thank you!" });
-      setStatusTone("success");
+      const successMessage = data.message || "You are all set. Thank you!";
+      if (photoUploadWarning) {
+        setFeedback({ ok: true, message: `${successMessage} ${photoUploadWarning}` });
+        setStatusTone("info");
+      } else {
+        setFeedback({ ok: true, message: successMessage });
+        setStatusTone("success");
+      }
       setForm({
         firstName: "",
         lastName: "",
@@ -627,7 +655,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
               className="checkin-textarea"
               value={form.familyTree}
               onChange={(e) => updateField("familyTree", e.target.value)}
-              placeholder="e.g. Spouse: Kojo Mensah, Children: Abena & Kwame"
+              placeholder="e.g. Kojo Mensah (spouse), Abena Mensah (child)"
             />
             <div className="checkin-help-text">{selectedLanguage.familyTreeHelp}</div>
           </label>
