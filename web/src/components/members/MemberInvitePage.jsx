@@ -12,7 +12,215 @@ const statusOptions = [
   { value: "OTHER", label: "Other" },
 ];
 
+const languageOptions = [
+  { value: "en", label: "English" },
+  { value: "fr", label: "Français" },
+  { value: "es", label: "Español" },
+  { value: "twi", label: "Twi" },
+  { value: "ewe", label: "Eʋegbe" },
+  { value: "ga", label: "Gã" },
+  { value: "de", label: "Deutsch" },
+];
+
+const translations = {
+  en: {
+    title: "Share your details",
+    subtitle:
+      "A leader invited you to join their community list. Fill this form to be added automatically.",
+    language: "Language",
+    welcome: "Welcome to your church family",
+    note: "We will only use this to stay connected with you.",
+    firstName: "First name",
+    lastName: "Last name",
+    phone: "Phone",
+    email: "Email",
+    status: "Status",
+    dob: "Date of birth",
+    baptized: "Have you been baptized?",
+    familyTree: "Family tree & household",
+    familyTreeHelp:
+      "Tell us who else in your family attends, or the best way to connect with your household.",
+    photo: "Upload your picture",
+    optionalTitle: "Optional questions",
+    optionalHelp: "You can skip these for now.",
+    heardAbout: "How did you hear about us?",
+    ministryInterest: "Ministry interest",
+    prayerRequest: "Prayer request",
+    inviteToken: "Invite token",
+    tokenHelp: "The token from your link helps us connect you to the right church.",
+    submit: "Send my details",
+    submitting: "Submitting…",
+  },
+  fr: {
+    title: "Partagez vos informations",
+    subtitle:
+      "Un responsable vous a invité à rejoindre la liste de la communauté. Remplissez ce formulaire pour être ajouté automatiquement.",
+    language: "Langue",
+    welcome: "Bienvenue dans votre famille d'église",
+    note: "Nous l'utiliserons uniquement pour rester en contact.",
+    firstName: "Prénom",
+    lastName: "Nom",
+    phone: "Téléphone",
+    email: "E-mail",
+    status: "Statut",
+    dob: "Date de naissance",
+    baptized: "Avez-vous été baptisé(e) ?",
+    familyTree: "Famille & foyer",
+    familyTreeHelp:
+      "Indiquez qui d'autre dans votre famille participe ou comment contacter votre foyer.",
+    photo: "Télécharger votre photo",
+    optionalTitle: "Questions facultatives",
+    optionalHelp: "Vous pouvez les ignorer pour l'instant.",
+    heardAbout: "Comment nous avez-vous connu ?",
+    ministryInterest: "Intérêt pour les ministères",
+    prayerRequest: "Sujet de prière",
+    inviteToken: "Jeton d'invitation",
+    tokenHelp: "Le jeton du lien nous relie à la bonne église.",
+    submit: "Envoyer mes informations",
+    submitting: "Envoi…",
+  },
+  es: {
+    title: "Comparte tus datos",
+    subtitle:
+      "Un líder te invitó a unirte a la lista de la comunidad. Completa este formulario para agregarte automáticamente.",
+    language: "Idioma",
+    welcome: "Bienvenido a tu familia de iglesia",
+    note: "Solo lo usaremos para mantenernos en contacto.",
+    firstName: "Nombre",
+    lastName: "Apellido",
+    phone: "Teléfono",
+    email: "Correo",
+    status: "Estado",
+    dob: "Fecha de nacimiento",
+    baptized: "¿Has sido bautizado?",
+    familyTree: "Familia y hogar",
+    familyTreeHelp:
+      "Cuéntanos quién más asiste en tu familia o la mejor forma de contactar a tu hogar.",
+    photo: "Sube tu foto",
+    optionalTitle: "Preguntas opcionales",
+    optionalHelp: "Puedes omitirlas por ahora.",
+    heardAbout: "¿Cómo supiste de nosotros?",
+    ministryInterest: "Interés ministerial",
+    prayerRequest: "Petición de oración",
+    inviteToken: "Token de invitación",
+    tokenHelp: "El token del enlace nos conecta con la iglesia correcta.",
+    submit: "Enviar mis datos",
+    submitting: "Enviando…",
+  },
+  twi: {
+    title: "Kyɛ wo ho nsɛm",
+    subtitle: "Ɔsɔfo bi frɛɛ wo sɛ wo mmra asafo no mu. Hyɛ krataa yi na yɛmmfa wo ho nka.",
+    language: "Kasa",
+    welcome: "Akwaaba wo asafo abusua mu",
+    note: "Yɛde bɛka wo ho nko ara.",
+    firstName: "Dzin a edi kan",
+    lastName: "Dzin a edi akyi",
+    phone: "Telefon",
+    email: "Email",
+    status: "Gyinae",
+    dob: "Awo da",
+    baptized: "Wɔabɔ wo asuo mu?",
+    familyTree: "Abusua & fie",
+    familyTreeHelp: "Ka abusuafo a wɔn nso ba asafo no mu anaa sɛnea yɛbɛtumi aka wo fie ho asɛm.",
+    photo: "Fa wo mfonini to so",
+    optionalTitle: "Nsɛmmisa a ɛyɛ ɔpɛ",
+    optionalHelp: "Wubetumi agyae wɔn seesei.",
+    heardAbout: "Ɛhe na wotee yɛn ho?",
+    ministryInterest: "Som wɔn mu anigye",
+    prayerRequest: "Mpaebɔ asɛm",
+    inviteToken: "Frɛ nkɔmhyɛ",
+    tokenHelp: "Link no mu token no boa yɛn sɛ yɛbɛhu asafo no.",
+    submit: "Fa me nsɛm mena",
+    submitting: "Ɔde rekɔ…",
+  },
+  ewe: {
+    title: "Nɔ wò ŋkɔ",
+    subtitle:
+      "Leaɖa aɖe ɖe wò ƒe nyagɔ me, kple wò nanɛ ŋutɔ me. Ɖe agbalẽ sia me be wò nyagɔ nakɔ.",
+    language: "Gbe",
+    welcome: "Wò nɔvi ƒe hame me wò va",
+    note: "Míatsɔe aɖe wò ŋu ɖe leɖeɖe ŋu.",
+    firstName: "Ŋkɔgbãtɔ",
+    lastName: "Ŋkɔgake",
+    phone: "Telefon",
+    email: "E-mail",
+    status: "Nɔƒe",
+    dob: "Dzidzɔ ŋkeke",
+    baptized: "Wò ŋɔe dzi wɔ baptizm ɖe?",
+    familyTree: "Ƒome & Aƒe",
+    familyTreeHelp:
+      "Gblɔ ame siwo kple wò ƒome me vɔna hame, alo nɔnɔme si ɖe ɖo.",
+    photo: "Tsɔ wò foto da ɖe",
+    optionalTitle: "Nukpliwo",
+    optionalHelp: "Àte ŋu anya asi le wò dzɔdzɔ me.",
+    heardAbout: "Aleke wò se míaƒe nya?",
+    ministryInterest: "Ŋusẽ dzi hã",
+    prayerRequest: "Mawugbe",
+    inviteToken: "Dɔmeɖoɖo",
+    tokenHelp: "Tokɛn sia ka wò kple hame si gbɔ.",
+    submit: "Ɖo wò nyagɔ ɖa",
+    submitting: "Wò me…",
+  },
+  ga: {
+    title: "Fa wo ŋkɔ nɛ ɔkɛ",
+    subtitle:
+      "Ɔsɔfo bi frɛɛ wo sɛ wo mmra asafo no mu. Hye krataa yi na yɛmmfa wo ho nka.",
+    language: "Kasa",
+    welcome: "Akwaaba wo asafo abusua mu",
+    note: "Yɛde bɛka wo ho nko ara.",
+    firstName: "Dzin a edi kan",
+    lastName: "Dzin a edi akyi",
+    phone: "Telefon",
+    email: "Email",
+    status: "Gyinae",
+    dob: "Awo da",
+    baptized: "Wɔabɔ wo asuo mu?",
+    familyTree: "Abusua & fie",
+    familyTreeHelp:
+      "Ka abusuafo a wɔn nso ba asafo no mu anaa sɛnea yɛbɛtumi aka wo fie ho asɛm.",
+    photo: "Fa wo mfonini to so",
+    optionalTitle: "Nsɛmmisa a ɛyɛ ɔpɛ",
+    optionalHelp: "Wubetumi agyae wɔn seesei.",
+    heardAbout: "Ɛhe na wotee yɛn ho?",
+    ministryInterest: "Som wɔn mu anigye",
+    prayerRequest: "Mpaebɔ asɛm",
+    inviteToken: "Frɛ nkɔmhyɛ",
+    tokenHelp: "Link no mu token no boa yɛn sɛ yɛbɛhu asafo no.",
+    submit: "Fa me nsɛm mena",
+    submitting: "Ɔde rekɔ…",
+  },
+  de: {
+    title: "Teile deine Angaben",
+    subtitle:
+      "Eine Leitungsperson hat dich eingeladen, der Gemeindeliste beizutreten. Fülle dieses Formular aus, um automatisch hinzugefügt zu werden.",
+    language: "Sprache",
+    welcome: "Willkommen in deiner Gemeindefamilie",
+    note: "Wir nutzen das nur, um mit dir in Kontakt zu bleiben.",
+    firstName: "Vorname",
+    lastName: "Nachname",
+    phone: "Telefon",
+    email: "E-Mail",
+    status: "Status",
+    dob: "Geburtsdatum",
+    baptized: "Bist du getauft?",
+    familyTree: "Familie & Haushalt",
+    familyTreeHelp:
+      "Sag uns, wer aus deiner Familie auch kommt oder wie wir deinen Haushalt erreichen können.",
+    photo: "Foto hochladen",
+    optionalTitle: "Optionale Fragen",
+    optionalHelp: "Du kannst sie vorerst überspringen.",
+    heardAbout: "Wie hast du von uns gehört?",
+    ministryInterest: "Dienstinteresse",
+    prayerRequest: "Gebetsanliegen",
+    inviteToken: "Einladungscode",
+    tokenHelp: "Der Code aus deinem Link verbindet dich mit der richtigen Gemeinde.",
+    submit: "Meine Angaben senden",
+    submitting: "Senden…",
+  },
+};
+
 export default function MemberInvitePage({ token: initialToken = "" }) {
+  const [language, setLanguage] = useState("en");
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -20,6 +228,13 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     email: "",
     status: "VISITOR",
     dateOfBirth: "",
+    baptized: "NOT_YET",
+    familyTree: "",
+    photoDataUrl: "",
+    heardAbout: "",
+    ministryInterest: "",
+    prayerRequest: "",
+    preferredLanguage: "en",
   });
   const [token, setToken] = useState(initialToken || "");
   const [feedback, setFeedback] = useState({ ok: false, message: "" });
@@ -50,6 +265,26 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const selectedLanguage = translations[language] || translations.en;
+  const optionalFields = ["heardAbout", "ministryInterest", "prayerRequest"];
+  const optionalAnswered = optionalFields.reduce(
+    (count, key) => count + (form[key]?.trim() ? 1 : 0),
+    0
+  );
+  const optionalProgress = Math.round(
+    (optionalAnswered / optionalFields.length) * 100
+  );
+
+  const handlePhotoUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateField("photoDataUrl", reader.result || "");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
@@ -119,6 +354,13 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         email: trimmedEmail,
         status: form.status,
         dateOfBirth: "",
+        baptized: "NOT_YET",
+        familyTree: "",
+        photoDataUrl: "",
+        heardAbout: "",
+        ministryInterest: "",
+        prayerRequest: "",
+        preferredLanguage: form.preferredLanguage,
       });
     } catch (err) {
       console.error("Invite submit error", err);
@@ -130,101 +372,240 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
   };
 
   return (
-    <div className="checkin-shell">
+    <div className="checkin-page">
       <div className="checkin-card">
-        <div className="checkin-header">
+        <div className="checkin-hero">
           <div>
-            <h1 className="checkin-title">Share your details</h1>
-            <p className="checkin-subtitle">
-              A leader invited you to join their community list. Fill this form to be added
-              automatically.
-            </p>
+            <h1 className="checkin-title">{selectedLanguage.title}</h1>
+            <p className="checkin-subtitle">{selectedLanguage.subtitle}</p>
+            <div className="checkin-welcome">
+              <span className="checkin-welcome-title">{selectedLanguage.welcome}</span>
+              <span className="checkin-welcome-note">{selectedLanguage.note}</span>
+            </div>
           </div>
-          <StatusBanner />
-        </div>
-
-        <form onSubmit={handleSubmit} className="checkin-form" autoComplete="on">
-          <div className="checkin-grid">
-            <label className="checkin-field">
-              <span>First name</span>
-              <input
-                type="text"
-                value={form.firstName}
-                onChange={(e) => updateField("firstName", e.target.value)}
-                placeholder="e.g. Ama"
-              />
-            </label>
-
-            <label className="checkin-field">
-              <span>Last name</span>
-              <input
-                type="text"
-                value={form.lastName}
-                onChange={(e) => updateField("lastName", e.target.value)}
-                placeholder="e.g. Mensah"
-              />
-            </label>
-
-            <label className="checkin-field">
-              <span>Phone*</span>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => updateField("phone", e.target.value)}
-                placeholder="e.g. 0501234567"
-              />
-            </label>
-
-            <label className="checkin-field">
-              <span>Email</span>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => updateField("email", e.target.value)}
-                placeholder="name@example.com"
-              />
-            </label>
-
-            <label className="checkin-field">
-              <span>Status</span>
+          <div className="checkin-hero-side">
+            <div className="checkin-language">
+              <label htmlFor="invite-language">{selectedLanguage.language}</label>
               <select
-                value={form.status}
-                onChange={(e) => updateField("status", e.target.value)}
+                id="invite-language"
+                value={language}
+                onChange={(e) => {
+                  const nextLanguage = e.target.value;
+                  setLanguage(nextLanguage);
+                  updateField("preferredLanguage", nextLanguage);
+                }}
               >
-                {statusOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                {languageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
-            </label>
-
-            <label className="checkin-field">
-              <span>Date of birth</span>
-              <input
-                type="date"
-                value={form.dateOfBirth}
-                onChange={(e) => updateField("dateOfBirth", e.target.value)}
-              />
-              <div className="checkin-help-text">
-                We use this to place you in the right age group.
-              </div>
-            </label>
-
-            <label className="checkin-field">
-              <span>Invite token*</span>
-              <input
-                type="text"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Automatically filled from the link"
-                autoComplete="off"
-              />
-              <div className="checkin-help-text">
-                The token from your link helps us connect you to the right church.
-              </div>
-            </label>
+            </div>
+            <StatusBanner />
           </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="checkin-form" autoComplete="on">
+          <div className="checkin-section">
+            <h2>Personal details</h2>
+            <p>Help us create your member profile.</p>
+          </div>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.firstName}</span>
+            <input
+              className="checkin-input"
+              type="text"
+              value={form.firstName}
+              onChange={(e) => updateField("firstName", e.target.value)}
+              placeholder="e.g. Ama"
+            />
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.lastName}</span>
+            <input
+              className="checkin-input"
+              type="text"
+              value={form.lastName}
+              onChange={(e) => updateField("lastName", e.target.value)}
+              placeholder="e.g. Mensah"
+            />
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.phone}*</span>
+            <input
+              className="checkin-input"
+              type="tel"
+              value={form.phone}
+              onChange={(e) => updateField("phone", e.target.value)}
+              placeholder="e.g. 0501234567"
+            />
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.email}</span>
+            <input
+              className="checkin-input"
+              type="email"
+              value={form.email}
+              onChange={(e) => updateField("email", e.target.value)}
+              placeholder="name@example.com"
+            />
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.status}</span>
+            <select
+              className="checkin-input"
+              value={form.status}
+              onChange={(e) => updateField("status", e.target.value)}
+            >
+              {statusOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.dob}</span>
+            <input
+              className="checkin-input"
+              type="date"
+              value={form.dateOfBirth}
+              onChange={(e) => updateField("dateOfBirth", e.target.value)}
+            />
+            <div className="checkin-help-text">
+              We use this to place you in the right age group.
+            </div>
+          </label>
+
+          <div className="checkin-field checkin-field-full">
+            <span>{selectedLanguage.baptized}</span>
+            <div className="checkin-radio-group">
+              {[
+                { value: "YES", label: "Yes" },
+                { value: "NO", label: "No" },
+                { value: "NOT_YET", label: "Not yet" },
+              ].map((option) => (
+                <label key={option.value} className="checkin-radio">
+                  <input
+                    type="radio"
+                    name="baptized"
+                    value={option.value}
+                    checked={form.baptized === option.value}
+                    onChange={(e) => updateField("baptized", e.target.value)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <label className="checkin-field checkin-field-full">
+            <span>{selectedLanguage.familyTree}</span>
+            <textarea
+              className="checkin-textarea"
+              value={form.familyTree}
+              onChange={(e) => updateField("familyTree", e.target.value)}
+              placeholder="e.g. Spouse: Kojo Mensah, Children: Abena & Kwame"
+            />
+            <div className="checkin-help-text">{selectedLanguage.familyTreeHelp}</div>
+          </label>
+
+          <div className="checkin-field checkin-field-full">
+            <span>{selectedLanguage.photo}</span>
+            <div className="checkin-photo">
+              <div className="checkin-photo-preview">
+                {form.photoDataUrl ? (
+                  <img src={form.photoDataUrl} alt="Profile preview" />
+                ) : (
+                  <div className="checkin-photo-placeholder">Add a photo</div>
+                )}
+              </div>
+              <div className="checkin-photo-controls">
+                <input
+                  id="invite-photo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                />
+                {form.photoDataUrl && (
+                  <button
+                    type="button"
+                    className="checkin-photo-remove"
+                    onClick={() => updateField("photoDataUrl", "")}
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="checkin-section checkin-section-full">
+            <div>
+              <h2>{selectedLanguage.optionalTitle}</h2>
+              <p>{selectedLanguage.optionalHelp}</p>
+            </div>
+            <div className="checkin-progress">
+              <div className="checkin-progress-bar">
+                <span style={{ width: `${optionalProgress}%` }} />
+              </div>
+              <span>
+                {optionalAnswered}/{optionalFields.length}
+              </span>
+            </div>
+          </div>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.heardAbout}</span>
+            <input
+              className="checkin-input"
+              type="text"
+              value={form.heardAbout}
+              onChange={(e) => updateField("heardAbout", e.target.value)}
+              placeholder="Friend, online, outreach..."
+            />
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.ministryInterest}</span>
+            <input
+              className="checkin-input"
+              type="text"
+              value={form.ministryInterest}
+              onChange={(e) => updateField("ministryInterest", e.target.value)}
+              placeholder="Music, ushering, children..."
+            />
+          </label>
+
+          <label className="checkin-field checkin-field-full">
+            <span>{selectedLanguage.prayerRequest}</span>
+            <textarea
+              className="checkin-textarea"
+              value={form.prayerRequest}
+              onChange={(e) => updateField("prayerRequest", e.target.value)}
+              placeholder="We would love to pray with you."
+            />
+          </label>
+
+          <label className="checkin-field checkin-field-full">
+            <span>{selectedLanguage.inviteToken}*</span>
+            <input
+              className="checkin-input"
+              type="text"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="Automatically filled from the link"
+              autoComplete="off"
+            />
+            <div className="checkin-help-text">{selectedLanguage.tokenHelp}</div>
+          </label>
 
           {feedback.message && (
             <div className={`checkin-feedback checkin-feedback-${statusTone}`}>
@@ -232,8 +613,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
             </div>
           )}
 
-          <button type="submit" className="checkin-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Submitting…" : "Send my details"}
+          <button type="submit" className="checkin-button" disabled={isSubmitting}>
+            {isSubmitting ? selectedLanguage.submitting : selectedLanguage.submit}
           </button>
         </form>
       </div>
