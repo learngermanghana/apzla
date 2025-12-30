@@ -5,6 +5,7 @@ import { storage } from "../../firebase";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { resizeImageFile } from "../../utils/imageProcessing";
 
+
 const statusOptions = [
   { value: "VISITOR", label: "Visitor" },
   { value: "NEW_CONVERT", label: "New convert" },
@@ -61,9 +62,11 @@ const translations = {
     gender: "Gender",
     maritalStatus: "Marital status",
     baptized: "Have you been baptized?",
-    familyTree: "Family & household names",
+    familyTree: "Family members",
     familyTreeHelp:
-      "List anyone we should connect with your household (spouse, children, guardians). Separate names with commas.",
+      "Add each family member's name and phone number. We’ll save them for you.",
+    familyMemberName: "Name",
+    familyMemberPhone: "Phone",
     photo: "Upload your picture",
     optionalTitle: "Optional questions",
     optionalHelp: "You can skip these for now.",
@@ -74,7 +77,10 @@ const translations = {
     tokenHelp: "The token from your link helps us connect you to the right church.",
     submit: "Send my details",
     submitting: "Submitting…",
+    addFamilyMember: "Add family member",
+    remove: "Remove",
   },
+  // Other language translations fall back to English for new keys
   fr: {
     title: "Partagez vos informations",
     subtitle:
@@ -88,12 +94,13 @@ const translations = {
     email: "E-mail",
     status: "Statut",
     dob: "Date de naissance",
-    gender: "Gender",
-    maritalStatus: "Marital status",
+    gender: "Genre",
+    maritalStatus: "Statut marital",
     baptized: "Avez-vous été baptisé(e) ?",
-    familyTree: "Famille & foyer",
-    familyTreeHelp:
-      "Indiquez les personnes à relier à votre foyer (conjoint, enfants, tuteurs). Séparez les noms par des virgules.",
+    familyTree: "Membres de la famille",
+    familyTreeHelp: "Ajoutez le nom et le numéro de téléphone de chaque membre de la famille.",
+    familyMemberName: "Nom",
+    familyMemberPhone: "Téléphone",
     photo: "Télécharger votre photo",
     optionalTitle: "Questions facultatives",
     optionalHelp: "Vous pouvez les ignorer pour l'instant.",
@@ -104,6 +111,8 @@ const translations = {
     tokenHelp: "Le jeton du lien nous relie à la bonne église.",
     submit: "Envoyer mes informations",
     submitting: "Envoi…",
+    addFamilyMember: "Ajouter un membre",
+    remove: "Retirer",
   },
   es: {
     title: "Comparte tus datos",
@@ -118,12 +127,13 @@ const translations = {
     email: "Correo",
     status: "Estado",
     dob: "Fecha de nacimiento",
-    gender: "Gender",
-    maritalStatus: "Marital status",
+    gender: "Género",
+    maritalStatus: "Estado civil",
     baptized: "¿Has sido bautizado?",
-    familyTree: "Familia y hogar",
-    familyTreeHelp:
-      "Indica a quién debemos conectar con tu hogar (pareja, hijos, tutores). Separa los nombres con comas.",
+    familyTree: "Miembros de la familia",
+    familyTreeHelp: "Agregue el nombre y número de cada miembro.",
+    familyMemberName: "Nombre",
+    familyMemberPhone: "Teléfono",
     photo: "Sube tu foto",
     optionalTitle: "Preguntas opcionales",
     optionalHelp: "Puedes omitirlas por ahora.",
@@ -134,6 +144,8 @@ const translations = {
     tokenHelp: "El token del enlace nos conecta con la iglesia correcta.",
     submit: "Enviar mis datos",
     submitting: "Enviando…",
+    addFamilyMember: "Añadir miembro",
+    remove: "Eliminar",
   },
   twi: {
     title: "Kyɛ wo ho nsɛm",
@@ -147,22 +159,25 @@ const translations = {
     email: "Email",
     status: "Gyinae",
     dob: "Awo da",
-    gender: "Gender",
-    maritalStatus: "Marital status",
+    gender: "Gyinta",
+    maritalStatus: "Warehom",
     baptized: "Wɔabɔ wo asuo mu?",
-    familyTree: "Abusua & fie",
-    familyTreeHelp:
-      "Ka wɔn a wɔwɔ wo fie mu (warefo, mma, wɔn a wɔhwɛ wo). Fa comma mfa wɔn din gu mu.",
+    familyTree: "Abusuafo",
+    familyTreeHelp: "Fa abusuafo din ne namba to ho.",
+    familyMemberName: "Din",
+    familyMemberPhone: "Namba",
     photo: "Fa wo mfonini to so",
     optionalTitle: "Nsɛmmisa a ɛyɛ ɔpɛ",
     optionalHelp: "Wubetumi agyae wɔn seesei.",
     heardAbout: "Ɛhe na wotee yɛn ho?",
-    ministryInterest: "Som wɔn mu anigye",
+    ministryInterest: "Som mu anigye",
     prayerRequest: "Mpaebɔ asɛm",
     inviteToken: "Frɛ nkɔmhyɛ",
     tokenHelp: "Link no mu token no boa yɛn sɛ yɛbɛhu asafo no.",
     submit: "Fa me nsɛm mena",
     submitting: "Ɔde rekɔ…",
+    addFamilyMember: "Ka abusuafo",
+    remove: "Yi",
   },
   ewe: {
     title: "Nɔ wò ŋkɔ",
@@ -177,12 +192,13 @@ const translations = {
     email: "E-mail",
     status: "Nɔƒe",
     dob: "Dzidzɔ ŋkeke",
-    gender: "Gender",
-    maritalStatus: "Marital status",
+    gender: "Zowò",
+    maritalStatus: "Fomeɖeke sia/meɖeke sia",
     baptized: "Wò ŋɔe dzi wɔ baptizm ɖe?",
-    familyTree: "Ƒome & Aƒe",
-    familyTreeHelp:
-      "Gblɔ ame siwo míadɔ ɖe wò aƒe (srɔ̃, viwo, wɔn a wɔkpɔ wo). Fa comma tsɔ wɔn ŋkɔwo.",
+    familyTree: "ƒomeʋiwo",
+    familyTreeHelp: "Tsɔ ŋkɔ kple telefon ŋu ta aɖe ɖe.",
+    familyMemberName: "Ŋkɔ",
+    familyMemberPhone: "Telefon",
     photo: "Tsɔ wò foto da ɖe",
     optionalTitle: "Nukpliwo",
     optionalHelp: "Àte ŋu anya asi le wò dzɔdzɔ me.",
@@ -193,6 +209,8 @@ const translations = {
     tokenHelp: "Tokɛn sia ka wò kple hame si gbɔ.",
     submit: "Ɖo wò nyagɔ ɖa",
     submitting: "Wò me…",
+    addFamilyMember: "Tsɔ ɖo ŋusẽ",
+    remove: "Yi",
   },
   ga: {
     title: "Fa wo ŋkɔ nɛ ɔkɛ",
@@ -207,22 +225,25 @@ const translations = {
     email: "Email",
     status: "Gyinae",
     dob: "Awo da",
-    gender: "Gender",
-    maritalStatus: "Marital status",
+    gender: "Gyinta",
+    maritalStatus: "Warehom",
     baptized: "Wɔabɔ wo asuo mu?",
-    familyTree: "Abusua & fie",
-    familyTreeHelp:
-      "Ka wɔn a wɔwɔ wo fie mu (warefo, mma, wɔn a wɔhwɛ wo). Fa comma mfa wɔn din gu mu.",
+    familyTree: "Abusuafo",
+    familyTreeHelp: "Fa abusuafo din ne namba to ho.",
+    familyMemberName: "Din",
+    familyMemberPhone: "Namba",
     photo: "Fa wo mfonini to so",
     optionalTitle: "Nsɛmmisa a ɛyɛ ɔpɛ",
     optionalHelp: "Wubetumi agyae wɔn seesei.",
     heardAbout: "Ɛhe na wotee yɛn ho?",
-    ministryInterest: "Som wɔn mu anigye",
+    ministryInterest: "Som mu anigye",
     prayerRequest: "Mpaebɔ asɛm",
     inviteToken: "Frɛ nkɔmhyɛ",
     tokenHelp: "Link no mu token no boa yɛn sɛ yɛbɛhu asafo no.",
     submit: "Fa me nsɛm mena",
     submitting: "Ɔde rekɔ…",
+    addFamilyMember: "Ka abusuafo",
+    remove: "Yi",
   },
   de: {
     title: "Teile deine Angaben",
@@ -237,12 +258,13 @@ const translations = {
     email: "E-Mail",
     status: "Status",
     dob: "Geburtsdatum",
-    gender: "Gender",
-    maritalStatus: "Marital status",
+    gender: "Geschlecht",
+    maritalStatus: "Familienstand",
     baptized: "Bist du getauft?",
-    familyTree: "Familie & Haushalt",
-    familyTreeHelp:
-      "Nenne Personen, die wir mit deinem Haushalt verbinden sollen (Partner, Kinder, Betreuer). Trenne Namen mit Kommas.",
+    familyTree: "Familienmitglieder",
+    familyTreeHelp: "Fügen Sie den Namen und die Nummer jedes Familienmitglieds hinzu.",
+    familyMemberName: "Name",
+    familyMemberPhone: "Telefon",
     photo: "Foto hochladen",
     optionalTitle: "Optionale Fragen",
     optionalHelp: "Du kannst sie vorerst überspringen.",
@@ -253,10 +275,10 @@ const translations = {
     tokenHelp: "Der Code aus deinem Link verbindet dich mit der richtigen Gemeinde.",
     submit: "Meine Angaben senden",
     submitting: "Senden…",
+    addFamilyMember: "Familienmitglied hinzufügen",
+    remove: "Entfernen",
   },
 };
-
-const PHOTO_UPLOAD_TIMEOUT_MS = 15000;
 
 export default function MemberInvitePage({ token: initialToken = "" }) {
   const [language, setLanguage] = useState("en");
@@ -270,6 +292,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     gender: "",
     maritalStatus: "",
     baptized: "NOT_YET",
+    // We keep familyTree for backwards compatibility but build it from familyMembers
     familyTree: "",
     photoFile: null,
     photoPreviewUrl: "",
@@ -278,6 +301,9 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     prayerRequest: "",
     preferredLanguage: "en",
   });
+  const [familyMembers, setFamilyMembers] = useState([
+    { name: "", phone: "" },
+  ]);
   const [token, setToken] = useState(initialToken || "");
   const [feedback, setFeedback] = useState({ ok: false, message: "" });
   const [statusTone, setStatusTone] = useState("info");
@@ -309,6 +335,22 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateFamilyMember = (index, key, value) => {
+    setFamilyMembers((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  };
+
+  const addFamilyMember = () => {
+    setFamilyMembers((prev) => [...prev, { name: "", phone: "" }]);
+  };
+
+  const removeFamilyMember = (index) => {
+    setFamilyMembers((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const selectedLanguage = translations[language] || translations.en;
   const optionalFields = ["heardAbout", "ministryInterest", "prayerRequest"];
   const optionalAnswered = optionalFields.reduce(
@@ -319,29 +361,36 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     (optionalAnswered / optionalFields.length) * 100
   );
 
-  const handlePhotoUpload = (event) => {
+  // Handle image upload and preview. Wrap the resized blob as a File to preserve MIME type.
+  const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    resizeImageFile(file, { maxSize: 800, quality: 0.82 })
-      .then(({ blob, dataUrl }) => {
-        setForm((prev) => ({
-          ...prev,
-          photoFile: blob,
-          photoPreviewUrl: dataUrl,
-        }));
-        setFeedback({ ok: false, message: "" });
-        setStatusTone("info");
-      })
-      .catch((err) => {
-        console.error("Invite photo load error", err);
-        setFeedback({
-          ok: false,
-          message: err.message || "Unable to load that photo.",
-        });
-        setStatusTone("error");
+    try {
+      const { blob } = await resizeImageFile(file, {
+        maxSize: 800,
+        quality: 0.82,
       });
+      // Create a new File so that file.type remains defined
+      const compressedFile = new File([blob], file.name, { type: file.type });
+      const previewUrl = URL.createObjectURL(compressedFile);
+      setForm((prev) => ({
+        ...prev,
+        photoFile: compressedFile,
+        photoPreviewUrl: previewUrl,
+      }));
+      setFeedback({ ok: false, message: "" });
+      setStatusTone("info");
+    } catch (err) {
+      console.error("Invite photo load error", err);
+      setFeedback({
+        ok: false,
+        message: err.message || "Unable to load that photo.",
+      });
+      setStatusTone("error");
+    }
   };
 
+  // Revoke object URLs when unmounting or changing the preview
   useEffect(() => {
     return () => {
       if (form.photoPreviewUrl?.startsWith("blob:")) {
@@ -384,38 +433,33 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
       return;
     }
 
+    // Build the familyTree string from familyMembers for submission
+    const familyTreeString = familyMembers
+      .map((member) => {
+        const name = member.name.trim();
+        const phone = member.phone.trim();
+        if (!name && !phone) return "";
+        if (name && phone) return `${name}: ${phone}`;
+        return name || phone;
+      })
+      .filter(Boolean)
+      .join(", ");
+
     try {
       setIsSubmitting(true);
       let photoUrl = "";
-      let photoUploadWarning = "";
       if (form.photoFile && storage) {
         const timestamp = Date.now();
         const fileRef = storageRef(
           storage,
-          `member-invites/${trimmedToken}/${timestamp}.jpg`
+          `member-invites/${trimmedToken}/${timestamp}_${form.photoFile.name}`
         );
-        try {
-          const uploadTask = (async () => {
-            await uploadBytes(fileRef, form.photoFile, {
-              contentType: form.photoFile.type || "image/jpeg",
-            });
-            return getDownloadURL(fileRef);
-          })();
-          photoUrl = await Promise.race([
-            uploadTask,
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Photo upload timed out.")),
-                PHOTO_UPLOAD_TIMEOUT_MS
-              )
-            ),
-          ]);
-        } catch (err) {
-          console.error("Invite photo upload error", err);
-          photoUploadWarning =
-            err?.message ||
-            "We could not upload your photo. We'll save the rest of your details.";
-        }
+        // Use the preserved MIME type to set contentType metadata. Without this,
+        // Firebase defaults to application/octet-stream【987727374089957†L1668-L1674】.
+        await uploadBytes(fileRef, form.photoFile, {
+          contentType: form.photoFile.type,
+        });
+        photoUrl = await getDownloadURL(fileRef);
       }
       const res = await fetch("/api/member-invite-submit", {
         method: "POST",
@@ -430,7 +474,7 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
           gender: form.gender,
           maritalStatus: form.maritalStatus,
           baptized: form.baptized,
-          familyTree: form.familyTree,
+          familyTree: familyTreeString,
           heardAbout: form.heardAbout,
           ministryInterest: form.ministryInterest,
           prayerRequest: form.prayerRequest,
@@ -439,7 +483,6 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
           token: trimmedToken,
         }),
       });
-
       const data = await res.json().catch(() => ({}));
       const ok = data.ok ?? res.ok;
 
@@ -449,20 +492,13 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         return;
       }
 
-      const successMessage = data.message || "You are all set. Thank you!";
-      if (photoUploadWarning) {
-        setFeedback({ ok: true, message: `${successMessage} ${photoUploadWarning}` });
-        setStatusTone("info");
-      } else {
-        setFeedback({ ok: true, message: successMessage });
-        setStatusTone("success");
-      }
-      setForm({
+      setFeedback({ ok: true, message: data.message || "You are all set. Thank you!" });
+      setStatusTone("success");
+      // Reset form fields but preserve phone, email, status, and preferredLanguage
+      setForm((prev) => ({
+        ...prev,
         firstName: "",
         lastName: "",
-        phone: trimmedPhone,
-        email: trimmedEmail,
-        status: form.status,
         dateOfBirth: "",
         gender: "",
         maritalStatus: "",
@@ -473,8 +509,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         heardAbout: "",
         ministryInterest: "",
         prayerRequest: "",
-        preferredLanguage: form.preferredLanguage,
-      });
+      }));
+      setFamilyMembers([{ name: "", phone: "" }]);
     } catch (err) {
       console.error("Invite submit error", err);
       setFeedback({ ok: false, message: err.message || "Unable to submit right now." });
@@ -649,16 +685,49 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
             </div>
           </div>
 
-          <label className="checkin-field checkin-field-full">
+          {/* Family members input */}
+          <div className="checkin-field checkin-field-full">
             <span>{selectedLanguage.familyTree}</span>
-            <textarea
-              className="checkin-textarea"
-              value={form.familyTree}
-              onChange={(e) => updateField("familyTree", e.target.value)}
-              placeholder="e.g. Kojo Mensah (spouse), Abena Mensah (child)"
-            />
+            {familyMembers.map((member, idx) => (
+              <div
+                key={idx}
+                className="checkin-family-member"
+                style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.5rem" }}
+              >
+                <input
+                  className="checkin-input"
+                  type="text"
+                  placeholder={selectedLanguage.familyMemberName}
+                  value={member.name}
+                  onChange={(e) => updateFamilyMember(idx, "name", e.target.value)}
+                />
+                <input
+                  className="checkin-input"
+                  type="text"
+                  placeholder={selectedLanguage.familyMemberPhone}
+                  value={member.phone}
+                  onChange={(e) => updateFamilyMember(idx, "phone", e.target.value)}
+                />
+                {familyMembers.length > 1 && (
+                  <button
+                    type="button"
+                    className="checkin-photo-remove"
+                    onClick={() => removeFamilyMember(idx)}
+                  >
+                    {selectedLanguage.remove}
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="checkin-button-secondary"
+              onClick={addFamilyMember}
+            >
+              {selectedLanguage.addFamilyMember}
+            </button>
             <div className="checkin-help-text">{selectedLanguage.familyTreeHelp}</div>
-          </label>
+          </div>
 
           <div className="checkin-field checkin-field-full">
             <span>{selectedLanguage.photo}</span>
