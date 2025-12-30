@@ -3,6 +3,7 @@ import "../checkin/checkin.css";
 import StatusBanner from "../StatusBanner";
 import { storage } from "../../firebase";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import { resizeImageFile } from "../../utils/imageProcessing";
 
 const statusOptions = [
   { value: "VISITOR", label: "Visitor" },
@@ -318,47 +319,29 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
   const handlePhotoUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const maxSize = 800;
-    const quality = 0.82;
-    const readerUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-      const width = Math.round(img.width * scale);
-      const height = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        URL.revokeObjectURL(readerUrl);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          URL.revokeObjectURL(readerUrl);
-          if (!blob) return;
-          const previewUrl = URL.createObjectURL(blob);
-          setForm((prev) => ({
-            ...prev,
-            photoFile: blob,
-            photoPreviewUrl: previewUrl,
-          }));
-        },
-        "image/jpeg",
-        quality
-      );
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(readerUrl);
-    };
-    img.src = readerUrl;
+    resizeImageFile(file, { maxSize: 800, quality: 0.82 })
+      .then(({ blob, dataUrl }) => {
+        setForm((prev) => ({
+          ...prev,
+          photoFile: blob,
+          photoPreviewUrl: dataUrl,
+        }));
+        setFeedback({ ok: false, message: "" });
+        setStatusTone("info");
+      })
+      .catch((err) => {
+        console.error("Invite photo load error", err);
+        setFeedback({
+          ok: false,
+          message: err.message || "Unable to load that photo.",
+        });
+        setStatusTone("error");
+      });
   };
 
   useEffect(() => {
     return () => {
-      if (form.photoPreviewUrl) {
+      if (form.photoPreviewUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(form.photoPreviewUrl);
       }
     };
