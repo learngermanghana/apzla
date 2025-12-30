@@ -71,7 +71,20 @@ module.exports = async function handler(request, response) {
     })
   }
 
-  const { token, firstName, lastName, phone, email, status } = request.body || {}
+  const {
+    token,
+    firstName,
+    lastName,
+    phone,
+    email,
+    status,
+    baptizedStatus,
+    familyMembers,
+    heardFrom,
+    ministryInterest,
+    smallGroupInterest,
+    prayerRequest,
+  } = request.body || {}
 
   if (!token) {
     return response.status(400).json({
@@ -84,6 +97,29 @@ module.exports = async function handler(request, response) {
   const trimmedFirst = (firstName || '').trim()
   const trimmedLast = (lastName || '').trim()
   const trimmedEmail = (email || '').trim().toLowerCase()
+  const trimmedHeardFrom = (heardFrom || '').trim()
+  const trimmedPrayerRequest = (prayerRequest || '').trim()
+  const normalizedBaptizedStatus = (baptizedStatus || '').trim().toUpperCase()
+  const normalizedMinistryInterest = (ministryInterest || '').trim().toUpperCase()
+  const normalizedSmallGroupInterest = (smallGroupInterest || '').trim().toUpperCase()
+
+  const sanitizedBaptizedStatus = ['YES', 'NO', 'NOT_SURE'].includes(normalizedBaptizedStatus)
+    ? normalizedBaptizedStatus
+    : ''
+  const sanitizedMinistryInterest = ['YES', 'NO', 'MAYBE'].includes(normalizedMinistryInterest)
+    ? normalizedMinistryInterest
+    : ''
+  const sanitizedSmallGroupInterest = ['YES', 'NO', 'MAYBE'].includes(normalizedSmallGroupInterest)
+    ? normalizedSmallGroupInterest
+    : ''
+  const sanitizedFamilyMembers = Array.isArray(familyMembers)
+    ? familyMembers
+        .map((member) => ({
+          name: (member?.name || '').trim(),
+          relationship: (member?.relationship || '').trim(),
+        }))
+        .filter((member) => member.name || member.relationship)
+    : []
 
   if (!trimmedFirst && !trimmedLast) {
     return response.status(400).json({
@@ -133,6 +169,12 @@ module.exports = async function handler(request, response) {
       phone: trimmedPhone,
       email: trimmedEmail,
       status: status || 'VISITOR',
+      baptizedStatus: sanitizedBaptizedStatus,
+      familyMembers: sanitizedFamilyMembers,
+      heardFrom: trimmedHeardFrom,
+      ministryInterest: sanitizedMinistryInterest,
+      smallGroupInterest: sanitizedSmallGroupInterest,
+      prayerRequest: trimmedPrayerRequest,
       source: 'INVITE',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     })
