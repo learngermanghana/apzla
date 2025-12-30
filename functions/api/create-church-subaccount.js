@@ -1,4 +1,5 @@
 const { admin, db, initError } = require('../lib/firestoreAdmin')
+const { PAYSTACK_BANK_OPTIONS } = require('../lib/paystackOptions')
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY
 
@@ -92,6 +93,8 @@ async function handler(request, response) {
     const payoutAccountNumber = (church.payoutAccountNumber || '').trim()
     const payoutNetwork = (church.payoutNetwork || '').trim()
     const bankCode = (church.payoutBankCode || payoutNetwork || payoutBankType).trim()
+    const bankCodeNormalized = bankCode.toUpperCase()
+    const validBankCodes = new Set(PAYSTACK_BANK_OPTIONS.map((bank) => bank.code))
 
     if (!payoutBankType || !payoutAccountName || !payoutAccountNumber) {
       return response.status(400).json({
@@ -107,10 +110,18 @@ async function handler(request, response) {
       })
     }
 
+    if (!validBankCodes.has(bankCodeNormalized)) {
+      return response.status(400).json({
+        status: 'error',
+        message:
+          'Invalid Paystack bank code. Please select the short code from the payout form (e.g. MTN, VOD, CAL).',
+      })
+    }
+
     const body = {
       business_name: church.name || `Apzla Church ${churchId}`,
       account_number: payoutAccountNumber,
-      bank_code: bankCode,
+      bank_code: bankCodeNormalized,
       percentage_charge: 0,
     }
 

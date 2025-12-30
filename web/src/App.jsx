@@ -1849,6 +1849,13 @@ function AppContent() {
       return;
     }
 
+    const trimmedBankType = payoutForm.bankType.trim();
+    const validBankCode = PAYSTACK_BANK_OPTIONS.some((bank) => bank.code === trimmedBankType);
+    if (!validBankCode) {
+      showToast("Select a valid Paystack bank code from the list (e.g. MTN, VOD, CAL).", "error");
+      return;
+    }
+
     if (!payoutForm.confirmDetails) {
       showToast("Please confirm the settlement details are correct.", "error");
       return;
@@ -1859,7 +1866,7 @@ function AppContent() {
       const nowIso = new Date().toISOString();
 
       await updateDoc(doc(db, "churches", userProfile.churchId), {
-        payoutBankType: payoutForm.bankType.trim(),
+        payoutBankType: trimmedBankType,
         payoutAccountName: payoutForm.accountName.trim(),
         payoutAccountNumber: payoutForm.accountNumber.trim(),
         payoutNetwork: payoutForm.network.trim() || null,
@@ -1878,7 +1885,7 @@ function AppContent() {
               ...prev,
               payoutStatus: "PENDING_SUBACCOUNT",
               paystackSubaccountCode: null,
-              payoutBankType: payoutForm.bankType.trim(),
+              payoutBankType: trimmedBankType,
               payoutAccountName: payoutForm.accountName.trim(),
               payoutAccountNumber: payoutForm.accountNumber.trim(),
               payoutNetwork: payoutForm.network.trim() || "",
@@ -6204,9 +6211,7 @@ function AppContent() {
                   >
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       <span style={{ fontSize: "13px", color: "#374151" }}>Bank / MoMo type</span>
-                      <input
-                        type="text"
-                        list="paystack-bank-codes"
+                      <select
                         value={payoutForm.bankType}
                         onChange={(e) =>
                           setPayoutForm((prev) => ({
@@ -6219,22 +6224,19 @@ function AppContent() {
                           borderRadius: "8px",
                           border: "1px solid #d1d5db",
                           fontSize: "14px",
+                          backgroundColor: "white",
                         }}
-                        placeholder="e.g. MTN, VOD, CAL"
-                      />
-                      <datalist id="paystack-bank-codes">
+                      >
+                        <option value="">Select a Paystack code</option>
                         {PAYSTACK_BANK_OPTIONS.map((bank) => (
-                          <option
-                            key={bank.code}
-                            value={bank.code}
-                            label={`${bank.name} (${bank.code})`}
-                          >{`${bank.name} (${bank.code})`}</option>
+                          <option key={bank.code} value={bank.code}>
+                            {`${bank.code} \u2013 ${bank.name}`}
+                          </option>
                         ))}
-                      </datalist>
+                      </select>
                       <span style={{ fontSize: "12px", color: "#6b7280" }}>
-                        Select the exact Paystack bank or mobile money code from this list.
-                        If your bank isn&apos;t listed, enter the code from Paystack&apos;s bank
-                        directory so settlements don&apos;t fail.
+                        Choose the short Paystack code (e.g. CAL \u2013 Cal Bank, MTN \u2013 MTN
+                        Mobile Money, VOD \u2013 Vodafone Cash). Do not enter the full bank name.
                       </span>
                     </label>
 
