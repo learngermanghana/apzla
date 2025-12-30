@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Configuration is loaded from environment variables set in .env.local
 const requiredKeys = [
@@ -43,3 +44,4 @@ const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
 export const functions = app ? getFunctions(app) : null;
+export const storage = app ? getStorage(app) : null;

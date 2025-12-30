@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../checkin/checkin.css";
 import StatusBanner from "../StatusBanner";
+import { storage } from "../../firebase";
+import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 
 const statusOptions = [
   { value: "VISITOR", label: "Visitor" },
@@ -230,7 +232,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     dateOfBirth: "",
     baptized: "NOT_YET",
     familyTree: "",
-    photoDataUrl: "",
+    photoFile: null,
+    photoPreviewUrl: "",
     heardAbout: "",
     ministryInterest: "",
     prayerRequest: "",
@@ -280,12 +283,51 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
   const handlePhotoUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateField("photoDataUrl", reader.result || "");
+    const maxSize = 800;
+    const quality = 0.82;
+    const readerUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      const width = Math.round(img.width * scale);
+      const height = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(readerUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(readerUrl);
+          if (!blob) return;
+          const previewUrl = URL.createObjectURL(blob);
+          setForm((prev) => ({
+            ...prev,
+            photoFile: blob,
+            photoPreviewUrl: previewUrl,
+          }));
+        },
+        "image/jpeg",
+        quality
+      );
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(readerUrl);
+    };
+    img.src = readerUrl;
   };
+
+  useEffect(() => {
+    return () => {
+      if (form.photoPreviewUrl) {
+        URL.revokeObjectURL(form.photoPreviewUrl);
+      }
+    };
+  }, [form.photoPreviewUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -323,15 +365,35 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
 
     try {
       setIsSubmitting(true);
+      let photoUrl = "";
+      if (form.photoFile && storage) {
+        const timestamp = Date.now();
+        const fileRef = storageRef(
+          storage,
+          `member-invites/${trimmedToken}/${timestamp}.jpg`
+        );
+        await uploadBytes(fileRef, form.photoFile, {
+          contentType: form.photoFile.type || "image/jpeg",
+        });
+        photoUrl = await getDownloadURL(fileRef);
+      }
       const res = await fetch("/api/member-invite-submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
-          phone: trimmedPhone,
-          email: trimmedEmail,
           firstName: trimmedFirst,
           lastName: trimmedLast,
+          phone: trimmedPhone,
+          email: trimmedEmail,
+          status: form.status,
+          dateOfBirth: form.dateOfBirth,
+          baptized: form.baptized,
+          familyTree: form.familyTree,
+          heardAbout: form.heardAbout,
+          ministryInterest: form.ministryInterest,
+          prayerRequest: form.prayerRequest,
+          preferredLanguage: form.preferredLanguage,
+          photoUrl,
           token: trimmedToken,
         }),
       });
@@ -356,7 +418,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         dateOfBirth: "",
         baptized: "NOT_YET",
         familyTree: "",
-        photoDataUrl: "",
+        photoFile: null,
+        photoPreviewUrl: "",
         heardAbout: "",
         ministryInterest: "",
         prayerRequest: "",
@@ -521,8 +584,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
             <span>{selectedLanguage.photo}</span>
             <div className="checkin-photo">
               <div className="checkin-photo-preview">
-                {form.photoDataUrl ? (
-                  <img src={form.photoDataUrl} alt="Profile preview" />
+                {form.photoPreviewUrl ? (
+                  <img src={form.photoPreviewUrl} alt="Profile preview" />
                 ) : (
                   <div className="checkin-photo-placeholder">Add a photo</div>
                 )}
@@ -534,11 +597,17 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
                   accept="image/*"
                   onChange={handlePhotoUpload}
                 />
-                {form.photoDataUrl && (
+                {form.photoPreviewUrl && (
                   <button
                     type="button"
                     className="checkin-photo-remove"
-                    onClick={() => updateField("photoDataUrl", "")}
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        photoFile: null,
+                        photoPreviewUrl: "",
+                      }))
+                    }
                   >
                     Remove photo
                   </button>
