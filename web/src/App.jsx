@@ -58,6 +58,40 @@ const readImageAsDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+const memberGenderOptions = [
+  { value: "", label: "Gender (optional)" },
+  { value: "FEMALE", label: "Female" },
+  { value: "MALE", label: "Male" },
+  { value: "NON_BINARY", label: "Non-binary" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
+];
+
+const memberMaritalStatusOptions = [
+  { value: "", label: "Marital status (optional)" },
+  { value: "SINGLE", label: "Single" },
+  { value: "MARRIED", label: "Married" },
+  { value: "SEPARATED", label: "Separated" },
+  { value: "DIVORCED", label: "Divorced" },
+  { value: "WIDOWED", label: "Widowed" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
+];
+
+const memberBaptizedOptions = [
+  { value: "YES", label: "Baptized: Yes" },
+  { value: "NO", label: "Baptized: No" },
+  { value: "NOT_YET", label: "Baptized: Not yet" },
+];
+
+const memberLanguageOptions = [
+  { value: "en", label: "English" },
+  { value: "fr", label: "Français" },
+  { value: "es", label: "Español" },
+  { value: "twi", label: "Twi" },
+  { value: "ewe", label: "Eʋegbe" },
+  { value: "ga", label: "Gã" },
+  { value: "de", label: "Deutsch" },
+];
+
 function AppContent() {
   const {
     user,
@@ -141,8 +175,17 @@ function AppContent() {
     photoDataUrl: "",
     status: "VISITOR",
     dateOfBirth: "",
+    gender: "",
+    maritalStatus: "",
+    baptized: "NOT_YET",
+    familyTree: "",
+    heardAbout: "",
+    ministryInterest: "",
+    prayerRequest: "",
+    preferredLanguage: "en",
   });
   const [memberSearch, setMemberSearch] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
 
   const memberLookup = useMemo(() => {
     const map = new Map();
@@ -153,6 +196,11 @@ function AppContent() {
     });
     return map;
   }, [members]);
+
+  const selectedMember = useMemo(
+    () => members.find((member) => member.id === selectedMemberId) || null,
+    [members, selectedMemberId]
+  );
 
   const recentMemberCheckins = useMemo(
     () =>
@@ -187,6 +235,22 @@ function AppContent() {
 
   const normalizeServiceTypeKey = (value = "") =>
     value.trim().toLowerCase() || "service";
+
+  const formatMemberEnum = (value) => {
+    if (!value) return "-";
+    return value
+      .toString()
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const formatMemberLanguage = (value) => {
+    if (!value) return "-";
+    return (
+      memberLanguageOptions.find((option) => option.value === value)?.label || value
+    );
+  };
 
   // Member attendance (per person check-ins)
   const [memberAttendance, setMemberAttendance] = useState([]);
@@ -1021,17 +1085,34 @@ function AppContent() {
 
     try {
       setLoading(true);
-      await addDoc(collection(db, "members"), {
+      const payload = {
         churchId: userProfile.churchId,
         firstName: memberForm.firstName.trim(),
         lastName: memberForm.lastName.trim(),
         phone: memberForm.phone.trim(),
         email: memberForm.email.trim(),
-        photoDataUrl: memberForm.photoDataUrl,
         status: memberForm.status,
-        dateOfBirth: memberForm.dateOfBirth,
+        baptized: memberForm.baptized,
+        ...(memberForm.dateOfBirth ? { dateOfBirth: memberForm.dateOfBirth } : {}),
+        ...(memberForm.photoDataUrl ? { photoDataUrl: memberForm.photoDataUrl } : {}),
+        ...(memberForm.gender ? { gender: memberForm.gender } : {}),
+        ...(memberForm.maritalStatus ? { maritalStatus: memberForm.maritalStatus } : {}),
+        ...(memberForm.familyTree.trim()
+          ? { familyTree: memberForm.familyTree.trim() }
+          : {}),
+        ...(memberForm.heardAbout.trim() ? { heardAbout: memberForm.heardAbout.trim() } : {}),
+        ...(memberForm.ministryInterest.trim()
+          ? { ministryInterest: memberForm.ministryInterest.trim() }
+          : {}),
+        ...(memberForm.prayerRequest.trim()
+          ? { prayerRequest: memberForm.prayerRequest.trim() }
+          : {}),
+        ...(memberForm.preferredLanguage
+          ? { preferredLanguage: memberForm.preferredLanguage }
+          : {}),
         createdAt: new Date().toISOString(),
-      });
+      };
+      await addDoc(collection(db, "members"), payload);
 
       setMemberForm({
         firstName: "",
@@ -1041,6 +1122,14 @@ function AppContent() {
         photoDataUrl: "",
         status: "VISITOR",
         dateOfBirth: "",
+        gender: "",
+        maritalStatus: "",
+        baptized: "NOT_YET",
+        familyTree: "",
+        heardAbout: "",
+        ministryInterest: "",
+        prayerRequest: "",
+        preferredLanguage: "en",
       });
 
       await loadMembers();
@@ -1127,6 +1216,9 @@ function AppContent() {
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
       if (editingMemberId === memberId) {
         cancelEditingMember();
+      }
+      if (selectedMemberId === memberId) {
+        setSelectedMemberId(null);
       }
       showToast("Member deleted.", "success");
     } catch (err) {
@@ -4170,6 +4262,177 @@ function AppContent() {
                   fontSize: "14px",
                 }}
               />
+              <select
+                value={memberForm.gender}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    gender: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {memberGenderOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={memberForm.maritalStatus}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    maritalStatus: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {memberMaritalStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={memberForm.baptized}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    baptized: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {memberBaptizedOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={memberForm.preferredLanguage}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    preferredLanguage: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              >
+                {memberLanguageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "8px",
+                marginBottom: "12px",
+                maxWidth: "720px",
+              }}
+            >
+              <textarea
+                placeholder="Family tree & household"
+                value={memberForm.familyTree}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    familyTree: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="How did they hear about us?"
+                value={memberForm.heardAbout}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    heardAbout: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Ministry interest"
+                value={memberForm.ministryInterest}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    ministryInterest: e.target.value,
+                  }))
+                }
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
+              <textarea
+                placeholder="Prayer request"
+                value={memberForm.prayerRequest}
+                onChange={(e) =>
+                  setMemberForm((f) => ({
+                    ...f,
+                    prayerRequest: e.target.value,
+                  }))
+                }
+                rows={2}
+                style={{
+                  gridColumn: "span 2",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                }}
+              />
             </div>
 
             <button
@@ -4337,7 +4600,20 @@ function AppContent() {
                                     />
                                   </div>
                                 ) : (
-                                  <>{m.firstName} {m.lastName}</>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedMemberId(m.id)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      padding: 0,
+                                      color: "#111827",
+                                      cursor: "pointer",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {m.firstName} {m.lastName}
+                                  </button>
                                 )}
                               </td>
                               <td style={{ padding: "6px 4px" }}>
@@ -4592,6 +4868,21 @@ function AppContent() {
                                     style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
                                   >
                                     <button
+                                      onClick={() => setSelectedMemberId(m.id)}
+                                      disabled={memberActionLoading}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #e5e7eb",
+                                        background: "white",
+                                        color: "#111827",
+                                        cursor: memberActionLoading ? "default" : "pointer",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      View
+                                    </button>
+                                    <button
                                       onClick={() => startEditingMember(m)}
                                       disabled={memberActionLoading}
                                       style={{
@@ -4631,6 +4922,181 @@ function AppContent() {
                     </table>
                   </div>
                 </>
+              )}
+
+              {selectedMember && (
+                <div
+                  onClick={() => setSelectedMemberId(null)}
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "rgba(15, 23, 42, 0.55)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "24px",
+                    zIndex: 40,
+                  }}
+                >
+                  <div
+                    onClick={(event) => event.stopPropagation()}
+                    style={{
+                      background: "white",
+                      borderRadius: "16px",
+                      padding: "20px",
+                      width: "min(720px, 100%)",
+                      boxShadow: "0 20px 60px rgba(15, 23, 42, 0.2)",
+                      maxHeight: "90vh",
+                      overflowY: "auto",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      <div>
+                        <p style={{ margin: 0, color: "#6b7280", fontSize: "12px" }}>
+                          Member profile
+                        </p>
+                        <h2 style={{ margin: 0, fontSize: "18px" }}>
+                          {selectedMember.firstName} {selectedMember.lastName}
+                        </h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMemberId(null)}
+                        style={{
+                          border: "1px solid #e5e7eb",
+                          background: "white",
+                          borderRadius: "8px",
+                          padding: "6px 10px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                      <div
+                        style={{
+                          width: "72px",
+                          height: "72px",
+                          borderRadius: "999px",
+                          border: "1px solid #e5e7eb",
+                          background: "#f9fafb",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                          fontSize: "18px",
+                          fontWeight: 600,
+                          color: "#6b7280",
+                        }}
+                      >
+                        {selectedMember.photoDataUrl || selectedMember.photoUrl ? (
+                          <img
+                            src={selectedMember.photoDataUrl || selectedMember.photoUrl}
+                            alt={`${selectedMember.firstName || ""} ${
+                              selectedMember.lastName || ""
+                            }`.trim()}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          getMemberInitials(selectedMember)
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "14px", color: "#4b5563" }}>
+                          Status: {formatMemberEnum(selectedMember.status)}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                          Member ID: {selectedMember.id}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                        gap: "12px",
+                        marginTop: "16px",
+                      }}
+                    >
+                      {[
+                        { label: "Phone", value: selectedMember.phone },
+                        { label: "Email", value: selectedMember.email },
+                        {
+                          label: "Date of birth",
+                          value: formatDateOfBirth(selectedMember.dateOfBirth),
+                        },
+                        {
+                          label: "Gender",
+                          value: formatMemberEnum(selectedMember.gender),
+                        },
+                        {
+                          label: "Marital status",
+                          value: formatMemberEnum(selectedMember.maritalStatus),
+                        },
+                        {
+                          label: "Baptized",
+                          value: formatMemberEnum(selectedMember.baptized),
+                        },
+                        {
+                          label: "Preferred language",
+                          value: formatMemberLanguage(selectedMember.preferredLanguage),
+                        },
+                        {
+                          label: "Family tree & household",
+                          value: selectedMember.familyTree,
+                          full: true,
+                        },
+                        {
+                          label: "Heard about us",
+                          value: selectedMember.heardAbout,
+                          full: true,
+                        },
+                        {
+                          label: "Ministry interest",
+                          value: selectedMember.ministryInterest,
+                          full: true,
+                        },
+                        {
+                          label: "Prayer request",
+                          value: selectedMember.prayerRequest,
+                          full: true,
+                        },
+                        {
+                          label: "Source",
+                          value: selectedMember.source,
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          style={{
+                            gridColumn: item.full ? "span 2" : "span 1",
+                            background: "#f9fafb",
+                            borderRadius: "10px",
+                            padding: "10px 12px",
+                            border: "1px solid #e5e7eb",
+                          }}
+                        >
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            {item.label}
+                          </div>
+                          <div style={{ fontSize: "14px", color: "#111827" }}>
+                            {item.value ? item.value : "-"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
 
               {membersHasMore && members.length > 0 && (

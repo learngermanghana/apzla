@@ -90,6 +90,14 @@ module.exports = async function handler(request, response) {
     dateOfBirth,
     photoUrl,
     photoDataUrl,
+    gender,
+    maritalStatus,
+    baptized,
+    familyTree,
+    heardAbout,
+    ministryInterest,
+    prayerRequest,
+    preferredLanguage,
   } = request.body || {}
 
   if (!token) {
@@ -105,6 +113,19 @@ module.exports = async function handler(request, response) {
   const trimmedEmail = (email || '').trim().toLowerCase()
   const trimmedDob = typeof dateOfBirth === 'string' ? dateOfBirth.trim() : ''
   const trimmedPhotoUrl = typeof photoUrl === 'string' ? photoUrl.trim() : ''
+  const trimmedGender = typeof gender === 'string' ? gender.trim() : ''
+  const trimmedMaritalStatus =
+    typeof maritalStatus === 'string' ? maritalStatus.trim() : ''
+  const trimmedFamilyTree =
+    typeof familyTree === 'string' ? familyTree.trim() : ''
+  const trimmedHeardAbout =
+    typeof heardAbout === 'string' ? heardAbout.trim() : ''
+  const trimmedMinistryInterest =
+    typeof ministryInterest === 'string' ? ministryInterest.trim() : ''
+  const trimmedPrayerRequest =
+    typeof prayerRequest === 'string' ? prayerRequest.trim() : ''
+  const trimmedPreferredLanguage =
+    typeof preferredLanguage === 'string' ? preferredLanguage.trim() : ''
   void photoDataUrl
 
   if (!trimmedFirst && !trimmedLast) {
@@ -162,7 +183,17 @@ module.exports = async function handler(request, response) {
       phone: trimmedPhone,
       email: trimmedEmail,
       status: status || 'VISITOR',
+      baptized: baptized || 'NOT_YET',
       ...(trimmedDob ? { dateOfBirth: trimmedDob } : {}),
+      ...(trimmedGender ? { gender: trimmedGender } : {}),
+      ...(trimmedMaritalStatus ? { maritalStatus: trimmedMaritalStatus } : {}),
+      ...(trimmedFamilyTree ? { familyTree: trimmedFamilyTree } : {}),
+      ...(trimmedHeardAbout ? { heardAbout: trimmedHeardAbout } : {}),
+      ...(trimmedMinistryInterest ? { ministryInterest: trimmedMinistryInterest } : {}),
+      ...(trimmedPrayerRequest ? { prayerRequest: trimmedPrayerRequest } : {}),
+      ...(trimmedPreferredLanguage
+        ? { preferredLanguage: trimmedPreferredLanguage }
+        : {}),
       ...(trimmedPhotoUrl ? { photoUrl: trimmedPhotoUrl } : {}),
       source: 'INVITE',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
