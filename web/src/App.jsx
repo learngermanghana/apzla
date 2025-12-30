@@ -47,16 +47,9 @@ import {
   getUpcomingBirthdayDate,
   parseDateValue,
 } from "./utils/memberUtils";
+import { resizeImageFile } from "./utils/imageProcessing";
 import { evaluateAccessStatus } from "./utils/subscriptionUtils";
 import { isValidEmail } from "./utils/validation";
-
-const readImageAsDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("Unable to read image."));
-    reader.readAsDataURL(file);
-  });
 
 const memberGenderOptions = [
   { value: "", label: "Gender (optional)" },
@@ -1059,12 +1052,11 @@ function AppContent() {
 
   const handleMemberPhotoFile = async (file, setForm) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      showToast("Please choose an image file.", "error");
-      return;
-    }
     try {
-      const dataUrl = await readImageAsDataUrl(file);
+      const { dataUrl } = await resizeImageFile(file, {
+        maxSize: 800,
+        quality: 0.82,
+      });
       setForm((form) => ({
         ...form,
         photoDataUrl: dataUrl,
