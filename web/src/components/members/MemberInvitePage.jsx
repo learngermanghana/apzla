@@ -12,6 +12,25 @@ const statusOptions = [
   { value: "PASTOR", label: "Pastor" },
   { value: "ELDER", label: "Elder" },
   { value: "OTHER", label: "Other" },
+  { value: "INACTIVE", label: "Inactive" },
+];
+
+const genderOptions = [
+  { value: "", label: "Select" },
+  { value: "FEMALE", label: "Female" },
+  { value: "MALE", label: "Male" },
+  { value: "NON_BINARY", label: "Non-binary" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
+];
+
+const maritalStatusOptions = [
+  { value: "", label: "Select" },
+  { value: "SINGLE", label: "Single" },
+  { value: "MARRIED", label: "Married" },
+  { value: "SEPARATED", label: "Separated" },
+  { value: "DIVORCED", label: "Divorced" },
+  { value: "WIDOWED", label: "Widowed" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
 ];
 
 const languageOptions = [
@@ -38,6 +57,8 @@ const translations = {
     email: "Email",
     status: "Status",
     dob: "Date of birth",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "Have you been baptized?",
     familyTree: "Family tree & household",
     familyTreeHelp:
@@ -66,6 +87,8 @@ const translations = {
     email: "E-mail",
     status: "Statut",
     dob: "Date de naissance",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "Avez-vous été baptisé(e) ?",
     familyTree: "Famille & foyer",
     familyTreeHelp:
@@ -94,6 +117,8 @@ const translations = {
     email: "Correo",
     status: "Estado",
     dob: "Fecha de nacimiento",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "¿Has sido bautizado?",
     familyTree: "Familia y hogar",
     familyTreeHelp:
@@ -121,6 +146,8 @@ const translations = {
     email: "Email",
     status: "Gyinae",
     dob: "Awo da",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "Wɔabɔ wo asuo mu?",
     familyTree: "Abusua & fie",
     familyTreeHelp: "Ka abusuafo a wɔn nso ba asafo no mu anaa sɛnea yɛbɛtumi aka wo fie ho asɛm.",
@@ -148,6 +175,8 @@ const translations = {
     email: "E-mail",
     status: "Nɔƒe",
     dob: "Dzidzɔ ŋkeke",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "Wò ŋɔe dzi wɔ baptizm ɖe?",
     familyTree: "Ƒome & Aƒe",
     familyTreeHelp:
@@ -176,6 +205,8 @@ const translations = {
     email: "Email",
     status: "Gyinae",
     dob: "Awo da",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "Wɔabɔ wo asuo mu?",
     familyTree: "Abusua & fie",
     familyTreeHelp:
@@ -204,6 +235,8 @@ const translations = {
     email: "E-Mail",
     status: "Status",
     dob: "Geburtsdatum",
+    gender: "Gender",
+    maritalStatus: "Marital status",
     baptized: "Bist du getauft?",
     familyTree: "Familie & Haushalt",
     familyTreeHelp:
@@ -230,6 +263,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
     email: "",
     status: "VISITOR",
     dateOfBirth: "",
+    gender: "",
+    maritalStatus: "",
     baptized: "NOT_YET",
     familyTree: "",
     photoFile: null,
@@ -387,6 +422,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
           email: trimmedEmail,
           status: form.status,
           dateOfBirth: form.dateOfBirth,
+          gender: form.gender,
+          maritalStatus: form.maritalStatus,
           baptized: form.baptized,
           familyTree: form.familyTree,
           heardAbout: form.heardAbout,
@@ -416,6 +453,8 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
         email: trimmedEmail,
         status: form.status,
         dateOfBirth: "",
+        gender: "",
+        maritalStatus: "",
         baptized: "NOT_YET",
         familyTree: "",
         photoFile: null,
@@ -545,6 +584,36 @@ export default function MemberInvitePage({ token: initialToken = "" }) {
             <div className="checkin-help-text">
               We use this to place you in the right age group.
             </div>
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.gender}</span>
+            <select
+              className="checkin-input"
+              value={form.gender}
+              onChange={(e) => updateField("gender", e.target.value)}
+            >
+              {genderOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="checkin-field">
+            <span>{selectedLanguage.maritalStatus}</span>
+            <select
+              className="checkin-input"
+              value={form.maritalStatus}
+              onChange={(e) => updateField("maritalStatus", e.target.value)}
+            >
+              {maritalStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <div className="checkin-field checkin-field-full">
