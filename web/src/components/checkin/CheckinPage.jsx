@@ -278,7 +278,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="checkin-form">
+        <form onSubmit={handleSubmit} className="checkin-form checkin-form-compact">
           {/* Phone field */}
           <div className="checkin-field">
             <label className="checkin-label" htmlFor="phone">
