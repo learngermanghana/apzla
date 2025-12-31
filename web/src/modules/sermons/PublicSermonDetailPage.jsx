@@ -1,8 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
 import StatusBanner from "../../components/StatusBanner";
 import { db } from "../../firebase";
 import { normalizeBaseUrl, PREFERRED_BASE_URL } from "../../utils/baseUrl";
+import {
+  formatChurchSlug,
+  normalizeChurchName,
+  safeDecodeURIComponent,
+} from "../../utils/churchSlug";
 import "./sermons.css";
 
 export default function PublicSermonDetailPage({ churchId, sermonId }) {
@@ -15,6 +29,10 @@ export default function PublicSermonDetailPage({ churchId, sermonId }) {
     if (typeof window === "undefined") return PREFERRED_BASE_URL;
     return normalizeBaseUrl(window.location.origin || PREFERRED_BASE_URL);
   }, []);
+  const publicChurchKey = useMemo(() => {
+    if (!church) return "";
+    return church.publicSlug || formatChurchSlug(church.name || "") || church.id;
+  }, [church]);
 
   useEffect(() => {
     if (!churchId || !sermonId) {
@@ -26,28 +44,77 @@ export default function PublicSermonDetailPage({ churchId, sermonId }) {
     const loadSermon = async () => {
       try {
         setLoading(true);
-        const [churchSnapshot, sermonSnapshot] = await Promise.all([
-          getDoc(doc(db, "churches", churchId)),
-          getDoc(doc(db, "sermons", sermonId)),
-        ]);
+        const decodedKey = safeDecodeURIComponent(churchId);
+        const normalizedSlug = formatChurchSlug(decodedKey);
+        const normalizedName = normalizeChurchName(decodedKey);
+        let churchData = null;
 
-        if (!churchSnapshot.exists()) {
+        const churchSnapshot = await getDoc(doc(db, "churches", churchId));
+        if (churchSnapshot.exists()) {
+          churchData = { id: churchSnapshot.id, ...churchSnapshot.data() };
+        }
+
+        if (!churchData && normalizedSlug) {
+          const slugQuery = query(
+            collection(db, "churches"),
+            where("publicSlug", "==", normalizedSlug),
+            limit(1)
+          );
+          const slugSnapshot = await getDocs(slugQuery);
+          if (!slugSnapshot.empty) {
+            const slugDoc = slugSnapshot.docs[0];
+            churchData = { id: slugDoc.id, ...slugDoc.data() };
+          }
+        }
+
+        if (!churchData && normalizedName) {
+          const nameQuery = query(
+            collection(db, "churches"),
+            where("nameLower", "==", normalizedName),
+            limit(1)
+          );
+          const nameSnapshot = await getDocs(nameQuery);
+          if (!nameSnapshot.empty) {
+            const nameDoc = nameSnapshot.docs[0];
+            churchData = { id: nameDoc.id, ...nameDoc.data() };
+          }
+        }
+
+        if (!churchData) {
           setError("We could not find this church. Please confirm the link.");
           return;
         }
 
-        if (!sermonSnapshot.exists()) {
-          setError("We could not find this sermon. Please confirm the link.");
-          return;
+        let sermonData = null;
+
+        if (sermonId === "latest") {
+          const latestQuery = query(
+            collection(db, "sermons"),
+            where("churchId", "==", churchData.id),
+            orderBy("date", "desc"),
+            limit(1)
+          );
+          const latestSnapshot = await getDocs(latestQuery);
+          if (latestSnapshot.empty) {
+            setError("No sermons have been published yet. Please check back soon.");
+            return;
+          }
+          const latestDoc = latestSnapshot.docs[0];
+          sermonData = { id: latestDoc.id, ...latestDoc.data() };
+        } else {
+          const sermonSnapshot = await getDoc(doc(db, "sermons", sermonId));
+          if (!sermonSnapshot.exists()) {
+            setError("We could not find this sermon. Please confirm the link.");
+            return;
+          }
+          sermonData = { id: sermonSnapshot.id, ...sermonSnapshot.data() };
+          if (sermonData.churchId !== churchData.id) {
+            setError("This sermon link is not valid for the selected church.");
+            return;
+          }
         }
 
-        const sermonData = { id: sermonSnapshot.id, ...sermonSnapshot.data() };
-        if (sermonData.churchId !== churchId) {
-          setError("This sermon link is not valid for the selected church.");
-          return;
-        }
-
-        setChurch({ id: churchSnapshot.id, ...churchSnapshot.data() });
+        setChurch(churchData);
         setSermon(sermonData);
       } catch (err) {
         console.error("Load public sermon error:", err);
@@ -93,7 +160,7 @@ export default function PublicSermonDetailPage({ churchId, sermonId }) {
           </div>
           <a
             className="sermon-public-share"
-            href={`${baseUrl.replace(/\/$/, "")}/sermons/${churchId}`}
+            href={`${baseUrl.replace(/\/$/, "")}/sermons/${publicChurchKey}`}
           >
             Back to sermons
           </a>

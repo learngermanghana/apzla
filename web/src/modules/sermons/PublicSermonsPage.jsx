@@ -1,8 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  where,
+} from "firebase/firestore";
 import StatusBanner from "../../components/StatusBanner";
 import { db } from "../../firebase";
 import { normalizeBaseUrl, PREFERRED_BASE_URL } from "../../utils/baseUrl";
+import {
+  formatChurchSlug,
+  normalizeChurchName,
+  safeDecodeURIComponent,
+} from "../../utils/churchSlug";
 import "./sermons.css";
 
 function getPublicLink(baseUrl, churchId, sermonId) {
@@ -21,10 +34,14 @@ export default function PublicSermonsPage({ churchId }) {
     if (typeof window === "undefined") return PREFERRED_BASE_URL;
     return normalizeBaseUrl(window.location.origin || PREFERRED_BASE_URL);
   }, []);
+  const publicChurchKey = useMemo(() => {
+    if (!church) return "";
+    return church.publicSlug || formatChurchSlug(church.name || "") || church.id;
+  }, [church]);
 
   useEffect(() => {
     if (!churchId) {
-      setError("No church ID was provided in this link.");
+      setError("No church was provided in this link.");
       setLoading(false);
       return;
     }
@@ -32,19 +49,52 @@ export default function PublicSermonsPage({ churchId }) {
     const loadPublicSermons = async () => {
       try {
         setLoading(true);
-        const churchSnapshot = await getDoc(doc(db, "churches", churchId));
+        const decodedKey = safeDecodeURIComponent(churchId);
+        const normalizedSlug = formatChurchSlug(decodedKey);
+        const normalizedName = normalizeChurchName(decodedKey);
+        let churchData = null;
 
-        if (!churchSnapshot.exists()) {
+        const churchSnapshot = await getDoc(doc(db, "churches", churchId));
+        if (churchSnapshot.exists()) {
+          churchData = { id: churchSnapshot.id, ...churchSnapshot.data() };
+        }
+
+        if (!churchData && normalizedSlug) {
+          const slugQuery = query(
+            collection(db, "churches"),
+            where("publicSlug", "==", normalizedSlug),
+            limit(1)
+          );
+          const slugSnapshot = await getDocs(slugQuery);
+          if (!slugSnapshot.empty) {
+            const slugDoc = slugSnapshot.docs[0];
+            churchData = { id: slugDoc.id, ...slugDoc.data() };
+          }
+        }
+
+        if (!churchData && normalizedName) {
+          const nameQuery = query(
+            collection(db, "churches"),
+            where("nameLower", "==", normalizedName),
+            limit(1)
+          );
+          const nameSnapshot = await getDocs(nameQuery);
+          if (!nameSnapshot.empty) {
+            const nameDoc = nameSnapshot.docs[0];
+            churchData = { id: nameDoc.id, ...nameDoc.data() };
+          }
+        }
+
+        if (!churchData) {
           setError("We could not find this church. Please confirm the link.");
           return;
         }
 
-        const churchData = { id: churchSnapshot.id, ...churchSnapshot.data() };
         setChurch(churchData);
 
         const sermonQuery = query(
           collection(db, "sermons"),
-          where("churchId", "==", churchSnapshot.id)
+          where("churchId", "==", churchData.id)
         );
         const sermonSnapshot = await getDocs(sermonQuery);
         const sermonData = sermonSnapshot.docs
@@ -151,7 +201,7 @@ export default function PublicSermonsPage({ churchId }) {
                   </div>
                   <a
                     className="sermon-public-share"
-                    href={getPublicLink(baseUrl, churchId, sermon.id)}
+                    href={getPublicLink(baseUrl, publicChurchKey, sermon.id)}
                     target="_blank"
                     rel="noreferrer"
                   >
