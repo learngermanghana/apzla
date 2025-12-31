@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STATUS_COLORS = {
   ok: { text: "#166534", background: "#dcfce7", border: "#bbf7d0" },
