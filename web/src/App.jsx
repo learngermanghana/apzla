@@ -356,6 +356,11 @@ function AppContent() {
     link: "",
   });
   const [sermonsPublicBaseUrl, setSermonsPublicBaseUrl] = useState(defaultBaseUrl);
+  const sermonsPublicLink = useMemo(() => {
+    if (!userProfile?.churchId) return "";
+    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
+    return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}`;
+  }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
 
   // Follow-up
   const [followupAudience, setFollowupAudience] = useState("VISITOR");
@@ -3030,12 +3035,6 @@ function AppContent() {
   const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
   const normalizePhone = (value = "") => value.replace(/\D/g, "");
-
-  const sermonsPublicLink = useMemo(() => {
-    if (!userProfile?.churchId) return "";
-    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
-    return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}`;
-  }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
 
   const visitorMembers = members.filter(
     (m) => (m.status || "").toUpperCase() === "VISITOR"
