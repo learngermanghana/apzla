@@ -14,13 +14,9 @@ function SermonsPage({
   churchId,
   publicChurchKey,
   publicSermonsLink,
-  publicSermonsIdLink,
   publicLatestSermonLink,
-  publicLatestSermonIdLink,
   onCopyPublicLink,
-  onCopyPublicIdLink,
   onCopyLatestLink,
-  onCopyLatestIdLink,
 }) {
   const sermonPublicBaseUrl = useMemo(() => {
     if (publicBaseUrl) return normalizeBaseUrl(publicBaseUrl);
@@ -140,86 +136,6 @@ function SermonsPage({
                 }}
               >
                 Copy latest
-              </button>
-            </div>
-          </div>
-          <div>
-            <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#6b7280" }}>
-              Fallback links (church ID)
-            </p>
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                alignItems: "center",
-                flexWrap: "wrap",
-                marginBottom: "8px",
-              }}
-            >
-              <input
-                type="text"
-                value={publicSermonsIdLink}
-                readOnly
-                style={{
-                  flex: 1,
-                  minWidth: "220px",
-                  padding: "8px 10px",
-                  borderRadius: "8px",
-                  border: "1px solid #d1d5db",
-                  fontSize: "13px",
-                  background: "#fff",
-                }}
-              />
-              <button
-                type="button"
-                onClick={onCopyPublicIdLink}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid #e5e7eb",
-                  background: "white",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                }}
-              >
-                Copy ID link
-              </button>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <input
-                type="text"
-                value={publicLatestSermonIdLink}
-                readOnly
-                style={{
-                  flex: 1,
-                  minWidth: "220px",
-                  padding: "8px 10px",
-                  borderRadius: "8px",
-                  border: "1px solid #d1d5db",
-                  fontSize: "13px",
-                  background: "#fff",
-                }}
-              />
-              <button
-                type="button"
-                onClick={onCopyLatestIdLink}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid #e5e7eb",
-                  background: "white",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                }}
-              >
-                Copy latest ID
               </button>
             </div>
           </div>

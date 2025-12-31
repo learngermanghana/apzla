@@ -366,21 +366,11 @@ function AppContent() {
     const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
     return `${baseUrl.replace(/\/$/, "")}/sermons/${churchPublicKey}`;
   }, [churchPublicKey, defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl]);
-  const sermonsPublicIdLink = useMemo(() => {
-    if (!userProfile?.churchId) return "";
-    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
-    return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}`;
-  }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
   const sermonsLatestPublicLink = useMemo(() => {
     if (!churchPublicKey) return "";
     const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
     return `${baseUrl.replace(/\/$/, "")}/sermons/${churchPublicKey}/latest`;
   }, [churchPublicKey, defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl]);
-  const sermonsLatestPublicIdLink = useMemo(() => {
-    if (!userProfile?.churchId) return "";
-    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
-    return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}/latest`;
-  }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
 
   // Follow-up
   const [followupAudience, setFollowupAudience] = useState("VISITOR");
@@ -1738,17 +1728,6 @@ function AppContent() {
     }
   };
 
-  const copySermonsPublicIdLink = async () => {
-    if (!sermonsPublicIdLink) return;
-    try {
-      await navigator.clipboard.writeText(sermonsPublicIdLink);
-      showToast("Sermons ID link copied.", "success");
-    } catch (err) {
-      console.error("Copy sermons ID link error:", err);
-      showToast("Unable to copy sermons ID link.", "error");
-    }
-  };
-
   const copyLatestSermonPublicLink = async () => {
     if (!sermonsLatestPublicLink) return;
     try {
@@ -1757,17 +1736,6 @@ function AppContent() {
     } catch (err) {
       console.error("Copy latest sermon link error:", err);
       showToast("Unable to copy latest sermon link.", "error");
-    }
-  };
-
-  const copyLatestSermonPublicIdLink = async () => {
-    if (!sermonsLatestPublicIdLink) return;
-    try {
-      await navigator.clipboard.writeText(sermonsLatestPublicIdLink);
-      showToast("Latest sermon ID link copied.", "success");
-    } catch (err) {
-      console.error("Copy latest sermon ID link error:", err);
-      showToast("Unable to copy latest sermon ID link.", "error");
     }
   };
 
@@ -6968,13 +6936,9 @@ function AppContent() {
             churchId={userProfile?.churchId}
             publicChurchKey={churchPublicKey}
             publicSermonsLink={sermonsPublicLink}
-            publicSermonsIdLink={sermonsPublicIdLink}
             publicLatestSermonLink={sermonsLatestPublicLink}
-            publicLatestSermonIdLink={sermonsLatestPublicIdLink}
             onCopyPublicLink={copySermonsPublicLink}
-            onCopyPublicIdLink={copySermonsPublicIdLink}
             onCopyLatestLink={copyLatestSermonPublicLink}
-            onCopyLatestIdLink={copyLatestSermonPublicIdLink}
           />
         )}
 

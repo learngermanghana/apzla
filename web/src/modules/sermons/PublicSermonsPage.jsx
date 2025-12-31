@@ -85,19 +85,6 @@ export default function PublicSermonsPage({ churchId }) {
           }
         }
 
-        if (!churchData && decodedKey) {
-          const exactNameQuery = query(
-            collection(db, "churches"),
-            where("name", "==", decodedKey),
-            limit(1)
-          );
-          const exactNameSnapshot = await getDocs(exactNameQuery);
-          if (!exactNameSnapshot.empty) {
-            const nameDoc = exactNameSnapshot.docs[0];
-            churchData = { id: nameDoc.id, ...nameDoc.data() };
-          }
-        }
-
         if (!churchData) {
           setError("We could not find this church. Please confirm the link.");
           return;
