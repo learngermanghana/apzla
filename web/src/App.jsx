@@ -355,6 +355,7 @@ function AppContent() {
     notes: "",
     link: "",
   });
+  const [sermonsPublicBaseUrl, setSermonsPublicBaseUrl] = useState(defaultBaseUrl);
 
   // Follow-up
   const [followupAudience, setFollowupAudience] = useState("VISITOR");
@@ -419,6 +420,12 @@ function AppContent() {
     const { churchId, ...storedForm } = checkinTokenForm;
     localStorage.setItem("checkinTokenForm", JSON.stringify(storedForm));
   }, [checkinTokenForm]);
+
+  useEffect(() => {
+    if (!userProfile?.churchId) return;
+    const baseUrl = normalizeBaseUrlMemo(defaultBaseUrl);
+    setSermonsPublicBaseUrl(baseUrl);
+  }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrlMemo]);
 
   // ---------- Reset data when auth user changes ----------
   useEffect(() => {
@@ -1683,6 +1690,17 @@ function AppContent() {
     }
   };
 
+  const copySermonsPublicLink = async () => {
+    if (!sermonsPublicLink) return;
+    try {
+      await navigator.clipboard.writeText(sermonsPublicLink);
+      showToast("Sermons link copied.", "success");
+    } catch (err) {
+      console.error("Copy sermons link error:", err);
+      showToast("Unable to copy sermons link.", "error");
+    }
+  };
+
   const openOnlineGivingLink = () => {
     if (!onlineGivingLink) return;
     window.open(onlineGivingLink, "_blank", "noopener,noreferrer");
@@ -2143,10 +2161,12 @@ function AppContent() {
         where("churchId", "==", userProfile.churchId)
       );
       const snapshot = await getDocs(qSermons);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const data = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
       setSermons(data);
     } catch (err) {
       console.error("Load sermons error:", err);
@@ -3010,6 +3030,12 @@ function AppContent() {
   const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
   const normalizePhone = (value = "") => value.replace(/\D/g, "");
+
+  const sermonsPublicLink = useMemo(() => {
+    if (!userProfile?.churchId) return "";
+    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
+    return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}`;
+  }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
 
   const visitorMembers = members.filter(
     (m) => (m.status || "").toUpperCase() === "VISITOR"
@@ -6874,6 +6900,10 @@ function AppContent() {
             filteredSermons={filteredSermons}
             sermons={sermons}
             sermonsLoading={sermonsLoading}
+            publicBaseUrl={sermonsPublicBaseUrl}
+            churchId={userProfile?.churchId}
+            publicSermonsLink={sermonsPublicLink}
+            onCopyPublicLink={copySermonsPublicLink}
           />
         )}
 

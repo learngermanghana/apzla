@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useMemo } from "react";
+import { normalizeBaseUrl, PREFERRED_BASE_URL } from "../../utils/baseUrl";
 
 function SermonsPage({
   sermonForm,
@@ -9,7 +10,22 @@ function SermonsPage({
   filteredSermons,
   sermons,
   sermonsLoading,
+  publicBaseUrl,
+  churchId,
+  publicSermonsLink,
+  onCopyPublicLink,
 }) {
+  const sermonPublicBaseUrl = useMemo(() => {
+    if (publicBaseUrl) return normalizeBaseUrl(publicBaseUrl);
+    if (typeof window === "undefined") return PREFERRED_BASE_URL;
+    return normalizeBaseUrl(window.location.origin || PREFERRED_BASE_URL);
+  }, [publicBaseUrl]);
+
+  const getPublicLink = (id) =>
+    id && churchId
+      ? `${sermonPublicBaseUrl.replace(/\/$/, "")}/sermons/${churchId}/${id}`
+      : "";
+
   return (
     <>
       <p
@@ -21,6 +37,58 @@ function SermonsPage({
       >
         Log sermons and series so your team can quickly see what was preached and when.
       </p>
+
+      <div
+        style={{
+          border: "1px solid #e5e7eb",
+          background: "#f9fafb",
+          borderRadius: "12px",
+          padding: "12px 14px",
+          marginBottom: "16px",
+        }}
+      >
+        <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
+          Public sermons page link
+        </p>
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginTop: "8px",
+          }}
+        >
+          <input
+            type="text"
+            value={publicSermonsLink}
+            readOnly
+            style={{
+              flex: 1,
+              minWidth: "220px",
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #d1d5db",
+              fontSize: "13px",
+              background: "#fff",
+            }}
+          />
+          <button
+            type="button"
+            onClick={onCopyPublicLink}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "10px",
+              border: "1px solid #e5e7eb",
+              background: "white",
+              cursor: "pointer",
+              fontSize: "13px",
+            }}
+          >
+            Copy link
+          </button>
+        </div>
+      </div>
 
       {/* Sermon form */}
       <div
@@ -227,6 +295,7 @@ function SermonsPage({
                   <th style={{ padding: "6px 4px" }}>Series</th>
                   <th style={{ padding: "6px 4px" }}>Scripture</th>
                   <th style={{ padding: "6px 4px" }}>Link</th>
+                  <th style={{ padding: "6px 4px" }}>Public URL</th>
                   <th style={{ padding: "6px 4px" }}>Notes</th>
                 </tr>
               </thead>
@@ -247,6 +316,15 @@ function SermonsPage({
                       {s.link ? (
                         <a href={s.link} target="_blank" rel="noreferrer">
                           Open
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td style={{ padding: "6px 4px" }}>
+                      {s.id ? (
+                        <a href={getPublicLink(s.id)} target="_blank" rel="noreferrer">
+                          View
                         </a>
                       ) : (
                         "-"
