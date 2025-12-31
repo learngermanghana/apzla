@@ -12,8 +12,15 @@ function SermonsPage({
   sermonsLoading,
   publicBaseUrl,
   churchId,
+  publicChurchKey,
   publicSermonsLink,
+  publicSermonsIdLink,
+  publicLatestSermonLink,
+  publicLatestSermonIdLink,
   onCopyPublicLink,
+  onCopyPublicIdLink,
+  onCopyLatestLink,
+  onCopyLatestIdLink,
 }) {
   const sermonPublicBaseUrl = useMemo(() => {
     if (publicBaseUrl) return normalizeBaseUrl(publicBaseUrl);
@@ -22,8 +29,8 @@ function SermonsPage({
   }, [publicBaseUrl]);
 
   const getPublicLink = (id) =>
-    id && churchId
-      ? `${sermonPublicBaseUrl.replace(/\/$/, "")}/sermons/${churchId}/${id}`
+    id && publicChurchKey
+      ? `${sermonPublicBaseUrl.replace(/\/$/, "")}/sermons/${publicChurchKey}/${id}`
       : "";
 
   return (
@@ -48,45 +55,174 @@ function SermonsPage({
         }}
       >
         <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
-          Public sermons page link
+          Public sermons page link (uses church name)
         </p>
         <div
           style={{
-            display: "flex",
-            gap: "10px",
-            alignItems: "center",
-            flexWrap: "wrap",
+            display: "grid",
+            gap: "12px",
             marginTop: "8px",
           }}
         >
-          <input
-            type="text"
-            value={publicSermonsLink}
-            readOnly
+          <div
             style={{
-              flex: 1,
-              minWidth: "220px",
-              padding: "8px 10px",
-              borderRadius: "8px",
-              border: "1px solid #d1d5db",
-              fontSize: "13px",
-              background: "#fff",
-            }}
-          />
-          <button
-            type="button"
-            onClick={onCopyPublicLink}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "10px",
-              border: "1px solid #e5e7eb",
-              background: "white",
-              cursor: "pointer",
-              fontSize: "13px",
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              flexWrap: "wrap",
             }}
           >
-            Copy link
-          </button>
+            <input
+              type="text"
+              value={publicSermonsLink}
+              readOnly
+              style={{
+                flex: 1,
+                minWidth: "220px",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "13px",
+                background: "#fff",
+              }}
+            />
+            <button
+              type="button"
+              onClick={onCopyPublicLink}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "10px",
+                border: "1px solid #e5e7eb",
+                background: "white",
+                cursor: "pointer",
+                fontSize: "13px",
+              }}
+            >
+              Copy link
+            </button>
+          </div>
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#6b7280" }}>
+              Always-updated latest sermon link
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                type="text"
+                value={publicLatestSermonLink}
+                readOnly
+                style={{
+                  flex: 1,
+                  minWidth: "220px",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  background: "#fff",
+                }}
+              />
+              <button
+                type="button"
+                onClick={onCopyLatestLink}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e5e7eb",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                Copy latest
+              </button>
+            </div>
+          </div>
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#6b7280" }}>
+              Fallback links (church ID)
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                alignItems: "center",
+                flexWrap: "wrap",
+                marginBottom: "8px",
+              }}
+            >
+              <input
+                type="text"
+                value={publicSermonsIdLink}
+                readOnly
+                style={{
+                  flex: 1,
+                  minWidth: "220px",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  background: "#fff",
+                }}
+              />
+              <button
+                type="button"
+                onClick={onCopyPublicIdLink}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e5e7eb",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                Copy ID link
+              </button>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                type="text"
+                value={publicLatestSermonIdLink}
+                readOnly
+                style={{
+                  flex: 1,
+                  minWidth: "220px",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  background: "#fff",
+                }}
+              />
+              <button
+                type="button"
+                onClick={onCopyLatestIdLink}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e5e7eb",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                Copy latest ID
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

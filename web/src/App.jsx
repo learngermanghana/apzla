@@ -50,6 +50,7 @@ import {
 import { resizeImageFile } from "./utils/imageProcessing";
 import { evaluateAccessStatus } from "./utils/subscriptionUtils";
 import { isValidEmail } from "./utils/validation";
+import { formatChurchSlug, normalizeChurchName } from "./utils/churchSlug";
 
 const memberGenderOptions = [
   { value: "", label: "Gender (optional)" },
@@ -356,10 +357,29 @@ function AppContent() {
     link: "",
   });
   const [sermonsPublicBaseUrl, setSermonsPublicBaseUrl] = useState(defaultBaseUrl);
+  const churchPublicKey = useMemo(() => {
+    const slug = formatChurchSlug(userProfile?.churchName || "");
+    return slug || userProfile?.churchId || "";
+  }, [userProfile?.churchId, userProfile?.churchName]);
   const sermonsPublicLink = useMemo(() => {
+    if (!churchPublicKey) return "";
+    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
+    return `${baseUrl.replace(/\/$/, "")}/sermons/${churchPublicKey}`;
+  }, [churchPublicKey, defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl]);
+  const sermonsPublicIdLink = useMemo(() => {
     if (!userProfile?.churchId) return "";
     const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
     return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}`;
+  }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
+  const sermonsLatestPublicLink = useMemo(() => {
+    if (!churchPublicKey) return "";
+    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
+    return `${baseUrl.replace(/\/$/, "")}/sermons/${churchPublicKey}/latest`;
+  }, [churchPublicKey, defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl]);
+  const sermonsLatestPublicIdLink = useMemo(() => {
+    if (!userProfile?.churchId) return "";
+    const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
+    return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}/latest`;
   }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
 
   // Follow-up
@@ -752,8 +772,13 @@ function AppContent() {
     setAccountLoading(true);
 
     try {
+      const trimmedChurchName = churchSettings.name.trim();
+      const publicSlug = formatChurchSlug(trimmedChurchName);
+      const nameLower = normalizeChurchName(trimmedChurchName);
       await updateDoc(doc(db, "churches", userProfile.churchId), {
-        name: churchSettings.name.trim(),
+        name: trimmedChurchName,
+        publicSlug,
+        nameLower,
         address: churchSettings.address.trim(),
         country: churchSettings.country.trim(),
         city: churchSettings.city.trim(),
@@ -762,7 +787,7 @@ function AppContent() {
       });
 
       await updateDoc(doc(db, "users", user.uid), {
-        churchName: churchSettings.name.trim(),
+        churchName: trimmedChurchName,
         churchAddress: churchSettings.address.trim(),
         churchCity: churchSettings.city.trim(),
         churchPhone: churchSettings.phone.trim(),
@@ -772,7 +797,7 @@ function AppContent() {
         prev
           ? {
               ...prev,
-              churchName: churchSettings.name.trim(),
+              churchName: trimmedChurchName,
               churchAddress: churchSettings.address.trim(),
               churchCity: churchSettings.city.trim(),
               churchPhone: churchSettings.phone.trim(),
@@ -935,9 +960,14 @@ function AppContent() {
 
       const trialStart = new Date();
       const trialEnd = addDays(trialStart, TRIAL_LENGTH_DAYS);
+      const trimmedChurchName = churchName.trim();
+      const publicSlug = formatChurchSlug(trimmedChurchName);
+      const nameLower = normalizeChurchName(trimmedChurchName);
 
       const churchRef = await addDoc(collection(db, "churches"), {
-        name: churchName.trim(),
+        name: trimmedChurchName,
+        publicSlug,
+        nameLower,
         address: churchAddress.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
@@ -963,7 +993,7 @@ function AppContent() {
         email: user.email,
         churchId,
         role: "CHURCH_ADMIN",
-        churchName: churchName.trim(),
+        churchName: trimmedChurchName,
         churchAddress: churchAddress.trim(),
         churchCity: churchCity.trim(),
         churchPhone: churchPhone.trim(),
@@ -972,7 +1002,9 @@ function AppContent() {
 
       setChurchPlan({
         id: churchId,
-        name: churchName.trim(),
+        name: trimmedChurchName,
+        publicSlug,
+        nameLower,
         address: churchAddress.trim(),
         country: churchCountry.trim(),
         city: churchCity.trim(),
@@ -1011,7 +1043,7 @@ function AppContent() {
         email: user.email,
         churchId,
         role: "CHURCH_ADMIN",
-        churchName: churchName.trim(),
+        churchName: trimmedChurchName,
         churchAddress: churchAddress.trim(),
         churchCity: churchCity.trim(),
         churchPhone: churchPhone.trim(),
@@ -1703,6 +1735,39 @@ function AppContent() {
     } catch (err) {
       console.error("Copy sermons link error:", err);
       showToast("Unable to copy sermons link.", "error");
+    }
+  };
+
+  const copySermonsPublicIdLink = async () => {
+    if (!sermonsPublicIdLink) return;
+    try {
+      await navigator.clipboard.writeText(sermonsPublicIdLink);
+      showToast("Sermons ID link copied.", "success");
+    } catch (err) {
+      console.error("Copy sermons ID link error:", err);
+      showToast("Unable to copy sermons ID link.", "error");
+    }
+  };
+
+  const copyLatestSermonPublicLink = async () => {
+    if (!sermonsLatestPublicLink) return;
+    try {
+      await navigator.clipboard.writeText(sermonsLatestPublicLink);
+      showToast("Latest sermon link copied.", "success");
+    } catch (err) {
+      console.error("Copy latest sermon link error:", err);
+      showToast("Unable to copy latest sermon link.", "error");
+    }
+  };
+
+  const copyLatestSermonPublicIdLink = async () => {
+    if (!sermonsLatestPublicIdLink) return;
+    try {
+      await navigator.clipboard.writeText(sermonsLatestPublicIdLink);
+      showToast("Latest sermon ID link copied.", "success");
+    } catch (err) {
+      console.error("Copy latest sermon ID link error:", err);
+      showToast("Unable to copy latest sermon ID link.", "error");
     }
   };
 
@@ -6901,8 +6966,15 @@ function AppContent() {
             sermonsLoading={sermonsLoading}
             publicBaseUrl={sermonsPublicBaseUrl}
             churchId={userProfile?.churchId}
+            publicChurchKey={churchPublicKey}
             publicSermonsLink={sermonsPublicLink}
+            publicSermonsIdLink={sermonsPublicIdLink}
+            publicLatestSermonLink={sermonsLatestPublicLink}
+            publicLatestSermonIdLink={sermonsLatestPublicIdLink}
             onCopyPublicLink={copySermonsPublicLink}
+            onCopyPublicIdLink={copySermonsPublicIdLink}
+            onCopyLatestLink={copyLatestSermonPublicLink}
+            onCopyLatestIdLink={copyLatestSermonPublicIdLink}
           />
         )}
 
