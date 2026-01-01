@@ -478,6 +478,22 @@ export function AuthPanel({
               TikTok
             </a>
           </div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "12px",
+              fontSize: "12px",
+              color: "#64748b",
+            }}
+          >
+            <a href="/privacy" style={{ color: "#2563eb", fontWeight: 600 }}>
+              Privacy Policy
+            </a>
+            <a href="/terms" style={{ color: "#2563eb", fontWeight: 600 }}>
+              Terms of Service
+            </a>
+          </div>
         </Card>
       </div>
     </div>
