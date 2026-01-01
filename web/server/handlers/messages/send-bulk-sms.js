@@ -3,9 +3,9 @@ const verifyUser = require('../../lib/verifyUser')
 const ensureChurchAccess = require('../../lib/ensureChurchAccess')
 const { normalizePhone } = require('../../lib/phone')
 
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
-const TWILIO_SMS_FROM = process.env.TWILIO_SMS_FROM
+const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID
+const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET
+const HUBTEL_SENDER_ID = process.env.HUBTEL_SENDER_ID
 
 const MAX_RECIPIENTS = 50
 
@@ -99,21 +99,21 @@ const createMessageBatchAndReserve = async ({
   return batchRef
 }
 
-const sendTwilioMessage = async ({ to, body }) => {
-  const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')
+const sendHubtelMessage = async ({ to, body }) => {
+  const auth = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64')
   const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+    'https://sms.hubtel.com/v1/messages/send',
     {
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: new URLSearchParams({
+      body: JSON.stringify({
+        From: HUBTEL_SENDER_ID,
         To: to,
-        From: TWILIO_SMS_FROM,
-        Body: body,
-      }).toString(),
+        Content: body,
+      }),
     }
   )
 
@@ -141,10 +141,10 @@ async function handler(request, response) {
     })
   }
 
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_SMS_FROM) {
+  if (!HUBTEL_CLIENT_ID || !HUBTEL_CLIENT_SECRET || !HUBTEL_SENDER_ID) {
     return response.status(500).json({
       status: 'error',
-      message: 'Twilio SMS credentials are not configured.',
+      message: 'Hubtel SMS credentials are not configured.',
     })
   }
 
@@ -236,14 +236,14 @@ async function handler(request, response) {
     const results = await Promise.all(
       recipients.map(async (recipient) => {
         try {
-          const result = await sendTwilioMessage({
+          const result = await sendHubtelMessage({
             to: recipient,
             body: message,
           })
           return {
             recipient,
             status: result.ok ? 'sent' : 'failed',
-            providerMessageId: result.ok ? result.data?.sid : null,
+            providerMessageId: result.ok ? result.data?.messageId || result.data?.MessageId : null,
             error: result.ok ? null : result.errorMessage,
           }
         } catch (error) {

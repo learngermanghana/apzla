@@ -8,7 +8,6 @@ const creditsTopupInit = require('../server/handlers/credits/topup-init')
 const paystackWebhook = require('../server/handlers/credits/paystack-webhook')
 
 const sendBulkSms = require('../server/handlers/messages/send-bulk-sms')
-const sendBulkWhatsapp = require('../server/handlers/messages/send-bulk-whatsapp')
 
 const seedBundles = require('../server/handlers/admin/seed-messaging-bundles')
 
@@ -92,7 +91,6 @@ module.exports = async function handler(req, res) {
   if (path === 'credits/topup-init') return creditsTopupInit(req, res)
 
   if (path === 'messages/send-bulk-sms') return sendBulkSms(req, res)
-  if (path === 'messages/send-bulk-whatsapp') return sendBulkWhatsapp(req, res)
 
   if (path === 'admin/seed-messaging-bundles') return seedBundles(req, res)
 
