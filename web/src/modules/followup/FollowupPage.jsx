@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   fetchBundles,
   sendBulkSms,
-  sendBulkWhatsapp,
   startTopup,
 } from "../../utils/messageApi";
 
@@ -24,15 +23,12 @@ function FollowupPage({
   showToast,
   churchId,
   smsCredits,
-  whatsappCredits,
   smsCreditsPerMessage,
-  whatsappCreditsPerMessage,
   user,
 }) {
   const [sendMode, setSendMode] = useState("FREE");
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [sendingChannel, setSendingChannel] = useState(null);
-  const [topupChannel, setTopupChannel] = useState("sms");
   const [bundleId, setBundleId] = useState("sms-100");
   const [bundles, setBundles] = useState([]);
   const [isPaying, setIsPaying] = useState(false);
@@ -78,7 +74,7 @@ function FollowupPage({
     setSelectedRecipients(recipientsWithPhone.map((member) => member.id));
   };
 
-  const handleBulkSend = async (channel) => {
+  const handleBulkSend = async () => {
     if (!churchId) {
       showToast("Church ID missing. Please reload and try again.", "error");
       return;
@@ -102,10 +98,8 @@ function FollowupPage({
       return;
     }
 
-    const availableCredits =
-      channel === "sms" ? smsCredits : whatsappCredits;
-    const creditsPerMessage =
-      channel === "sms" ? smsCreditsPerMessage : whatsappCreditsPerMessage;
+    const availableCredits = smsCredits;
+    const creditsPerMessage = smsCreditsPerMessage;
     const creditsRequired = selectedPhones.length * creditsPerMessage;
     if (availableCredits < creditsRequired) {
       showToast("Not enough credits to send to all selected recipients.", "error");
@@ -113,23 +107,14 @@ function FollowupPage({
     }
 
     try {
-      setSendingChannel(channel);
+      setSendingChannel("sms");
       const token = await user.getIdToken();
-      if (channel === "sms") {
-        await sendBulkSms({
-          churchId,
-          message: followupTemplate,
-          recipients: selectedPhones,
-          token,
-        });
-      } else {
-        await sendBulkWhatsapp({
-          churchId,
-          message: followupTemplate,
-          recipients: selectedPhones,
-          token,
-        });
-      }
+      await sendBulkSms({
+        churchId,
+        message: followupTemplate,
+        recipients: selectedPhones,
+        token,
+      });
       showToast("Bulk message sent successfully.", "success");
       setSelectedRecipients([]);
     } catch (error) {
@@ -157,7 +142,7 @@ function FollowupPage({
         setIsLoadingBundles(true);
         setBundleError("");
         const token = await user.getIdToken();
-        const bundleList = await fetchBundles({ channel: topupChannel, token });
+        const bundleList = await fetchBundles({ token });
         if (!isActive) return;
         setBundles(bundleList);
         setBundleId((prev) =>
@@ -181,7 +166,7 @@ function FollowupPage({
     return () => {
       isActive = false;
     };
-  }, [sendMode, topupChannel, user]);
+  }, [sendMode, user]);
 
   const handleBuyCredits = async () => {
     if (!churchId) {
@@ -204,7 +189,7 @@ function FollowupPage({
       const token = await user.getIdToken();
       await startTopup({
         churchId,
-        channel: topupChannel,
+        channel: "sms",
         bundleId,
         token,
       });
@@ -305,7 +290,6 @@ function FollowupPage({
             }}
           >
             <span>SMS credits: {smsCredits}</span>
-            <span>WhatsApp credits: {whatsappCredits}</span>
           </div>
           <div
             style={{
@@ -336,28 +320,6 @@ function FollowupPage({
                 alignItems: "center",
               }}
             >
-              <label
-                style={{
-                  fontSize: "12px",
-                  color: "#6b7280",
-                }}
-              >
-                Channel
-                <select
-                  value={topupChannel}
-                  onChange={(event) => setTopupChannel(event.target.value)}
-                  style={{
-                    marginLeft: "6px",
-                    padding: "6px 8px",
-                    borderRadius: "6px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "12px",
-                  }}
-                >
-                  <option value="sms">SMS</option>
-                  <option value="whatsapp">WhatsApp</option>
-                </select>
-              </label>
               <label
                 style={{
                   fontSize: "12px",
@@ -554,7 +516,7 @@ function FollowupPage({
                 }}
               >
                 <button
-                  onClick={() => handleBulkSend("sms")}
+                  onClick={handleBulkSend}
                   disabled={sendingChannel !== null}
                   style={{
                     padding: "6px 10px",
@@ -571,26 +533,6 @@ function FollowupPage({
                   {sendingChannel === "sms"
                     ? "Sending SMS..."
                     : "Send SMS to selected"}
-                </button>
-                <button
-                  onClick={() => handleBulkSend("whatsapp")}
-                  disabled={sendingChannel !== null}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: "8px",
-                    border: "1px solid #22c55e",
-                    background:
-                      sendingChannel !== null ? "#dcfce7" : "#ecfdf3",
-                    color: "#15803d",
-                    cursor:
-                      sendingChannel !== null ? "default" : "pointer",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                  }}
-                >
-                  {sendingChannel === "whatsapp"
-                    ? "Sending WhatsApp..."
-                    : "Send WhatsApp to selected"}
                 </button>
                 <span
                   style={{

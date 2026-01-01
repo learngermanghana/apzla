@@ -67,15 +67,6 @@ export const sendBulkSms = ({ churchId, message, recipients, token }) =>
     token,
   })
 
-export const sendBulkWhatsapp = ({ churchId, message, recipients, token }) =>
-  sendBulkMessage({
-    endpoint: '/api/messages/send-bulk-whatsapp',
-    churchId,
-    message,
-    recipients,
-    token,
-  })
-
 export const startTopup = async ({ churchId, channel, bundleId, token }) => {
   const data = await postJson({
     endpoint: '/api/credits/topup-init',
@@ -90,7 +81,7 @@ export const startTopup = async ({ churchId, channel, bundleId, token }) => {
   window.location.assign(url)
 }
 
-export const fetchBundles = async ({ channel, token }) => {
+export const fetchBundles = async ({ channel = 'sms', token }) => {
   const data = await getJson({
     endpoint: `/api/credits/bundles?channel=${encodeURIComponent(channel)}`,
     token,
