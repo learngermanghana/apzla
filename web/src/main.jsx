@@ -6,6 +6,8 @@ import GivePage from "./components/giving/GivePage.jsx";
 import MemberInvitePage from "./components/members/MemberInvitePage.jsx";
 import StatusPage from "./components/status/StatusPage.jsx";
 import OfflineNotice from "./components/ui/OfflineNotice.jsx";
+import PrivacyPage from "./components/legal/PrivacyPage.jsx";
+import TermsPage from "./components/legal/TermsPage.jsx";
 import PublicSermonDetailPage from "./modules/sermons/PublicSermonDetailPage.jsx";
 import PublicSermonsPage from "./modules/sermons/PublicSermonsPage.jsx";
 import { registerServiceWorker } from "./serviceWorker";
@@ -28,6 +30,8 @@ const isGiveRoute = pathname === "/give" || pathname.startsWith("/give/");
 const isMemberInviteRoute =
   pathname === "/member-invite" || pathname.startsWith("/member-invite/");
 const isSermonsRoute = pathname === "/sermons" || pathname.startsWith("/sermons/");
+const isPrivacyRoute = pathname === "/privacy" || pathname.startsWith("/privacy/");
+const isTermsRoute = pathname === "/terms" || pathname.startsWith("/terms/");
 
 function getSecondSegment(path) {
   // "/checkin/<token>" => "<token>"
@@ -66,6 +70,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       ) : (
         <PublicSermonsPage churchId={sermonsChurchId} />
       )
+    ) : isPrivacyRoute ? (
+      <PrivacyPage />
+    ) : isTermsRoute ? (
+      <TermsPage />
     ) : isStatusRoute ? (
       <StatusPage />
     ) : (
