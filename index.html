@@ -175,6 +175,73 @@
         text-align: center;
       }
 
+      .advert {
+        padding: 56px 32px;
+        background: white;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .advert-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 24px;
+      }
+
+      .advert h2 {
+        margin: 0;
+        font-size: clamp(26px, 4vw, 34px);
+        color: #1a202c;
+      }
+
+      .advert p {
+        margin: 0;
+        color: #4a5568;
+        line-height: 1.7;
+      }
+
+      .advert-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+      }
+
+      .advert-card {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 18px;
+      }
+
+      .advert-card h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        color: var(--primary);
+      }
+
+      .advert-card ul {
+        margin: 0;
+        padding-left: 18px;
+        color: #4a5568;
+        line-height: 1.7;
+      }
+
+      .advert-card li + li {
+        margin-top: 6px;
+      }
+
+      .advert-contact {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: #ebf4ff;
+        color: #2c5282;
+        font-weight: 700;
+        width: fit-content;
+      }
+
       @media (max-width: 640px) {
         header {
           flex-direction: column;
@@ -222,6 +289,48 @@
         <img src="/photos/pexels-jibarofoto-2019331.jpg" alt="Apza Church community" />
       </div>
     </main>
+
+    <section class="advert">
+      <div class="advert-inner">
+        <h2>Sedifex was built by Xenom IT Solutions.</h2>
+        <p>
+          We build reliable digital products for ambitious businesses. In addition to Sedifex, we
+          deliver ready-to-use platforms and custom web builds that help teams launch fast and
+          scale with confidence.
+        </p>
+        <div class="advert-grid">
+          <div class="advert-card">
+            <h3>Other products we have built</h3>
+            <ul>
+              <li>Falowen German Learning App</li>
+              <li>Apzla Church Management Software</li>
+              <li>Sedifex</li>
+            </ul>
+          </div>
+          <div class="advert-card">
+            <h3>Website setup packages (pricing in GHS)</h3>
+            <ul>
+              <li>
+                <strong>Basic Landing Website — GHS 1,200 – 2,500:</strong> 4–6 pages (Home,
+                Services, Packages, Gallery, About, Contact), WhatsApp booking button, Google Map
+                embed, basic gallery, mobile responsive.
+              </li>
+              <li>
+                <strong>Standard Business Website — GHS 2,500 – 5,500:</strong> Everything in Basic
+                plus enhanced visuals, SEO basics, contact form, speed optimization, 1–2 revisions,
+                and optional analytics setup.
+              </li>
+              <li>
+                <strong>Premium / Booking Website — GHS 6,000 – 12,000+:</strong> Everything in
+                Standard plus booking system, admin dashboard, email/SMS confirmations, payments,
+                and a CMS for self-updates.
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="advert-contact">Book a Sedifex demo: sedifexbiz@gmail.com</div>
+      </div>
+    </section>
 
     <footer>
       Made with care for growing churches. If you reached this page from a QR code or token, the
