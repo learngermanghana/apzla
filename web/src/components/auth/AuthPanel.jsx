@@ -45,9 +45,9 @@ export function AuthPanel({
             <div className="auth-hero-photo-caption">
               <span aria-hidden>🌅</span>
               <div>
-                <p style={{ margin: 0, fontWeight: 700 }}>Moments of worship</p>
+                <p style={{ margin: 0, fontWeight: 700 }}>Tithes & offerings</p>
                 <p style={{ margin: 0, fontSize: "12px" }}>
-                  Capture every service highlight with Apzla.
+                  Deliver giving receipts fast with next-day payouts.
                 </p>
               </div>
             </div>
@@ -67,7 +67,7 @@ export function AuthPanel({
               letterSpacing: "-0.02em",
             }}
           >
-            Ministry-first customer relationships.
+            Everything your church needs to welcome, track, and grow.
           </h1>
           <p
             style={{
@@ -77,9 +77,10 @@ export function AuthPanel({
               maxWidth: "540px",
             }}
           >
-            Apzla is a modern ministry relationship platform built for churches.
-            Unite follow-up, member care, attendance, giving, and communication
-            in one beautiful workspace.
+            Apzla brings overview dashboards, member care, attendance, giving,
+            sermons, and bulk messaging into one ministry workspace. Invite
+            guests with a link or QR code, capture attendance automatically,
+            and deliver tithes to bank accounts or mobile money within 24 hours.
           </p>
 
           <div
@@ -141,45 +142,112 @@ export function AuthPanel({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
               gap: "12px",
             }}
           >
-            {["Member care CRM", "Attendance & giving", "Visitor follow-up", "Sermon + media links"].map(
-              (item) => (
-                <Card
-                  key={item}
-                  variant="compact"
-                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+            {[
+              {
+                title: "Overview dashboards",
+                description: "See attendance, giving, and follow-up health at a glance.",
+              },
+              {
+                title: "Members & guests",
+                description: "Add manually or invite with a link or QR code.",
+              },
+              {
+                title: "Attendance tracking",
+                description: "Record manually or capture attendance automatically.",
+              },
+              {
+                title: "Tithes & offerings",
+                description:
+                  "Dedicated sub-accounts with payouts to bank or mobile money in 24 hours.",
+              },
+              {
+                title: "Bulk messaging",
+                description: "Send announcements and care reminders in minutes.",
+              },
+              {
+                title: "Sermon sharing",
+                description: "Publish a free public URL for every sermon and share everywhere.",
+              },
+            ].map((item) => (
+              <Card
+                key={item.title}
+                variant="compact"
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "10px",
+                    background: "linear-gradient(135deg, #4338ca, #22c55e)",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                  }}
                 >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: "30px",
-                      height: "30px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "10px",
-                      background: "linear-gradient(135deg, #4338ca, #22c55e)",
-                      color: "white",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ✓
-                  </span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
-                      {item}
-                    </p>
-                    <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>
-                      Purpose-built for ministry momentum.
-                    </p>
-                  </div>
+                  ✓
+                </span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
+                    {item.title}
+                  </p>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>
+                    {item.description}
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: "16px", fontWeight: 800 }}>
+              Pricing that scales with your ministry
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "12px",
+              }}
+            >
+              {[
+                {
+                  title: "14-day trial",
+                  price: "Free",
+                  detail: "Start today and explore every feature for two weeks.",
+                },
+                {
+                  title: "Monthly plan",
+                  price: "GHS 120",
+                  detail: "Pay monthly and keep giving receipts flowing.",
+                },
+                {
+                  title: "Yearly plan",
+                  price: "GHS 1,200",
+                  detail: "Subscribe yearly and save two months.",
+                },
+              ].map((plan) => (
+                <Card key={plan.title} variant="compact" className="ui-card-compact">
+                  <p style={{ margin: 0, color: "#4338ca", fontSize: "12px" }}>
+                    {plan.title}
+                  </p>
+                  <p style={{ margin: "6px 0 0", fontWeight: 800, fontSize: "18px" }}>
+                    {plan.price}
+                  </p>
+                  <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#475569" }}>
+                    {plan.detail}
+                  </p>
                 </Card>
-              )
-            )}
+              ))}
+            </div>
           </div>
         </Card>
 
