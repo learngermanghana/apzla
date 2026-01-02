@@ -153,10 +153,17 @@
 
 .dashboard-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
   gap: 8px;
   margin-bottom: 20px;
   font-size: 14px;
+}
+
+.dashboard-tabs button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .member-form-grid {
@@ -563,12 +570,11 @@
 
 @media (max-width: 640px) {
   .dashboard-tabs {
-    overflow-x: auto;
-    padding-bottom: 6px;
+    padding-bottom: 8px;
   }
 
   .dashboard-tabs button {
-    flex: 1 0 auto;
+    flex: 0 0 auto;
   }
 
   .checkin-card {

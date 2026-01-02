@@ -14,16 +14,7 @@ export const DASHBOARD_TABS = [
 
 function DashboardTabs({ activeTab, onTabChange, tabs = DASHBOARD_TABS }) {
   return (
-    <div
-      className="dashboard-tabs"
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "8px",
-        marginBottom: "20px",
-        fontSize: "14px",
-      }}
-    >
+    <div className="dashboard-tabs">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
