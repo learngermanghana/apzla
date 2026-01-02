@@ -3891,6 +3891,53 @@ function AppContent() {
                   display: "flex",
                   flexWrap: "wrap",
                   justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{ fontWeight: 600, color: "#111827", marginBottom: "6px" }}
+                  >
+                    Import or export members with CSV
+                  </div>
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: "14px" }}>
+                    Head to the Data transfer tab to upload a CSV template, merge new
+                    members, or export your full directory.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("data")}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "999px",
+                    border: "none",
+                    background: "#111827",
+                    color: "white",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Open CSV uploader
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "12px 14px",
+                marginBottom: "18px",
+                background: "#f8fafc",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
                   alignItems: "flex-start",
                   gap: "10px",
                 }}
