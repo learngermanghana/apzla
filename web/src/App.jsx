@@ -29,6 +29,7 @@ import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsPage from "./modules/sermons/SermonsPage";
 import FollowupPage from "./modules/followup/FollowupPage";
+import DataTransferPage from "./modules/data/DataTransferPage";
 import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
@@ -1241,7 +1242,8 @@ function AppContent() {
         activeTab === "overview" ||
         activeTab === "followup" ||
         activeTab === "checkin" ||
-        activeTab === "giving") &&
+        activeTab === "giving" ||
+        activeTab === "data") &&
       userProfile?.churchId
     ) {
       loadMembers();
@@ -5143,6 +5145,8 @@ function AppContent() {
             </div>
           </>
         )}
+
+        {activeTab === "data" && <DataTransferPage members={members} />}
 
         {activeTab === "attendance" && (
           <>
