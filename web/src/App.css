@@ -16,7 +16,6 @@
     linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
 }
 
-@@ -14,50 +14,94 @@
     radial-gradient(circle at 85% 15%, rgba(16, 185, 129, 0.14) 0, transparent 30%),
     radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.12) 0, transparent 32%),
     linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
@@ -153,17 +152,83 @@
 
 .dashboard-tabs {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  position: relative;
+}
+
+.dashboard-tabs__scroll {
+  display: flex;
   flex-wrap: nowrap;
   overflow-x: auto;
   padding-bottom: 6px;
   gap: 8px;
-  margin-bottom: 20px;
-  font-size: 14px;
 }
 
-.dashboard-tabs button {
+.dashboard-tabs__scroll button {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.dashboard-tabs__mobile {
+  display: none;
+  position: relative;
+}
+
+.dashboard-tabs__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #111827;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dashboard-tabs__toggle-icon {
+  font-size: 18px;
+}
+
+.dashboard-tabs__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.12);
+  padding: 6px;
+  z-index: 20;
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-tabs__menu-item {
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 14px;
+  color: #111827;
+  cursor: pointer;
+}
+
+.dashboard-tabs__menu-item.is-active {
+  background: #111827;
+  color: #fff;
+}
+
+.dashboard-page {
+  padding: 24px;
 }
 
 .member-form-grid {
@@ -568,13 +633,52 @@
   line-height: 1.5;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
+  .dashboard-tabs__scroll {
+    display: none;
+  }
+
+  .dashboard-tabs__mobile {
+    display: block;
+  }
+
   .dashboard-tabs {
     padding-bottom: 8px;
   }
 
-  .dashboard-tabs button {
-    flex: 0 0 auto;
+  .dashboard-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+
+  .dashboard-header h1 {
+    font-size: 20px !important;
+  }
+
+  .dashboard-header-actions {
+    width: 100% !important;
+    align-items: stretch !important;
+  }
+
+  .dashboard-header-buttons {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  .dashboard-header-buttons button {
+    width: 100%;
+  }
+
+  .dashboard-page {
+    padding: 16px !important;
+    align-items: stretch !important;
+  }
+
+  .dashboard-card {
+    padding: 16px !important;
+    border-radius: 12px !important;
   }
 
   .checkin-card {

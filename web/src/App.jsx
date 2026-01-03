@@ -3046,6 +3046,7 @@ function AppContent() {
 
   return (
     <div
+      className="dashboard-page"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -3130,6 +3131,7 @@ function AppContent() {
       )}
 
       <div
+        className="dashboard-card"
         style={{
           background: "white",
           borderRadius: "16px",
@@ -3141,6 +3143,7 @@ function AppContent() {
       >
         {/* Header */}
         <div
+          className="dashboard-header"
           style={{
             display: "flex",
             justifyContent: "space-between",
@@ -3190,6 +3193,7 @@ function AppContent() {
           </div>
 
           <div
+            className="dashboard-header-actions"
             style={{
               display: "flex",
               flexDirection: "column",
@@ -3227,7 +3231,10 @@ function AppContent() {
               </div>
             )}
 
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <div
+              className="dashboard-header-buttons"
+              style={{ display: "flex", gap: "8px", alignItems: "center" }}
+            >
               <button
                 onClick={handleOpenAccountSettings}
                 style={{
