@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 
 export const DASHBOARD_TABS = [
@@ -13,27 +13,81 @@ export const DASHBOARD_TABS = [
 ];
 
 function DashboardTabs({ activeTab, onTabChange, tabs = DASHBOARD_TABS }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const activeLabel = useMemo(() => {
+    return tabs.find((tab) => tab.id === activeTab)?.label ?? "Menu";
+  }, [activeTab, tabs]);
+
+  const handleTabChange = (tabId) => {
+    onTabChange(tabId);
+    setIsMenuOpen(false);
+  };
+
   return (
     <div className="dashboard-tabs">
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background: isActive ? "#111827" : "#e5e7eb",
-              color: isActive ? "white" : "#111827",
-              cursor: "pointer",
-            }}
+      <div className="dashboard-tabs__mobile">
+        <button
+          type="button"
+          className="dashboard-tabs__toggle"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          aria-expanded={isMenuOpen}
+          aria-controls="dashboard-tabs-menu"
+        >
+          <span className="dashboard-tabs__toggle-label">{activeLabel}</span>
+          <span className="dashboard-tabs__toggle-icon" aria-hidden>
+            ☰
+          </span>
+        </button>
+        {isMenuOpen && (
+          <div
+            id="dashboard-tabs-menu"
+            className="dashboard-tabs__menu"
+            role="menu"
           >
-            {tab.label}
-          </button>
-        );
-      })}
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`dashboard-tabs__menu-item${
+                    isActive ? " is-active" : ""
+                  }`}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-tabs__scroll" aria-label="Dashboard navigation">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "999px",
+                border: "none",
+                background: isActive ? "#111827" : "#e5e7eb",
+                color: isActive ? "white" : "#111827",
+                cursor: "pointer",
+              }}
+              aria-current={isActive ? "page" : undefined}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
