@@ -4,9 +4,9 @@ const { db, initError } = require('../../lib/firestoreAdmin')
 
 const DEFAULT_BUNDLES = {
   sms: [
-    { id: 'sms-100', name: 'SMS 100', credits: 100, priceGhs: 20 },
-    { id: 'sms-250', name: 'SMS 250', credits: 250, priceGhs: 45 },
-    { id: 'sms-500', name: 'SMS 500', credits: 500, priceGhs: 85 },
+    { id: 'sms-10000', name: '10,000 credits (833 SMS)', credits: 10000, priceGhs: 50 },
+    { id: 'sms-50000', name: '50,000 credits (4,166 SMS)', credits: 50000, priceGhs: 250 },
+    { id: 'sms-100000', name: '100,000 credits (8,333 SMS)', credits: 100000, priceGhs: 430 },
   ],
   whatsapp: [
     { id: 'whatsapp-100', name: 'WhatsApp 100', credits: 100, priceGhs: 30 },
