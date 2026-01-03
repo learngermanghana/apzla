@@ -633,7 +633,7 @@
   line-height: 1.5;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 640px) {
   .dashboard-tabs__scroll {
     display: none;
   }
