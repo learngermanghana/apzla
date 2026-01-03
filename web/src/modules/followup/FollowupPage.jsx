@@ -184,16 +184,26 @@ function FollowupPage({
       return;
     }
 
+    const paymentWindow = window.open("", "_blank", "noopener,noreferrer");
+
     try {
       setIsPaying(true);
       const token = await user.getIdToken();
-      await startTopup({
+      const url = await startTopup({
         churchId,
         channel: "sms",
         bundleId,
         token,
       });
+      if (paymentWindow) {
+        paymentWindow.location.href = url;
+      } else {
+        window.location.assign(url);
+      }
     } catch (error) {
+      if (paymentWindow) {
+        paymentWindow.close();
+      }
       showToast(error.message || "Could not start top-up.", "error");
     } finally {
       setIsPaying(false);
