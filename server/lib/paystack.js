@@ -10,7 +10,7 @@ const requirePaystackKey = () => {
   }
 }
 
-const initializeTransaction = async ({ email, amount, metadata }) => {
+const initializeTransaction = async ({ email, amount, metadata, callbackUrl }) => {
   requirePaystackKey()
 
   const payload = {
@@ -18,6 +18,10 @@ const initializeTransaction = async ({ email, amount, metadata }) => {
     amount,
     currency: 'GHS',
     metadata,
+  }
+
+  if (callbackUrl) {
+    payload.callback_url = callbackUrl
   }
 
   const response = await fetch('https://api.paystack.co/transaction/initialize', {

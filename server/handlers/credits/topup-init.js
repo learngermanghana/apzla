@@ -6,6 +6,20 @@ const { initializeTransaction } = require('../../lib/paystack')
 
 const toPaystackAmount = (priceGhs) => Math.round(Number(priceGhs) * 100)
 
+const sanitizeCallbackUrl = (value) => {
+  if (!value || typeof value !== 'string') return null
+
+  try {
+    const parsed = new URL(value)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return null
+    }
+    return parsed.toString()
+  } catch (error) {
+    return null
+  }
+}
+
 async function handler(request, response) {
   if (request.method !== 'POST') {
     return response.status(405).json({
@@ -25,6 +39,7 @@ async function handler(request, response) {
   const churchId = payload?.churchId
   const bundleId = payload?.bundleId
   const channel = normalizeChannel(payload?.channel)
+  const callbackUrl = sanitizeCallbackUrl(payload?.callbackUrl)
 
   if (!churchId) {
     return response.status(400).json({
@@ -90,6 +105,7 @@ async function handler(request, response) {
       email: userData.email,
       amount: paystackAmount,
       metadata,
+      callbackUrl,
     })
 
     const reference = transactionData?.reference
