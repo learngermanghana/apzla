@@ -1,4 +1,5 @@
 const { admin, db, initError } = require('../../lib/firestoreAdmin')
+const { normalizeChannel } = require('../../lib/messagingBundles')
 const { verifyTransaction, verifySignature, getRawBody } = require('../../lib/paystack')
 
 const readRawBody = (request) =>
@@ -73,12 +74,19 @@ async function handler(request, response) {
   }
 
   const reference = payload?.data?.reference
-  const metadata = payload?.data?.metadata || {}
+  let metadata = payload?.data?.metadata || {}
+  if (typeof metadata === 'string') {
+    try {
+      metadata = JSON.parse(metadata)
+    } catch (error) {
+      metadata = {}
+    }
+  }
+
   const churchId = metadata?.churchId
-  const channel = metadata?.channel
   const paystackEventId = payload?.id || payload?.data?.id || null
 
-  if (!reference || !churchId || !channel) {
+  if (!reference || !churchId) {
     return response.status(400).json({
       status: 'error',
       message: 'Missing Paystack reference metadata.',
@@ -114,13 +122,9 @@ async function handler(request, response) {
       })
     }
 
-    const creditsField = getChannelCreditsField(channel)
-    if (!creditsField) {
-      return response.status(400).json({
-        status: 'error',
-        message: 'Unknown channel for credits.',
-      })
-    }
+    const verificationMetadata = verification?.metadata || {}
+    const normalizedMetadataChannel = normalizeChannel(metadata?.channel)
+    const normalizedVerificationChannel = normalizeChannel(verificationMetadata?.channel)
 
     const churchRef = db.collection('churches').doc(churchId)
     const topupRef = churchRef.collection('topups').doc(reference)
@@ -145,7 +149,18 @@ async function handler(request, response) {
         return
       }
 
-      const credits = Number(topup.units) || Number(metadata?.credits) || 0
+      const resolvedChannel =
+        normalizedMetadataChannel ||
+        normalizedVerificationChannel ||
+        normalizeChannel(topup?.channel)
+      const creditsField = getChannelCreditsField(resolvedChannel)
+
+      if (!creditsField) {
+        throw new Error('Unknown channel for credits.')
+      }
+
+      const credits =
+        Number(topup.units) || Number(metadata?.credits) || Number(verificationMetadata?.credits) || 0
       const currentCredits = Number(churchSnap.data()?.[creditsField] ?? 0)
 
       transaction.update(churchRef, {
