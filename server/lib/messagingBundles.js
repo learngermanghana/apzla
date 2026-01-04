@@ -19,6 +19,21 @@ const getBundlesSnapshot = async () => {
   return bundlesSnap.data() || {}
 }
 
+const toBundleList = (value) => {
+  if (Array.isArray(value)) {
+    return value
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).map(([id, bundle]) => ({
+      ...(bundle || {}),
+      id: bundle?.id || id,
+    }))
+  }
+
+  return []
+}
+
 const getBundle = async ({ channel, bundleId }) => {
   const normalizedChannel = normalizeChannel(channel)
   if (!normalizedChannel) {
@@ -34,7 +49,7 @@ const getBundle = async ({ channel, bundleId }) => {
   }
 
   const bundles = await getBundlesSnapshot()
-  const bundleList = Array.isArray(bundles[normalizedChannel]) ? bundles[normalizedChannel] : []
+  const bundleList = toBundleList(bundles[normalizedChannel])
   const bundle = bundleList.find((entry) => entry.id === bundleId)
 
   if (!bundle) {
@@ -55,7 +70,7 @@ const listBundles = async ({ channel }) => {
   }
 
   const bundles = await getBundlesSnapshot()
-  const bundleList = Array.isArray(bundles[normalizedChannel]) ? bundles[normalizedChannel] : []
+  const bundleList = toBundleList(bundles[normalizedChannel])
 
   return bundleList.map((bundle) => ({ ...bundle, channel: normalizedChannel }))
 }
