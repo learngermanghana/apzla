@@ -18,6 +18,8 @@ const selfCheckinToken = require('../server/handlers/self-checkin-token')
 const verifyCheckin = require('../server/handlers/verify-checkin')
 const selfCheckinVerify = require('../server/handlers/self-checkin-verify')
 const createChurchSubaccount = require('../server/handlers/create-church-subaccount')
+const memberInvite = require('../server/handlers/member-invite')
+const memberInviteSubmit = require('../server/handlers/member-invite-submit')
 
 const transactionInitialize = require('../server/handlers/transaction/initialize')
 const transactionVerify = require('../server/handlers/transaction/verify-reference')
@@ -89,6 +91,9 @@ module.exports = async function handler(req, res) {
   if (path === 'self-checkin-verify') return selfCheckinVerify(req, res)
 
   if (path === 'create-church-subaccount') return createChurchSubaccount(req, res)
+
+  if (path === 'member-invite') return memberInvite(req, res)
+  if (path === 'member-invite-submit') return memberInviteSubmit(req, res)
 
   if (path === 'credits/bundles') return creditsBundles(req, res)
   if (path === 'credits/topup-init') return creditsTopupInit(req, res)
