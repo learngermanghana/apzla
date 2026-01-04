@@ -67,10 +67,18 @@ export const sendBulkSms = ({ churchId, message, recipients, token }) =>
     token,
   })
 
-export const startTopup = async ({ churchId, channel, bundleId, token }) => {
+export const startTopup = async ({ churchId, channel, bundleId, token, callbackUrl }) => {
+  const returnUrl =
+    callbackUrl ||
+    (typeof window !== 'undefined' ? window.location.href : null)
   const data = await postJson({
     endpoint: '/api/credits/topup-init',
-    payload: { churchId, channel, bundleId },
+    payload: {
+      churchId,
+      channel,
+      bundleId,
+      callbackUrl: returnUrl,
+    },
     token,
   })
 
