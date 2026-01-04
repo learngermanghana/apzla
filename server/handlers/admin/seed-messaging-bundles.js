@@ -1,4 +1,4 @@
-// web/api/admin/seed-messaging-bundles.js
+// server/handlers/admin/seed-messaging-bundles.js
 const crypto = require('crypto')
 const { db, initError } = require('../../lib/firestoreAdmin')
 
