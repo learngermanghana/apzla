@@ -1,4 +1,4 @@
-// web/api/router.js
+// api/router.js
 // Single entrypoint for all /api/* routes (Hobby plan friendly)
 
 const { URL } = require('url')
