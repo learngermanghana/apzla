@@ -82,6 +82,42 @@ export function AuthPanel({
             guests with a link or QR code, capture attendance automatically,
             and deliver tithes to bank accounts or mobile money within 24 hours.
           </p>
+          <Card
+            variant="gradient"
+            className="ui-card-compact"
+            style={{
+              display: "flex",
+              gap: "12px",
+              alignItems: "flex-start",
+              marginBottom: "18px",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: "36px",
+                height: "36px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "12px",
+                background: "rgba(255,255,255,0.2)",
+                color: "white",
+                fontSize: "18px",
+              }}
+            >
+              📣
+            </span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "15px" }}>
+                Bulk messaging, built for shepherding
+              </p>
+              <p style={{ margin: "4px 0 0", fontSize: "13px", opacity: 0.9 }}>
+                Send announcements, prayer requests, and care reminders to your
+                entire congregation in minutes with SMS or WhatsApp-ready lists.
+              </p>
+            </div>
+          </Card>
 
           <div
             style={{
