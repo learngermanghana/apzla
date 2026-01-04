@@ -1490,7 +1490,15 @@ function AppContent() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      const message = data?.error || data?.message || "Unable to issue link.";
+      const statusLabel = res.status
+        ? ` (${res.status}${res.statusText ? ` ${res.statusText}` : ""})`
+        : "";
+      const message =
+        data?.error ||
+        data?.message ||
+        data?.details ||
+        data?.reason ||
+        `Unable to issue link${statusLabel}.`;
       throw new Error(message);
     }
 
@@ -1546,7 +1554,11 @@ function AppContent() {
       showToast("Check-in link issued.", "success");
     } catch (err) {
       console.error("Issue check-in token error:", err);
-      setCheckinTokenError(err.message || "Unable to issue link.");
+      const message =
+        err?.message ||
+        (typeof err === "string" ? err : null) ||
+        "Unable to issue link.";
+      setCheckinTokenError(message);
     } finally {
       setCheckinTokenLoading(false);
     }
@@ -1576,7 +1588,11 @@ function AppContent() {
       showToast("Check-in link ready to share.", "success");
     } catch (err) {
       console.error("Issue member check-in link error:", err);
-      showToast(err.message || "Unable to issue check-in link.", "error");
+      const message =
+        err?.message ||
+        (typeof err === "string" ? err : null) ||
+        "Unable to issue check-in link.";
+      showToast(message, "error");
     } finally {
       setMemberLinkLoadingId(null);
     }
