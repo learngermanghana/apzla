@@ -53,12 +53,15 @@ const ensureJsonBody = async (req) => {
 module.exports = async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
   const pathname = url.pathname
-  const path = pathname.replace(/^\/api\/?/, '')
 
   req.query = {
     ...(req.query || {}),
     ...Object.fromEntries(url.searchParams.entries()),
   }
+
+  const rewriteParam = req.query?.path || req.query?.route
+  const rewrittenPath = Array.isArray(rewriteParam) ? rewriteParam[0] : rewriteParam
+  const path = (rewrittenPath || pathname.replace(/^\/api\/?/, '')).replace(/^\/+/, '')
 
   if (path === 'credits/paystack-webhook') {
     try {

@@ -17,7 +17,7 @@
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/web/api/router.js" },
+    { "src": "/api/(.*)", "dest": "/web/api/router.js?path=$1" },
 
     { "src": "/assets/(.*)", "dest": "/web/assets/$1" },
     { "src": "/icons/(.*)", "dest": "/web/icons/$1" },
