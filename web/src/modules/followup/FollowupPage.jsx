@@ -36,6 +36,20 @@ function FollowupPage({
   const [bundleError, setBundleError] = useState("");
   const bulkLimit = 50;
 
+  const loadPaystackScript = () =>
+    new Promise((resolve, reject) => {
+      if (window.PaystackPop) {
+        resolve(window.PaystackPop);
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://js.paystack.co/v1/inline.js";
+      script.onload = () => resolve(window.PaystackPop);
+      script.onerror = () => reject(new Error("Paystack script failed to load"));
+      document.body.appendChild(script);
+    });
+
   const recipientsWithPhone = useMemo(
     () =>
       followupTargets.filter((member) => {
@@ -187,17 +201,57 @@ function FollowupPage({
     try {
       setIsPaying(true);
       const token = await user.getIdToken();
-      await startTopup({
+      const topup = await startTopup({
         churchId,
         channel: "sms",
         bundleId,
         token,
       });
+
+      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      if (!paystackKey || !topup?.accessCode) {
+        if (topup?.authorizationUrl) {
+          window.location.assign(topup.authorizationUrl);
+          return;
+        }
+        throw new Error("Paystack did not return a payment link.");
+      }
+
+      await loadPaystackScript();
+      if (!window.PaystackPop || typeof window.PaystackPop.setup !== "function") {
+        if (topup?.authorizationUrl) {
+          window.location.assign(topup.authorizationUrl);
+          return;
+        }
+        throw new Error("Paystack failed to initialize");
+      }
+
+      const handler = window.PaystackPop.setup({
+        key: paystackKey,
+        access_code: topup.accessCode,
+        callback: function () {
+          showToast(
+            "Payment completed. Credits will appear once confirmed.",
+            "success"
+          );
+          setIsPaying(false);
+        },
+        onClose: function () {
+          setIsPaying(false);
+        },
+      });
+
+      if (!handler || typeof handler.openIframe !== "function") {
+        throw new Error("Paystack handler unavailable");
+      }
+
+      handler.openIframe();
+      return;
     } catch (error) {
       showToast(error.message || "Could not start top-up.", "error");
-    } finally {
-      setIsPaying(false);
     }
+
+    setIsPaying(false);
   };
 
   return (

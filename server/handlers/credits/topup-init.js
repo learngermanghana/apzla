@@ -109,6 +109,7 @@ async function handler(request, response) {
     })
 
     const reference = transactionData?.reference
+    const accessCode = transactionData?.access_code
 
     if (!reference) {
       return response.status(500).json({
@@ -135,6 +136,7 @@ async function handler(request, response) {
       status: 'success',
       data: {
         authorizationUrl: transactionData.authorization_url,
+        accessCode,
         reference,
       },
       message: 'Top-up initialized.',
