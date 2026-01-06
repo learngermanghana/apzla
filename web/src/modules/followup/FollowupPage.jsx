@@ -160,9 +160,11 @@ function FollowupPage({
         if (!isActive) return;
         setBundles(bundleList);
         setBundleId((prev) =>
-          bundleList.some((bundle) => bundle.id === prev)
-            ? prev
-            : bundleList[0]?.id || ""
+          bundleList.length === 0
+            ? prev || ""
+            : bundleList.some((bundle) => bundle.id === prev)
+              ? prev
+              : bundleList[0]?.id || ""
         );
       } catch (error) {
         if (!isActive) return;
@@ -413,8 +415,7 @@ function FollowupPage({
                 disabled={
                   isPaying ||
                   isLoadingBundles ||
-                  !bundleId ||
-                  bundles.length === 0
+                  !bundleId
                 }
                 style={{
                   padding: "6px 10px",
