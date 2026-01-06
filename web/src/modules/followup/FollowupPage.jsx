@@ -29,12 +29,48 @@ function FollowupPage({
   const [sendMode, setSendMode] = useState("FREE");
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [sendingChannel, setSendingChannel] = useState(null);
-  const [bundleId, setBundleId] = useState("sms-100");
-  const [bundles, setBundles] = useState([]);
+  const bundleStorageKey = "apzla.messagingBundles.sms";
+  const readCachedBundles = () => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = window.localStorage.getItem(bundleStorageKey);
+      const parsed = cached ? JSON.parse(cached) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  };
+  const writeCachedBundles = (bundleList) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        bundleStorageKey,
+        JSON.stringify(bundleList)
+      );
+    } catch (error) {
+      // ignore cache write failures
+    }
+  };
+  const cachedBundles = readCachedBundles();
+  const [bundleId, setBundleId] = useState(cachedBundles[0]?.id || "");
+  const [bundles, setBundles] = useState(cachedBundles);
   const [isPaying, setIsPaying] = useState(false);
   const [isLoadingBundles, setIsLoadingBundles] = useState(false);
   const [bundleError, setBundleError] = useState("");
   const bulkLimit = 50;
+
+  const getUserToken = async () => {
+    if (!user || typeof user.getIdToken !== "function") {
+      throw new Error("Please sign in again to continue.");
+    }
+
+    const token = await user.getIdToken(true);
+    if (!token) {
+      throw new Error("Authorization token missing. Please sign in again.");
+    }
+
+    return token;
+  };
 
   const loadPaystackScript = () =>
     new Promise((resolve, reject) => {
@@ -122,7 +158,7 @@ function FollowupPage({
 
     try {
       setSendingChannel("sms");
-      const token = await user.getIdToken();
+      const token = await getUserToken();
       await sendBulkSms({
         churchId,
         message: followupTemplate,
@@ -155,10 +191,26 @@ function FollowupPage({
       try {
         setIsLoadingBundles(true);
         setBundleError("");
-        const token = await user.getIdToken();
+        const token = await getUserToken();
         const bundleList = await fetchBundles({ token });
         if (!isActive) return;
+        if (bundleList.length === 0) {
+          const cached = readCachedBundles();
+          setBundles(cached);
+          setBundleError(
+            cached.length > 0
+              ? "Bundles are unavailable. Showing last saved bundles."
+              : "No bundles available."
+          );
+          setBundleId((prev) =>
+            cached.some((bundle) => bundle.id === prev)
+              ? prev
+              : cached[0]?.id || ""
+          );
+          return;
+        }
         setBundles(bundleList);
+        writeCachedBundles(bundleList);
         setBundleId((prev) =>
           bundleList.some((bundle) => bundle.id === prev)
             ? prev
@@ -166,8 +218,18 @@ function FollowupPage({
         );
       } catch (error) {
         if (!isActive) return;
-        setBundles([]);
-        setBundleError(error.message || "Unable to load bundles.");
+        const cached = readCachedBundles();
+        setBundles(cached);
+        setBundleError(
+          cached.length > 0
+            ? "Bundles are unavailable. Showing last saved bundles."
+            : error.message || "Unable to load bundles."
+        );
+        setBundleId((prev) =>
+          cached.some((bundle) => bundle.id === prev)
+            ? prev
+            : cached[0]?.id || ""
+        );
       } finally {
         if (isActive) {
           setIsLoadingBundles(false);
@@ -200,7 +262,7 @@ function FollowupPage({
 
     try {
       setIsPaying(true);
-      const token = await user.getIdToken();
+      const token = await getUserToken();
       const topup = await startTopup({
         churchId,
         channel: "sms",
@@ -413,8 +475,7 @@ function FollowupPage({
                 disabled={
                   isPaying ||
                   isLoadingBundles ||
-                  !bundleId ||
-                  bundles.length === 0
+                  !bundleId
                 }
                 style={{
                   padding: "6px 10px",
