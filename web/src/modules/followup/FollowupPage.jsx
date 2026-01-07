@@ -26,15 +26,17 @@ function FollowupPage({
   smsCreditsPerMessage,
   user,
 }) {
-  const [sendMode, setSendMode] = useState("FREE");
+  const [sendMode, setSendMode] = useState("FREE"); // FREE | BULK
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [sendingChannel, setSendingChannel] = useState(null);
-  const [bundleId, setBundleId] = useState("sms-100");
+  const [bundleId, setBundleId] = useState("");
   const [bundles, setBundles] = useState([]);
   const [isPaying, setIsPaying] = useState(false);
   const [isLoadingBundles, setIsLoadingBundles] = useState(false);
   const [bundleError, setBundleError] = useState("");
   const bulkLimit = 50;
+
+  // --- Derived data ----------------------------------------------------------
 
   const recipientsWithPhone = useMemo(
     () =>
@@ -58,6 +60,10 @@ function FollowupPage({
     [selectedMembers]
   );
 
+  const isBulkMode = sendMode === "BULK";
+
+  // --- Selection helpers -----------------------------------------------------
+
   const toggleRecipient = (memberId) => {
     setSelectedRecipients((prev) =>
       prev.includes(memberId)
@@ -69,10 +75,12 @@ function FollowupPage({
   const toggleAllRecipients = () => {
     if (selectedRecipients.length === recipientsWithPhone.length) {
       setSelectedRecipients([]);
-      return;
+    } else {
+      setSelectedRecipients(recipientsWithPhone.map((m) => m.id));
     }
-    setSelectedRecipients(recipientsWithPhone.map((member) => member.id));
   };
+
+  // --- Bulk send -------------------------------------------------------------
 
   const handleBulkSend = async () => {
     if (!churchId) {
@@ -86,7 +94,7 @@ function FollowupPage({
     }
 
     if (selectedPhones.length === 0) {
-      showToast("Select at least one recipient with a phone number.", "error");
+      showToast("Select at least one recipient.", "error");
       return;
     }
 
@@ -98,11 +106,12 @@ function FollowupPage({
       return;
     }
 
-    const availableCredits = smsCredits;
-    const creditsPerMessage = smsCreditsPerMessage;
-    const creditsRequired = selectedPhones.length * creditsPerMessage;
-    if (availableCredits < creditsRequired) {
-      showToast("Not enough credits to send to all selected recipients.", "error");
+    const creditsRequired = selectedPhones.length * smsCreditsPerMessage;
+    if (smsCredits < creditsRequired) {
+      showToast(
+        "Not enough SMS credits for all selected recipients.",
+        "error"
+      );
       return;
     }
 
@@ -115,7 +124,7 @@ function FollowupPage({
         recipients: selectedPhones,
         token,
       });
-      showToast("Bulk message sent successfully.", "success");
+      showToast("Bulk SMS sent.", "success");
       setSelectedRecipients([]);
     } catch (error) {
       showToast(error.message || "Unable to send bulk message.", "error");
@@ -124,15 +133,15 @@ function FollowupPage({
     }
   };
 
+  // --- Load bundles when switching to BULK ----------------------------------
+
   useEffect(() => {
-    if (sendMode !== "BULK") {
-      return undefined;
-    }
+    if (!isBulkMode) return;
 
     if (!user) {
       setBundles([]);
-      setBundleError("Sign in to view bundles.");
-      return undefined;
+      setBundleError("Sign in to view SMS bundles.");
+      return;
     }
 
     let isActive = true;
@@ -144,29 +153,30 @@ function FollowupPage({
         const token = await user.getIdToken();
         const bundleList = await fetchBundles({ token });
         if (!isActive) return;
+
         setBundles(bundleList);
-        setBundleId((prev) =>
-          bundleList.some((bundle) => bundle.id === prev)
-            ? prev
-            : bundleList[0]?.id || ""
+        setBundleId(
+          (prev) =>
+            (prev && bundleList.some((b) => b.id === prev) && prev) ||
+            bundleList[0]?.id ||
+            ""
         );
       } catch (error) {
         if (!isActive) return;
         setBundles([]);
         setBundleError(error.message || "Unable to load bundles.");
       } finally {
-        if (isActive) {
-          setIsLoadingBundles(false);
-        }
+        if (isActive) setIsLoadingBundles(false);
       }
     };
 
     loadBundles();
-
     return () => {
       isActive = false;
     };
-  }, [sendMode, user]);
+  }, [isBulkMode, user]);
+
+  // --- Buy credits -----------------------------------------------------------
 
   const handleBuyCredits = async () => {
     if (!churchId) {
@@ -180,7 +190,7 @@ function FollowupPage({
     }
 
     if (!bundleId) {
-      showToast("Select a bundle to continue.", "error");
+      showToast("Select a bundle first.", "error");
       return;
     }
 
@@ -200,43 +210,46 @@ function FollowupPage({
     }
   };
 
+  // --- Render ---------------------------------------------------------------
+
   return (
     <>
+      {/* Short description */}
       <p
         style={{
-          marginBottom: "16px",
+          marginBottom: 12,
           color: "#6b7280",
-          fontSize: "14px",
+          fontSize: 13,
         }}
       >
-        Apzla shows you who to follow up and gives you a ready message.
-        Copy it and send with your own phone via SMS or WhatsApp. No SMS
-        cost is handled inside Apzla yet.
+        Choose who to follow up, copy the message, and send via WhatsApp, SMS,
+        or email. You can also send directly from Apzla with SMS credits.
       </p>
 
+      {/* Mode toggle */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: 8,
           flexWrap: "wrap",
-          marginBottom: "16px",
+          marginBottom: 12,
         }}
       >
         <span
           style={{
-            fontSize: "13px",
+            fontSize: 13,
             fontWeight: 500,
             color: "#111827",
           }}
         >
-          Mode
+          Sending mode
         </span>
         {[
-          { value: "FREE", label: "Send with my phone (Free)" },
-          { value: "BULK", label: "Bulk send inside Apzla (Uses credits)" },
+          { value: "FREE", label: "Use my phone (Free)" },
+          { value: "BULK", label: "Bulk SMS (uses credits)" },
         ].map((mode) => {
-          const isActive = sendMode === mode.value;
+          const active = sendMode === mode.value;
           return (
             <button
               key={mode.value}
@@ -246,12 +259,12 @@ function FollowupPage({
               }}
               style={{
                 padding: "6px 10px",
-                borderRadius: "20px",
-                border: isActive ? "1px solid #111827" : "1px solid #d1d5db",
-                background: isActive ? "#111827" : "white",
-                color: isActive ? "white" : "#374151",
+                borderRadius: 999,
+                border: active ? "1px solid #111827" : "1px solid #d1d5db",
+                background: active ? "#111827" : "white",
+                color: active ? "white" : "#374151",
                 cursor: "pointer",
-                fontSize: "12px",
+                fontSize: 12,
                 fontWeight: 500,
               }}
             >
@@ -261,51 +274,58 @@ function FollowupPage({
         })}
       </div>
 
-      {sendMode === "BULK" && (
+      {/* Bulk section (only when BULK is active) */}
+      {isBulkMode && (
         <div
           style={{
-            padding: "10px 12px",
-            borderRadius: "10px",
+            padding: 12,
+            borderRadius: 10,
             border: "1px solid #e5e7eb",
             background: "white",
-            marginBottom: "16px",
+            marginBottom: 12,
           }}
         >
-          <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>
-            Bulk send inside Apzla
-          </div>
-          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
-            Uses church credits. Bulk sends are limited to {bulkLimit} recipients
-            per request.
+          <div
+            style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}
+          >
+            Bulk SMS in Apzla
           </div>
           <div
             style={{
-              display: "flex",
-              gap: "12px",
-              flexWrap: "wrap",
-              marginTop: "8px",
-              fontSize: "12px",
+              fontSize: 12,
+              color: "#6b7280",
+              marginTop: 4,
+            }}
+          >
+            Uses church SMS credits. Up to {bulkLimit} recipients per send.
+          </div>
+
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 12,
               color: "#111827",
               fontWeight: 600,
             }}
           >
-            <span>SMS credits: {smsCredits}</span>
+            SMS credits: {smsCredits}
           </div>
+
           <div
             style={{
-              marginTop: "12px",
-              padding: "10px 12px",
-              borderRadius: "10px",
+              marginTop: 10,
+              padding: 10,
+              borderRadius: 10,
               border: "1px dashed #e5e7eb",
               background: "#f9fafb",
               display: "flex",
               flexDirection: "column",
-              gap: "8px",
+              gap: 8,
             }}
           >
             <div
               style={{
-                fontSize: "12px",
+                fontSize: 12,
                 fontWeight: 600,
                 color: "#111827",
               }}
@@ -315,45 +335,36 @@ function FollowupPage({
             <div
               style={{
                 display: "flex",
-                gap: "8px",
+                gap: 8,
                 flexWrap: "wrap",
                 alignItems: "center",
               }}
             >
-              <label
+              <select
+                value={bundleId}
+                onChange={(e) => setBundleId(e.target.value)}
+                disabled={isLoadingBundles || bundles.length === 0}
                 style={{
-                  fontSize: "12px",
-                  color: "#6b7280",
+                  padding: "6px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #d1d5db",
+                  fontSize: 12,
+                  minWidth: 180,
                 }}
               >
-                Bundle
-                <select
-                  value={bundleId}
-                  onChange={(event) => setBundleId(event.target.value)}
-                  disabled={isLoadingBundles || bundles.length === 0}
-                  style={{
-                    marginLeft: "6px",
-                    padding: "6px 8px",
-                    borderRadius: "6px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "12px",
-                    minWidth: "160px",
-                  }}
-                >
-                  {isLoadingBundles && (
-                    <option value="">Loading bundles...</option>
-                  )}
-                  {!isLoadingBundles && bundles.length === 0 && (
-                    <option value="">No bundles available</option>
-                  )}
-                  {bundles.map((bundle) => (
-                    <option key={bundle.id} value={bundle.id}>
-                      {bundle.name || bundle.label || bundle.id} · {bundle.credits}{" "}
-                      credits · GHS {bundle.priceGhs}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                {isLoadingBundles && (
+                  <option value="">Loading bundles…</option>
+                )}
+                {!isLoadingBundles && bundles.length === 0 && (
+                  <option value="">No bundles available</option>
+                )}
+                {bundles.map((bundle) => (
+                  <option key={bundle.id} value={bundle.id}>
+                    {bundle.name || bundle.label || bundle.id} ·{" "}
+                    {bundle.credits} credits · GHS {bundle.priceGhs}
+                  </option>
+                ))}
+              </select>
               <button
                 onClick={handleBuyCredits}
                 disabled={
@@ -364,25 +375,25 @@ function FollowupPage({
                 }
                 style={{
                   padding: "6px 10px",
-                  borderRadius: "8px",
+                  borderRadius: 8,
                   border: "1px solid #111827",
-                  background: isPaying ? "#111827" : "#111827",
+                  background: "#111827",
                   color: "white",
                   cursor:
                     isPaying || isLoadingBundles || !bundleId
                       ? "default"
                       : "pointer",
-                  fontSize: "12px",
+                  fontSize: 12,
                   fontWeight: 600,
                   opacity:
                     isPaying || isLoadingBundles || !bundleId ? 0.7 : 1,
                 }}
               >
-                {isPaying ? "Starting payment..." : "Buy credits"}
+                {isPaying ? "Starting payment…" : "Buy credits"}
               </button>
             </div>
             {bundleError && (
-              <div style={{ fontSize: "12px", color: "#b91c1c" }}>
+              <div style={{ fontSize: 12, color: "#b91c1c" }}>
                 {bundleError}
               </div>
             )}
@@ -390,19 +401,14 @@ function FollowupPage({
         </div>
       )}
 
-      {/* Pastor name for signature */}
-      <div
-        style={{
-          marginBottom: "16px",
-          maxWidth: "320px",
-        }}
-      >
+      {/* Pastor name */}
+      <div style={{ marginBottom: 12, maxWidth: 320 }}>
         <label
           style={{
             display: "block",
-            fontSize: "12px",
+            fontSize: 12,
             color: "#6b7280",
-            marginBottom: "4px",
+            marginBottom: 4,
           }}
         >
           Pastor / sender name (optional)
@@ -415,45 +421,46 @@ function FollowupPage({
           style={{
             width: "100%",
             padding: "8px 10px",
-            borderRadius: "8px",
+            borderRadius: 8,
             border: "1px solid #d1d5db",
-            fontSize: "14px",
+            fontSize: 14,
           }}
         />
       </div>
 
+      {/* Audience selector */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: 8,
           flexWrap: "wrap",
-          marginBottom: "12px",
+          marginBottom: 10,
         }}
       >
         <span
           style={{
-            fontSize: "13px",
+            fontSize: 13,
             fontWeight: 500,
             color: "#111827",
           }}
         >
-          Choose audience
+          Audience
         </span>
         {["VISITOR", "MEMBER"].map((audience) => {
-          const isActive = followupAudience === audience;
+          const active = followupAudience === audience;
           return (
             <button
               key={audience}
               onClick={() => setFollowupAudience(audience)}
               style={{
                 padding: "6px 10px",
-                borderRadius: "20px",
-                border: isActive ? "1px solid #111827" : "1px solid #d1d5db",
-                background: isActive ? "#111827" : "white",
-                color: isActive ? "white" : "#374151",
+                borderRadius: 999,
+                border: active ? "1px solid #111827" : "1px solid #d1d5db",
+                background: active ? "#111827" : "white",
+                color: active ? "white" : "#374151",
                 cursor: "pointer",
-                fontSize: "12px",
+                fontSize: 12,
                 fontWeight: 500,
               }}
             >
@@ -463,56 +470,35 @@ function FollowupPage({
         })}
       </div>
 
-      {/* Audience list */}
-      <div style={{ marginBottom: "20px" }}>
+      {/* Member list + bulk send button */}
+      <div style={{ marginBottom: 16 }}>
         <h2
           style={{
-            fontSize: "16px",
+            fontSize: 15,
             fontWeight: 500,
-            marginBottom: "6px",
+            marginBottom: 4,
           }}
         >
           {isVisitorAudience
-            ? "Visitors in your members list"
+            ? "People you can follow up"
             : "Members you can message"}
         </h2>
-        <p
-          style={{
-            marginBottom: "8px",
-            color: "#6b7280",
-            fontSize: "13px",
-          }}
-        >
-          {isVisitorAudience ? (
-            <>
-              These are members with status <strong>VISITOR</strong>. Later,
-              you can add per-service attendance so this shows
-              <em> “visitors this Sunday.”</em>
-            </>
-          ) : (
-            <>Send a quick note of appreciation or care to any member.</>
-          )}
-        </p>
 
         {membersLoading ? (
-          <p style={{ fontSize: "14px", color: "#6b7280" }}>
-            Loading members…
-          </p>
+          <p style={{ fontSize: 13, color: "#6b7280" }}>Loading…</p>
         ) : followupTargets.length === 0 ? (
-          <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-            {isVisitorAudience
-              ? "No visitors found yet. Add members with status “Visitor” in the Members tab."
-              : "No members found yet. Add members in the Members tab to start messaging."}
+          <p style={{ fontSize: 13, color: "#9ca3af" }}>
+            Add members in the Members tab to start messaging.
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            {sendMode === "BULK" && (
+            {isBulkMode && (
               <div
                 style={{
                   display: "flex",
-                  gap: "8px",
+                  gap: 8,
                   flexWrap: "wrap",
-                  marginBottom: "10px",
+                  marginBottom: 8,
                 }}
               >
                 <button
@@ -520,23 +506,24 @@ function FollowupPage({
                   disabled={sendingChannel !== null}
                   style={{
                     padding: "6px 10px",
-                    borderRadius: "8px",
+                    borderRadius: 8,
                     border: "1px solid #6b7280",
                     background:
                       sendingChannel !== null ? "#f3f4f6" : "white",
                     color: "#111827",
-                    cursor: sendingChannel !== null ? "default" : "pointer",
-                    fontSize: "12px",
+                    cursor:
+                      sendingChannel !== null ? "default" : "pointer",
+                    fontSize: 12,
                     fontWeight: 600,
                   }}
                 >
                   {sendingChannel === "sms"
-                    ? "Sending SMS..."
+                    ? "Sending SMS…"
                     : "Send SMS to selected"}
                 </button>
                 <span
                   style={{
-                    fontSize: "12px",
+                    fontSize: 12,
                     color: "#6b7280",
                     alignSelf: "center",
                   }}
@@ -545,11 +532,12 @@ function FollowupPage({
                 </span>
               </div>
             )}
+
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                fontSize: "13px",
+                fontSize: 13,
               }}
             >
               <thead>
@@ -559,8 +547,8 @@ function FollowupPage({
                     borderBottom: "1px solid #e5e7eb",
                   }}
                 >
-                  {sendMode === "BULK" && (
-                    <th style={{ padding: "6px 4px", width: "32px" }}>
+                  {isBulkMode && (
+                    <th style={{ padding: "6px 4px", width: 32 }}>
                       <input
                         type="checkbox"
                         checked={
@@ -574,8 +562,7 @@ function FollowupPage({
                   )}
                   <th style={{ padding: "6px 4px" }}>Name</th>
                   <th style={{ padding: "6px 4px" }}>Phone</th>
-                  <th style={{ padding: "6px 4px" }}>Email</th>
-                  <th style={{ padding: "6px 4px" }}>Message options</th>
+                  <th style={{ padding: "6px 4px" }}>Message</th>
                 </tr>
               </thead>
               <tbody>
@@ -584,11 +571,9 @@ function FollowupPage({
                   const whatsappLink = phoneForLink
                     ? `https://wa.me/${phoneForLink}?text=${followupTemplateEncoded}`
                     : `https://wa.me/?text=${followupTemplateEncoded}`;
-                  const telegramLink = `https://t.me/share/url?text=${followupTemplateEncoded}`;
                   const smsLink = phoneForLink
                     ? `sms:${phoneForLink}?body=${followupTemplateEncoded}`
                     : `sms:?body=${followupTemplateEncoded}`;
-                  const emailLink = `mailto:${m.email || ""}?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
 
                   return (
                     <tr
@@ -597,7 +582,7 @@ function FollowupPage({
                         borderBottom: "1px solid #f3f4f6",
                       }}
                     >
-                      {sendMode === "BULK" && (
+                      {isBulkMode && (
                         <td style={{ padding: "6px 4px" }}>
                           <input
                             type="checkbox"
@@ -610,13 +595,14 @@ function FollowupPage({
                       <td style={{ padding: "6px 4px" }}>
                         {m.firstName} {m.lastName}
                       </td>
-                      <td style={{ padding: "6px 4px" }}>{m.phone || "-"}</td>
-                      <td style={{ padding: "6px 4px" }}>{m.email || "-"}</td>
+                      <td style={{ padding: "6px 4px" }}>
+                        {m.phone || "-"}
+                      </td>
                       <td style={{ padding: "6px 4px" }}>
                         <div
                           style={{
                             display: "flex",
-                            gap: "6px",
+                            gap: 6,
                             flexWrap: "wrap",
                           }}
                         >
@@ -625,60 +611,30 @@ function FollowupPage({
                             target="_blank"
                             rel="noreferrer"
                             style={{
-                              padding: "6px 10px",
-                              borderRadius: "6px",
+                              padding: "4px 8px",
+                              borderRadius: 6,
                               border: "1px solid #22c55e",
                               background: "#ecfdf3",
                               color: "#15803d",
-                              fontSize: "12px",
+                              fontSize: 12,
                               textDecoration: "none",
                             }}
                           >
                             WhatsApp
                           </a>
                           <a
-                            href={telegramLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: "6px",
-                              border: "1px solid #0ea5e9",
-                              background: "#e0f2fe",
-                              color: "#0369a1",
-                              fontSize: "12px",
-                              textDecoration: "none",
-                            }}
-                          >
-                            Telegram
-                          </a>
-                          <a
                             href={smsLink}
                             style={{
-                              padding: "6px 10px",
-                              borderRadius: "6px",
+                              padding: "4px 8px",
+                              borderRadius: 6,
                               border: "1px solid #6b7280",
                               background: "#f3f4f6",
                               color: "#111827",
-                              fontSize: "12px",
+                              fontSize: 12,
                               textDecoration: "none",
                             }}
                           >
                             SMS
-                          </a>
-                          <a
-                            href={emailLink}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: "6px",
-                              border: "1px solid #6366f1",
-                              background: "#eef2ff",
-                              color: "#4338ca",
-                              fontSize: "12px",
-                              textDecoration: "none",
-                            }}
-                          >
-                            Email
                           </a>
                         </div>
                       </td>
@@ -691,13 +647,13 @@ function FollowupPage({
         )}
       </div>
 
-      {/* Template area */}
+      {/* Template + share */}
       <div
         style={{
-          borderRadius: "12px",
+          borderRadius: 12,
           border: "1px solid #e5e7eb",
-          padding: "12px 14px",
-          maxWidth: "520px",
+          padding: 12,
+          maxWidth: 520,
           background: "#f9fafb",
         }}
       >
@@ -705,27 +661,27 @@ function FollowupPage({
           style={{
             display: "flex",
             justifyContent: "space-between",
-            gap: "8px",
+            gap: 8,
             alignItems: "center",
-            marginBottom: "8px",
+            marginBottom: 8,
           }}
         >
           <div
             style={{
-              fontSize: "13px",
+              fontSize: 13,
               fontWeight: 500,
               color: "#111827",
             }}
           >
             {isVisitorAudience
-              ? "Visitor thank-you message"
+              ? "Visitor follow-up message"
               : "Member check-in message"}
           </div>
           <button
             onClick={() => {
               if (!navigator.clipboard) {
                 showToast(
-                  "Clipboard not available. You can select and copy the text manually.",
+                  "Clipboard not available. Please copy the text manually.",
                   "error"
                 );
                 return;
@@ -734,25 +690,25 @@ function FollowupPage({
                 .writeText(followupTemplate)
                 .then(() =>
                   showToast(
-                    "Message copied. Paste it into WhatsApp or your SMS app.",
+                    "Message copied. Paste it in WhatsApp or your SMS app.",
                     "success"
                   )
                 )
                 .catch(() =>
                   showToast(
-                    "Could not copy automatically. Please select and copy the text.",
+                    "Could not copy automatically. Please select and copy.",
                     "error"
                   )
                 );
             }}
             style={{
               padding: "6px 10px",
-              borderRadius: "999px",
+              borderRadius: 999,
               border: "none",
               background: "#111827",
               color: "white",
               cursor: "pointer",
-              fontSize: "12px",
+              fontSize: 12,
               fontWeight: 500,
             }}
           >
@@ -767,67 +723,49 @@ function FollowupPage({
           style={{
             width: "100%",
             padding: "8px 10px",
-            borderRadius: "8px",
+            borderRadius: 8,
             border: "1px solid #d1d5db",
-            fontSize: "13px",
+            fontSize: 13,
             resize: "vertical",
             background: "white",
           }}
         />
         <p
           style={{
-            marginTop: "6px",
-            fontSize: "12px",
+            marginTop: 6,
+            fontSize: 12,
             color: "#6b7280",
           }}
         >
-          {isVisitorAudience
-            ? "Tip: You can also export phone numbers from the Members tab and use this text in any bulk SMS or WhatsApp broadcast tool."
-            : "Tip: Export phone numbers from the Members tab to send this to your whole congregation via bulk SMS or WhatsApp."}
+          Tip: You can export phone numbers from the Members tab and use this
+          text in any bulk SMS or WhatsApp tool.
         </p>
 
         <div
           style={{
-            marginTop: "10px",
-            padding: "10px 12px",
+            marginTop: 10,
+            padding: 10,
             border: "1px solid #e5e7eb",
-            borderRadius: "10px",
+            borderRadius: 10,
             background: "white",
             display: "flex",
             flexDirection: "column",
-            gap: "8px",
+            gap: 8,
           }}
         >
-          <div
+          <span
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              flexWrap: "wrap",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#111827",
             }}
           >
-            <span
-              style={{
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#111827",
-              }}
-            >
-              Share this message
-            </span>
-            <span
-              style={{
-                fontSize: "12px",
-                color: "#6b7280",
-              }}
-            >
-              Send it to yourself or your team chat.
-            </span>
-          </div>
+            Send to yourself / your team
+          </span>
           <div
             style={{
               display: "flex",
-              gap: "8px",
+              gap: 8,
               flexWrap: "wrap",
             }}
           >
@@ -837,16 +775,16 @@ function FollowupPage({
               rel="noreferrer"
               style={{
                 padding: "8px 12px",
-                borderRadius: "8px",
+                borderRadius: 8,
                 border: "1px solid #22c55e",
                 background: "#ecfdf3",
                 color: "#15803d",
-                fontSize: "12px",
+                fontSize: 12,
                 fontWeight: 600,
                 textDecoration: "none",
               }}
             >
-              WhatsApp message
+              WhatsApp
             </a>
             <a
               href={followupTelegramLink}
@@ -854,11 +792,11 @@ function FollowupPage({
               rel="noreferrer"
               style={{
                 padding: "8px 12px",
-                borderRadius: "8px",
+                borderRadius: 8,
                 border: "1px solid #0ea5e9",
                 background: "#e0f2fe",
                 color: "#0369a1",
-                fontSize: "12px",
+                fontSize: 12,
                 fontWeight: 600,
                 textDecoration: "none",
               }}
@@ -869,11 +807,11 @@ function FollowupPage({
               href={followupEmailLink}
               style={{
                 padding: "8px 12px",
-                borderRadius: "8px",
+                borderRadius: 8,
                 border: "1px solid #6366f1",
                 background: "#eef2ff",
                 color: "#4338ca",
-                fontSize: "12px",
+                fontSize: 12,
                 fontWeight: 600,
                 textDecoration: "none",
               }}
