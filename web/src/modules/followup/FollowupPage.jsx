@@ -150,8 +150,7 @@ function FollowupPage({
       try {
         setIsLoadingBundles(true);
         setBundleError("");
-        const token = await user.getIdToken();
-        const bundleList = await fetchBundles({ token });
+        const bundleList = await fetchBundles();
         if (!isActive) return;
 
         setBundles(bundleList);
