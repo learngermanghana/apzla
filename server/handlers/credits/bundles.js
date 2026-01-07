@@ -16,7 +16,7 @@ async function handler(request, response) {
     })
   }
 
-  const channel = normalizeChannel(request.query?.channel)
+  const channel = normalizeChannel(request.query?.channel || 'sms')
   if (!channel) {
     return response.status(400).json({
       status: 'error',

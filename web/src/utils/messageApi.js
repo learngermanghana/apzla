@@ -41,12 +41,16 @@ const postJson = async ({ endpoint, payload, token }) => {
 }
 
 const getJson = async ({ endpoint, token }) => {
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
   const response = await fetch(endpoint, {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
   })
 
   let data = null
@@ -85,10 +89,9 @@ export const startTopup = async ({ churchId, channel, bundleId, token }) => {
   window.location.assign(url)
 }
 
-export const fetchBundles = async ({ channel = 'sms', token }) => {
+export const fetchBundles = async ({ channel = 'sms' } = {}) => {
   const data = await getJson({
     endpoint: `/api/credits/bundles?channel=${encodeURIComponent(channel)}`,
-    token,
   })
 
   return Array.isArray(data?.data?.bundles) ? data.data.bundles : []
