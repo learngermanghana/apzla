@@ -9,6 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
+  onSnapshot,
   query,
   limit,
   orderBy,
@@ -452,19 +453,18 @@ function AppContent() {
   }, [userProfile?.churchId, defaultBaseUrl, normalizeBaseUrlMemo]);
 
   useEffect(() => {
-    const fetchChurchPlan = async () => {
-      if (!userProfile?.churchId) {
-        setChurchPlan(null);
-        setSubscriptionInfo(null);
-        syncOnlineGivingState(null);
-        return;
-      }
+    if (!userProfile?.churchId) {
+      setChurchPlan(null);
+      setSubscriptionInfo(null);
+      syncOnlineGivingState(null);
+      return undefined;
+    }
 
-      setPlanLoading(true);
-
-      try {
-        const snapshot = await getDoc(doc(db, "churches", userProfile.churchId));
-
+    setPlanLoading(true);
+    const churchRef = doc(db, "churches", userProfile.churchId);
+    const unsubscribe = onSnapshot(
+      churchRef,
+      (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           setChurchPlan({ id: snapshot.id, ...data });
@@ -485,15 +485,16 @@ function AppContent() {
           setSubscriptionInfo(null);
           syncOnlineGivingState(null);
         }
-      } catch (error) {
+        setPlanLoading(false);
+      },
+      (error) => {
         console.error("Load church plan error:", error);
         showToast("Unable to load subscription status.", "error");
-      } finally {
         setPlanLoading(false);
       }
-    };
+    );
 
-    fetchChurchPlan();
+    return () => unsubscribe();
   }, [userProfile?.churchId]);
 
   // ---------- Auth handlers ----------
