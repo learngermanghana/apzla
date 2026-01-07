@@ -195,13 +195,24 @@ function FollowupPage({
 
     try {
       setIsPaying(true);
+      const paymentWindow = window.open("", "_blank", "noopener,noreferrer");
       const token = await user.getIdToken();
-      await startTopup({
+      const authorizationUrl = await startTopup({
         churchId,
         channel: "sms",
         bundleId,
         token,
       });
+      if (paymentWindow && !paymentWindow.closed) {
+        paymentWindow.location.assign(authorizationUrl);
+        paymentWindow.focus?.();
+      } else {
+        showToast(
+          "Popup blocked. Redirecting this tab to the payment page.",
+          "info"
+        );
+        window.location.assign(authorizationUrl);
+      }
     } catch (error) {
       showToast(error.message || "Could not start top-up.", "error");
     } finally {

@@ -86,7 +86,8 @@ export const startTopup = async ({ churchId, channel, bundleId, token }) => {
   if (!url) {
     throw new Error('Paystack did not return a payment link.')
   }
-  window.location.assign(url)
+
+  return url
 }
 
 export const fetchBundles = async ({ channel = 'sms' } = {}) => {
