@@ -3,6 +3,11 @@ const { verifyTransaction, verifySignature, getRawBody } = require('../../lib/pa
 
 const readRawBody = (request) =>
   new Promise((resolve, reject) => {
+    if (request.rawBody) {
+      resolve(request.rawBody)
+      return
+    }
+
     const existingBody = getRawBody(request)
     if (existingBody) {
       resolve(existingBody)
@@ -41,6 +46,7 @@ async function handler(request, response) {
 
   const signature = request.headers['x-paystack-signature']
   const rawBody = await readRawBody(request)
+  const rawBodyText = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody
 
   if (!verifySignature({ signature, rawBody })) {
     return response.status(400).json({
@@ -52,7 +58,7 @@ async function handler(request, response) {
   let payload = request.body
   if (!payload) {
     try {
-      payload = JSON.parse(rawBody)
+      payload = JSON.parse(rawBodyText)
     } catch (error) {
       return response.status(400).json({
         status: 'error',
