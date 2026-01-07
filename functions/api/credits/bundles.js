@@ -1,5 +1,4 @@
 const { initError } = require('../../lib/firestoreAdmin')
-const verifyUser = require('../../lib/verifyUser')
 const { listBundles, normalizeChannel } = require('../../lib/messagingBundles')
 
 async function handler(request, response) {
@@ -22,14 +21,6 @@ async function handler(request, response) {
     return response.status(400).json({
       status: 'error',
       message: 'channel must be either sms or whatsapp.',
-    })
-  }
-
-  const authResult = await verifyUser(request)
-  if (authResult.error) {
-    return response.status(authResult.error.code).json({
-      status: 'error',
-      message: authResult.error.message,
     })
   }
 
