@@ -49,10 +49,14 @@ const getJson = async ({ endpoint, token }) => {
     },
   })
 
-  const data = await response.json().catch(() => ({}))
+  let data = null
+  try {
+    data = await response.json()
+  } catch (_) {}
 
   if (!response.ok) {
-    throw new Error(data?.message || 'Request failed.')
+    const message = data?.error || data?.message || `Request failed (${response.status})`
+    throw new Error(message)
   }
 
   return data
