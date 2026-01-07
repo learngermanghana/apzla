@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
+const PAYSTACK_CALLBACK_URL = process.env.PAYSTACK_CALLBACK_URL || 'https://www.apzla.com/'
 
 const requirePaystackKey = () => {
   if (!PAYSTACK_SECRET_KEY) {
@@ -18,6 +19,7 @@ const initializeTransaction = async ({ email, amount, metadata }) => {
     amount,
     currency: 'GHS',
     metadata,
+    callback_url: PAYSTACK_CALLBACK_URL,
   }
 
   const response = await fetch('https://api.paystack.co/transaction/initialize', {
