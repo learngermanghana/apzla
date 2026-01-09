@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  confirmTopup,
   fetchBundles,
   sendBulkSms,
   startTopup,
 } from "../../utils/messageApi";
+
+const TOPUP_REFERENCE_KEY = "apzla:lastTopupReference";
 
 function FollowupPage({
   followupPastorName,
@@ -32,8 +35,13 @@ function FollowupPage({
   const [bundleId, setBundleId] = useState("");
   const [bundles, setBundles] = useState([]);
   const [isPaying, setIsPaying] = useState(false);
+  const [isConfirmingTopup, setIsConfirmingTopup] = useState(false);
   const [isLoadingBundles, setIsLoadingBundles] = useState(false);
   const [bundleError, setBundleError] = useState("");
+  const [pendingTopupRef, setPendingTopupRef] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(TOPUP_REFERENCE_KEY) || "";
+  });
   const bulkLimit = 50;
 
   // --- Derived data ----------------------------------------------------------
@@ -197,12 +205,16 @@ function FollowupPage({
       setIsPaying(true);
       const paymentWindow = window.open("", "_blank", "noopener,noreferrer");
       const token = await user.getIdToken();
-      const authorizationUrl = await startTopup({
+      const { authorizationUrl, reference } = await startTopup({
         churchId,
         channel: "sms",
         bundleId,
         token,
       });
+      if (reference) {
+        window.localStorage.setItem(TOPUP_REFERENCE_KEY, reference);
+        setPendingTopupRef(reference);
+      }
       if (paymentWindow && !paymentWindow.closed) {
         paymentWindow.location.assign(authorizationUrl);
         paymentWindow.focus?.();
@@ -219,6 +231,50 @@ function FollowupPage({
       setIsPaying(false);
     }
   };
+
+  const confirmPendingTopup = async ({ reference, quiet } = {}) => {
+    if (!reference || isConfirmingTopup || !user || !churchId) return;
+
+    try {
+      setIsConfirmingTopup(true);
+      const token = await user.getIdToken();
+      const result = await confirmTopup({ churchId, reference, token });
+      if (result?.status === "success") {
+        window.localStorage.removeItem(TOPUP_REFERENCE_KEY);
+        setPendingTopupRef("");
+        showToast("SMS credits updated.", "success");
+      } else if (!quiet) {
+        showToast("Payment is still processing.", "info");
+      }
+    } catch (error) {
+      if (!quiet) {
+        showToast(error.message || "Unable to confirm payment yet.", "error");
+      }
+    } finally {
+      setIsConfirmingTopup(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!pendingTopupRef || !user || !churchId) return;
+
+    const handleFocus = () => {
+      confirmPendingTopup({ reference: pendingTopupRef, quiet: true });
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    const timer = setTimeout(() => {
+      confirmPendingTopup({ reference: pendingTopupRef, quiet: true });
+    }, 1500);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+      clearTimeout(timer);
+    };
+  }, [pendingTopupRef, user, churchId]);
 
   // --- Render ---------------------------------------------------------------
 
