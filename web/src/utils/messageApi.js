@@ -87,8 +87,18 @@ export const startTopup = async ({ churchId, channel, bundleId, token }) => {
     throw new Error('Paystack did not return a payment link.')
   }
 
-  return url
+  return {
+    authorizationUrl: url,
+    reference: data?.data?.reference || null,
+  }
 }
+
+export const confirmTopup = async ({ churchId, reference, token }) =>
+  postJson({
+    endpoint: '/api/credits/confirm-topup',
+    payload: { churchId, reference },
+    token,
+  })
 
 export const fetchBundles = async ({ channel = 'sms' } = {}) => {
   const data = await getJson({

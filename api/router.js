@@ -5,6 +5,7 @@ const { URL } = require('url')
 
 const creditsBundles = require('../server/handlers/credits/bundles')
 const creditsTopupInit = require('../server/handlers/credits/topup-init')
+const creditsConfirmTopup = require('../server/handlers/credits/confirm-topup')
 const paystackWebhook = require('../server/handlers/credits/paystack-webhook')
 
 const sendBulkSms = require('../server/handlers/messages/send-bulk-sms')
@@ -97,6 +98,7 @@ module.exports = async function handler(req, res) {
 
   if (path === 'credits/bundles') return creditsBundles(req, res)
   if (path === 'credits/topup-init') return creditsTopupInit(req, res)
+  if (path === 'credits/confirm-topup') return creditsConfirmTopup(req, res)
 
   if (path === 'messages/send-bulk-sms') return sendBulkSms(req, res)
 
