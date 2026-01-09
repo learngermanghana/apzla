@@ -628,7 +628,9 @@ function FollowupPage({
                   )}
                   <th style={{ padding: "6px 4px" }}>Name</th>
                   <th style={{ padding: "6px 4px" }}>Phone</th>
-                  <th style={{ padding: "6px 4px" }}>Message</th>
+                  <th style={{ padding: "6px 4px" }}>
+                    {isBulkMode ? "Bulk only" : "Message"}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -665,44 +667,50 @@ function FollowupPage({
                         {m.phone || "-"}
                       </td>
                       <td style={{ padding: "6px 4px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <a
-                            href={whatsappLink}
-                            target="_blank"
-                            rel="noreferrer"
+                        {isBulkMode ? (
+                          <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                            Use bulk send above
+                          </span>
+                        ) : (
+                          <div
                             style={{
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              border: "1px solid #22c55e",
-                              background: "#ecfdf3",
-                              color: "#15803d",
-                              fontSize: 12,
-                              textDecoration: "none",
+                              display: "flex",
+                              gap: 6,
+                              flexWrap: "wrap",
                             }}
                           >
-                            WhatsApp
-                          </a>
-                          <a
-                            href={smsLink}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              border: "1px solid #6b7280",
-                              background: "#f3f4f6",
-                              color: "#111827",
-                              fontSize: 12,
-                              textDecoration: "none",
-                            }}
-                          >
-                            SMS
-                          </a>
-                        </div>
+                            <a
+                              href={whatsappLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 6,
+                                border: "1px solid #22c55e",
+                                background: "#ecfdf3",
+                                color: "#15803d",
+                                fontSize: 12,
+                                textDecoration: "none",
+                              }}
+                            >
+                              WhatsApp
+                            </a>
+                            <a
+                              href={smsLink}
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 6,
+                                border: "1px solid #6b7280",
+                                background: "#f3f4f6",
+                                color: "#111827",
+                                fontSize: 12,
+                                textDecoration: "none",
+                              }}
+                            >
+                              SMS
+                            </a>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
