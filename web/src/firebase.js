@@ -38,8 +38,55 @@ const firebaseConfig = isFirebaseConfigured
     }
   : null;
 
+const HEARTBEAT_DATABASE = "firebase-heartbeat-database";
+const HEARTBEAT_STORE = "firebase-heartbeat-store";
+
+const openHeartbeatDatabase = () =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.open(HEARTBEAT_DATABASE);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+const deleteHeartbeatDatabase = () =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(HEARTBEAT_DATABASE);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => resolve();
+  });
+
+const ensureHeartbeatStore = async () => {
+  if (typeof indexedDB === "undefined") return;
+
+  if (typeof indexedDB.databases === "function") {
+    const databases = await indexedDB.databases();
+    const hasHeartbeatDb = databases.some((db) => db.name === HEARTBEAT_DATABASE);
+    if (!hasHeartbeatDb) return;
+  }
+
+  try {
+    const db = await openHeartbeatDatabase();
+    const hasStore = db.objectStoreNames.contains(HEARTBEAT_STORE);
+    db.close();
+
+    if (!hasStore) {
+      await deleteHeartbeatDatabase();
+    }
+  } catch (error) {
+    // Ignore cleanup errors and allow Firebase to continue initialization.
+  }
+};
+
+const initializeFirebaseApp = async () => {
+  await ensureHeartbeatStore();
+  return initializeApp(firebaseConfig);
+};
+
 // Initialize Firebase
-const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
+const app = firebaseConfig ? await initializeFirebaseApp() : null;
 
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
