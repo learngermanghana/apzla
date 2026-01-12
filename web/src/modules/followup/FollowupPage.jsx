@@ -17,9 +17,9 @@ function FollowupPage({
   membersLoading,
   followupTargets,
   formatPhoneForLink,
-  followupTemplateEncoded,
-  followupEmailSubject,
-  followupTemplate,
+  followupMessage,
+  followupMessageEncoded,
+  onFollowupMessageChange,
   followupWhatsappLink,
   followupTelegramLink,
   followupEmailLink,
@@ -128,7 +128,7 @@ function FollowupPage({
       const token = await user.getIdToken();
       await sendBulkSms({
         churchId,
-        message: followupTemplate,
+        message: followupMessage,
         recipients: selectedPhones,
         token,
       });
@@ -637,11 +637,11 @@ function FollowupPage({
                 {followupTargets.map((m) => {
                   const phoneForLink = formatPhoneForLink(m.phone);
                   const whatsappLink = phoneForLink
-                    ? `https://wa.me/${phoneForLink}?text=${followupTemplateEncoded}`
-                    : `https://wa.me/?text=${followupTemplateEncoded}`;
+                    ? `https://wa.me/${phoneForLink}?text=${followupMessageEncoded}`
+                    : `https://wa.me/?text=${followupMessageEncoded}`;
                   const smsLink = phoneForLink
-                    ? `sms:${phoneForLink}?body=${followupTemplateEncoded}`
-                    : `sms:?body=${followupTemplateEncoded}`;
+                    ? `sms:${phoneForLink}?body=${followupMessageEncoded}`
+                    : `sms:?body=${followupMessageEncoded}`;
 
                   return (
                     <tr
@@ -761,7 +761,7 @@ function FollowupPage({
                 return;
               }
               navigator.clipboard
-                .writeText(followupTemplate)
+                .writeText(followupMessage)
                 .then(() =>
                   showToast(
                     "Message copied. Paste it in WhatsApp or your SMS app.",
@@ -791,8 +791,8 @@ function FollowupPage({
         </div>
 
         <textarea
-          readOnly
-          value={followupTemplate}
+          value={followupMessage}
+          onChange={(event) => onFollowupMessageChange(event.target.value)}
           rows={3}
           style={{
             width: "100%",
