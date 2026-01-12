@@ -367,6 +367,8 @@ function AppContent() {
   // Follow-up
   const [followupAudience, setFollowupAudience] = useState("VISITOR");
   const [followupPastorName, setFollowupPastorName] = useState("");
+  const [followupMessage, setFollowupMessage] = useState("");
+  const [isFollowupMessageCustom, setIsFollowupMessageCustom] = useState(false);
 
   const showToast = (message, variant = "info") => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
@@ -3038,7 +3040,14 @@ function AppContent() {
 
   const followupTemplate =
     followupAudience === "VISITOR" ? visitorTemplate : memberTemplate;
-  const followupTemplateEncoded = encodeURIComponent(followupTemplate);
+
+  useEffect(() => {
+    if (!isFollowupMessageCustom) {
+      setFollowupMessage(followupTemplate);
+    }
+  }, [followupTemplate, isFollowupMessageCustom]);
+
+  const followupMessageEncoded = encodeURIComponent(followupMessage);
   const visitorEmailSubject = encodeURIComponent("Thank you for worshipping with us");
   const memberEmailSubject = encodeURIComponent(
     `Hello from ${userProfile.churchName || "our church"}`
@@ -3047,11 +3056,16 @@ function AppContent() {
     followupAudience === "VISITOR"
       ? visitorEmailSubject
       : memberEmailSubject;
-  const followupWhatsappLink = `https://wa.me/?text=${followupTemplateEncoded}`;
-  const followupTelegramLink = `https://t.me/share/url?text=${followupTemplateEncoded}`;
-  const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupTemplateEncoded}`;
+  const followupWhatsappLink = `https://wa.me/?text=${followupMessageEncoded}`;
+  const followupTelegramLink = `https://t.me/share/url?text=${followupMessageEncoded}`;
+  const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupMessageEncoded}`;
   const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
   const normalizePhone = (value = "") => value.replace(/\D/g, "");
+
+  const handleFollowupMessageChange = (value) => {
+    setFollowupMessage(value);
+    setIsFollowupMessageCustom(true);
+  };
 
   const visitorMembers = members.filter(
     (m) => (m.status || "").toUpperCase() === "VISITOR"
@@ -6946,9 +6960,9 @@ function AppContent() {
             membersLoading={membersLoading}
             followupTargets={followupTargets}
             formatPhoneForLink={formatPhoneForLink}
-            followupTemplateEncoded={followupTemplateEncoded}
-            followupEmailSubject={followupEmailSubject}
-            followupTemplate={followupTemplate}
+            followupMessage={followupMessage}
+            followupMessageEncoded={followupMessageEncoded}
+            onFollowupMessageChange={handleFollowupMessageChange}
             followupWhatsappLink={followupWhatsappLink}
             followupTelegramLink={followupTelegramLink}
             followupEmailLink={followupEmailLink}
