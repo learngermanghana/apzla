@@ -64,7 +64,10 @@ function FollowupPage({
   );
 
   const selectedPhones = useMemo(
-    () => selectedMembers.map((member) => member.phone).filter(Boolean),
+    () =>
+      selectedMembers
+        .map((member) => (member.phone || "").trim())
+        .filter((phone) => phone.length > 0),
     [selectedMembers]
   );
 
