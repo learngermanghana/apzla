@@ -6,6 +6,7 @@ const { normalizePhone } = require('../../lib/phone')
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET
 const HUBTEL_SENDER_ID = process.env.HUBTEL_SENDER_ID
+const HUBTEL_API_URL = process.env.HUBTEL_API_URL
 
 const MAX_RECIPIENTS = 50
 
@@ -100,22 +101,35 @@ const createMessageBatchAndReserve = async ({
 }
 
 const sendHubtelMessage = async ({ to, body }) => {
-  const auth = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64')
-  const response = await fetch(
-    'https://sms.hubtel.com/v1/messages/send',
-    {
+  const payload = {
+    From: HUBTEL_SENDER_ID,
+    To: to,
+    Content: body,
+  }
+
+  let response
+  if (HUBTEL_API_URL) {
+    const url = new URL(HUBTEL_API_URL)
+    url.searchParams.set('clientid', HUBTEL_CLIENT_ID)
+    url.searchParams.set('clientsecret', HUBTEL_CLIENT_SECRET)
+    url.searchParams.set('from', HUBTEL_SENDER_ID)
+    url.searchParams.set('to', to)
+    url.searchParams.set('content', body)
+
+    response = await fetch(url.toString(), {
+      method: 'GET',
+    })
+  } else {
+    const auth = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64')
+    response = await fetch('https://sms.hubtel.com/v1/messages/send', {
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        From: HUBTEL_SENDER_ID,
-        To: to,
-        Content: body,
-      }),
-    }
-  )
+      body: JSON.stringify(payload),
+    })
+  }
 
   const data = await response.json().catch(() => ({}))
 
