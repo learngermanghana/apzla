@@ -126,13 +126,31 @@ function FollowupPage({
     try {
       setSendingChannel("sms");
       const token = await user.getIdToken();
-      await sendBulkSms({
+      const result = await sendBulkSms({
         churchId,
         message: followupMessage,
         recipients: selectedPhones,
         token,
       });
-      showToast("Bulk SMS sent.", "success");
+      const sentCount = Number(result?.data?.sent ?? 0);
+      const failedCount = Number(result?.data?.failed ?? 0);
+      let toastVariant = "success";
+      let toastMessage = result?.message || "Bulk SMS sent.";
+
+      if (sentCount === 0) {
+        toastVariant = "error";
+        toastMessage =
+          result?.message || "Bulk SMS failed to send. Please try again.";
+      } else if (failedCount > 0) {
+        toastVariant = "warning";
+        toastMessage =
+          result?.message ||
+          `Bulk SMS sent to ${sentCount} recipient${
+            sentCount === 1 ? "" : "s"
+          } with ${failedCount} failure${failedCount === 1 ? "" : "s"}.`;
+      }
+
+      showToast(toastMessage, toastVariant);
       setSelectedRecipients([]);
     } catch (error) {
       showToast(error.message || "Unable to send bulk message.", "error");
