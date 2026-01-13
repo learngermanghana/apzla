@@ -370,6 +370,27 @@ function AppContent() {
   const [followupMessage, setFollowupMessage] = useState("");
   const [isFollowupMessageCustom, setIsFollowupMessageCustom] = useState(false);
 
+  const visitorTemplate = `Hi, thank you for worshipping with us at ${
+    userProfile?.churchName || "our church"
+  } today. We’re glad you came. God bless you!${
+    followupPastorName ? ` – ${followupPastorName}` : ""
+  }`;
+
+  const memberTemplate = `Hi from ${
+    userProfile?.churchName || "our church"
+  }. We appreciate you as part of our church family and are praying you’re well.${
+    followupPastorName ? ` – ${followupPastorName}` : ""
+  }`;
+
+  const followupTemplate =
+    followupAudience === "VISITOR" ? visitorTemplate : memberTemplate;
+
+  useEffect(() => {
+    if (!isFollowupMessageCustom) {
+      setFollowupMessage(followupTemplate);
+    }
+  }, [followupTemplate, isFollowupMessageCustom]);
+
   const showToast = (message, variant = "info") => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
     setToasts((prev) => [...prev, { id, message, variant }]);
@@ -3024,28 +3045,6 @@ function AppContent() {
       (value || "").toLowerCase().includes(normalizedSermonSearch)
     );
   });
-
-  // Follow-up templates
-  const visitorTemplate = `Hi, thank you for worshipping with us at ${
-    userProfile.churchName || "our church"
-  } today. We’re glad you came. God bless you!${
-    followupPastorName ? ` – ${followupPastorName}` : ""
-  }`;
-
-  const memberTemplate = `Hi from ${
-    userProfile.churchName || "our church"
-  }. We appreciate you as part of our church family and are praying you’re well.${
-    followupPastorName ? ` – ${followupPastorName}` : ""
-  }`;
-
-  const followupTemplate =
-    followupAudience === "VISITOR" ? visitorTemplate : memberTemplate;
-
-  useEffect(() => {
-    if (!isFollowupMessageCustom) {
-      setFollowupMessage(followupTemplate);
-    }
-  }, [followupTemplate, isFollowupMessageCustom]);
 
   const followupMessageEncoded = encodeURIComponent(followupMessage);
   const visitorEmailSubject = encodeURIComponent("Thank you for worshipping with us");
