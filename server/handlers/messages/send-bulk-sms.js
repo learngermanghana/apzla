@@ -326,15 +326,26 @@ async function handler(request, response) {
       }
     })
 
+    let responseStatus = 'success'
+    let responseMessage = 'Bulk SMS sent.'
+
+    if (sentCount === 0) {
+      responseStatus = 'error'
+      responseMessage = 'Bulk SMS failed to send.'
+    } else if (failedCount > 0) {
+      responseStatus = 'partial'
+      responseMessage = `Bulk SMS sent with ${failedCount} failure${failedCount === 1 ? '' : 's'}.`
+    }
+
     return response.status(200).json({
-      status: 'success',
+      status: responseStatus,
       data: {
         batchId: batchRef.id,
         sent: sentCount,
         failed: failedCount,
         results,
       },
-      message: 'Bulk SMS sent.',
+      message: responseMessage,
     })
   } catch (error) {
     if (error.message === 'NOT_ENOUGH_CREDITS') {
