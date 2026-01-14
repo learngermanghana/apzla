@@ -72,9 +72,13 @@ function FollowupPage({
 
   const selectedPhones = useMemo(
     () =>
-      selectedMembers
-        .map((member) => normalizedPhoneById.get(member.id))
-        .filter(Boolean),
+      Array.from(
+        new Set(
+          selectedMembers
+            .map((member) => normalizedPhoneById.get(member.id))
+            .filter(Boolean)
+        )
+      ),
     [selectedMembers, normalizedPhoneById]
   );
 
