@@ -684,7 +684,7 @@ function FollowupPage({
                       <td style={{ padding: "6px 4px" }}>
                         {m.firstName} {m.lastName}
                       </td>
-                      <td style={{ padding: "6px 4px" }}>
+                        <td style={{ padding: "6px 4px" }}>
                         {m.phone || "-"}
                       </td>
                       <td style={{ padding: "6px 4px" }}>
