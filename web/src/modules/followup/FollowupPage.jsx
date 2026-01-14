@@ -84,6 +84,8 @@ function FollowupPage({
   );
 
   const isBulkMode = sendMode === "BULK";
+  const creditsRequired = selectedPhones.length * smsCreditsPerMessage;
+  const hasEnoughCredits = smsCredits >= creditsRequired;
 
   // --- Selection helpers -----------------------------------------------------
 
@@ -129,7 +131,6 @@ function FollowupPage({
       return;
     }
 
-    const creditsRequired = selectedPhones.length * smsCreditsPerMessage;
     if (smsCredits < creditsRequired) {
       showToast(
         "Not enough SMS credits for all selected recipients.",
@@ -614,18 +615,36 @@ function FollowupPage({
               >
                 <button
                   onClick={handleBulkSend}
-                  disabled={sendingChannel !== null}
+                  disabled={
+                    sendingChannel !== null ||
+                    selectedPhones.length === 0 ||
+                    !hasEnoughCredits
+                  }
                   style={{
                     padding: "6px 10px",
                     borderRadius: 8,
                     border: "1px solid #6b7280",
                     background:
-                      sendingChannel !== null ? "#f3f4f6" : "white",
+                      sendingChannel !== null ||
+                      selectedPhones.length === 0 ||
+                      !hasEnoughCredits
+                        ? "#f3f4f6"
+                        : "white",
                     color: "#111827",
                     cursor:
-                      sendingChannel !== null ? "default" : "pointer",
+                      sendingChannel !== null ||
+                      selectedPhones.length === 0 ||
+                      !hasEnoughCredits
+                        ? "default"
+                        : "pointer",
                     fontSize: 12,
                     fontWeight: 600,
+                    opacity:
+                      sendingChannel !== null ||
+                      selectedPhones.length === 0 ||
+                      !hasEnoughCredits
+                        ? 0.7
+                        : 1,
                   }}
                 >
                   {sendingChannel === "sms"
@@ -640,6 +659,17 @@ function FollowupPage({
                   }}
                 >
                   Selected: {selectedPhones.length}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: hasEnoughCredits ? "#6b7280" : "#b91c1c",
+                    alignSelf: "center",
+                  }}
+                >
+                  Credits required: {creditsRequired} (
+                  {smsCreditsPerMessage} per message) · Available:{" "}
+                  {smsCredits}
                 </span>
               </div>
             )}
