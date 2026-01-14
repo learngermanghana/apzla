@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "../firebase";
+import { normalizePhone } from "../utils/phone";
 
 const overviewTabs = ["overview", "members", "attendance", "giving", "sermons", "followup"];
 const MEMBERS_PAGE_SIZE = 25;
@@ -165,11 +166,12 @@ export function useChurchData(userProfile, activeTab, todayStr) {
 
     try {
       setActionLoading(true);
+      const normalizedPhone = normalizePhone(memberForm.phone);
       await addDoc(collection(db, "members"), {
         churchId: userProfile.churchId,
         firstName: memberForm.firstName.trim(),
         lastName: memberForm.lastName.trim(),
-        phone: memberForm.phone.trim(),
+        phone: normalizedPhone || memberForm.phone.trim(),
         email: memberForm.email.trim(),
         status: memberForm.status,
         createdAt: new Date().toISOString(),
