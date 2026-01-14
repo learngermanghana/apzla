@@ -5,6 +5,7 @@ import {
   sendBulkSms,
   startTopup,
 } from "../../utils/messageApi";
+import { normalizePhone } from "../../utils/phone";
 
 const TOPUP_REFERENCE_KEY = "apzla:lastTopupReference";
 
@@ -16,7 +17,6 @@ function FollowupPage({
   isVisitorAudience,
   membersLoading,
   followupTargets,
-  formatPhoneForLink,
   followupMessage,
   followupMessageEncoded,
   onFollowupMessageChange,
@@ -46,13 +46,20 @@ function FollowupPage({
 
   // --- Derived data ----------------------------------------------------------
 
+  const normalizedPhoneById = useMemo(() => {
+    const map = new Map();
+    followupTargets.forEach((member) => {
+      map.set(member.id, normalizePhone(member.phone));
+    });
+    return map;
+  }, [followupTargets]);
+
   const recipientsWithPhone = useMemo(
     () =>
-      followupTargets.filter((member) => {
-        const normalized = (member.phone || "").trim();
-        return normalized.length > 0;
-      }),
-    [followupTargets]
+      followupTargets.filter((member) =>
+        Boolean(normalizedPhoneById.get(member.id))
+      ),
+    [followupTargets, normalizedPhoneById]
   );
 
   const selectedMembers = useMemo(
@@ -66,9 +73,9 @@ function FollowupPage({
   const selectedPhones = useMemo(
     () =>
       selectedMembers
-        .map((member) => (member.phone || "").trim())
-        .filter((phone) => phone.length > 0),
-    [selectedMembers]
+        .map((member) => normalizedPhoneById.get(member.id))
+        .filter(Boolean),
+    [selectedMembers, normalizedPhoneById]
   );
 
   const isBulkMode = sendMode === "BULK";
@@ -656,7 +663,12 @@ function FollowupPage({
               </thead>
               <tbody>
                 {followupTargets.map((m) => {
-                  const phoneForLink = formatPhoneForLink(m.phone);
+                  const normalizedPhone = normalizedPhoneById.get(m.id);
+                  const phoneForLink = normalizedPhone
+                    ? normalizedPhone.replace(/\D/g, "")
+                    : "";
+                  const hasPhone = Boolean((m.phone || "").trim());
+                  const hasValidPhone = Boolean(normalizedPhone);
                   const whatsappLink = phoneForLink
                     ? `https://wa.me/${phoneForLink}?text=${followupMessageEncoded}`
                     : `https://wa.me/?text=${followupMessageEncoded}`;
@@ -675,7 +687,7 @@ function FollowupPage({
                         <td style={{ padding: "6px 4px" }}>
                           <input
                             type="checkbox"
-                            disabled={!m.phone}
+                            disabled={!hasValidPhone}
                             checked={selectedRecipients.includes(m.id)}
                             onChange={() => toggleRecipient(m.id)}
                           />
@@ -684,8 +696,21 @@ function FollowupPage({
                       <td style={{ padding: "6px 4px" }}>
                         {m.firstName} {m.lastName}
                       </td>
-                        <td style={{ padding: "6px 4px" }}>
-                        {m.phone || "-"}
+                      <td style={{ padding: "6px 4px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                          }}
+                        >
+                          <span>{m.phone || "-"}</span>
+                          {hasPhone && !hasValidPhone && (
+                            <span style={{ fontSize: 11, color: "#dc2626" }}>
+                              Invalid phone number
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td style={{ padding: "6px 4px" }}>
                         {isBulkMode ? (
