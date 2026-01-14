@@ -38,6 +38,7 @@ function FollowupPage({
   const [isConfirmingTopup, setIsConfirmingTopup] = useState(false);
   const [isLoadingBundles, setIsLoadingBundles] = useState(false);
   const [bundleError, setBundleError] = useState("");
+  const [bulkFailures, setBulkFailures] = useState([]);
   const [pendingTopupRef, setPendingTopupRef] = useState(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem(TOPUP_REFERENCE_KEY) || "";
@@ -138,6 +139,7 @@ function FollowupPage({
     }
 
     try {
+      setBulkFailures([]);
       setSendingChannel("sms");
       const token = await user.getIdToken();
       const result = await sendBulkSms({
@@ -148,6 +150,14 @@ function FollowupPage({
       });
       const sentCount = Number(result?.data?.sent ?? 0);
       const failedCount = Number(result?.data?.failed ?? 0);
+      const failureResults = Array.isArray(result?.data?.results)
+        ? result.data.results
+            .filter((entry) => entry?.status === "failed")
+            .map((entry) => ({
+              recipient: entry?.recipient || "Unknown number",
+              error: entry?.error || "Unknown error.",
+            }))
+        : [];
       let toastVariant = "success";
       let toastMessage = result?.message || "Bulk SMS sent.";
 
@@ -165,7 +175,10 @@ function FollowupPage({
       }
 
       showToast(toastMessage, toastVariant);
-      setSelectedRecipients([]);
+      setBulkFailures(failureResults);
+      if (failureResults.length === 0) {
+        setSelectedRecipients([]);
+      }
     } catch (error) {
       showToast(error.message || "Unable to send bulk message.", "error");
     } finally {
@@ -628,6 +641,44 @@ function FollowupPage({
                 >
                   Selected: {selectedPhones.length}
                 </span>
+              </div>
+            )}
+
+            {isBulkMode && bulkFailures.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  borderRadius: 10,
+                  border: "1px solid #fecaca",
+                  background: "#fef2f2",
+                  padding: 10,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#991b1b",
+                    marginBottom: 6,
+                  }}
+                >
+                  Failed to send to {bulkFailures.length} recipient
+                  {bulkFailures.length === 1 ? "" : "s"}
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 18,
+                    color: "#7f1d1d",
+                    fontSize: 12,
+                  }}
+                >
+                  {bulkFailures.map((failure, index) => (
+                    <li key={`${failure.recipient}-${index}`}>
+                      {failure.recipient}: {failure.error}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
