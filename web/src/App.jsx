@@ -52,6 +52,7 @@ import {
 import { resizeImageFile } from "./utils/imageProcessing";
 import { evaluateAccessStatus } from "./utils/subscriptionUtils";
 import { isValidEmail } from "./utils/validation";
+import { normalizePhone } from "./utils/phone";
 
 const memberGenderOptions = [
   { value: "", label: "Gender (optional)" },
@@ -3058,8 +3059,6 @@ function AppContent() {
   const followupWhatsappLink = `https://wa.me/?text=${followupMessageEncoded}`;
   const followupTelegramLink = `https://t.me/share/url?text=${followupMessageEncoded}`;
   const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupMessageEncoded}`;
-  const formatPhoneForLink = (phone) => (phone || "").replace(/\D/g, "");
-  const normalizePhone = (value = "") => value.replace(/\D/g, "");
 
   const handleFollowupMessageChange = (value) => {
     setFollowupMessage(value);
@@ -6958,7 +6957,6 @@ function AppContent() {
             isVisitorAudience={isVisitorAudience}
             membersLoading={membersLoading}
             followupTargets={followupTargets}
-            formatPhoneForLink={formatPhoneForLink}
             followupMessage={followupMessage}
             followupMessageEncoded={followupMessageEncoded}
             onFollowupMessageChange={handleFollowupMessageChange}
