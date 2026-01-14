@@ -1115,11 +1115,12 @@ function AppContent() {
 
     try {
       setLoading(true);
+      const normalizedPhone = normalizePhone(memberForm.phone);
       const payload = {
         churchId: userProfile.churchId,
         firstName: memberForm.firstName.trim(),
         lastName: memberForm.lastName.trim(),
-        phone: memberForm.phone.trim(),
+        phone: normalizedPhone || memberForm.phone.trim(),
         email: memberForm.email.trim(),
         status: memberForm.status,
         baptized: memberForm.baptized,
@@ -1209,10 +1210,11 @@ function AppContent() {
     try {
       setMemberActionLoading(true);
       const docRef = doc(db, "members", editingMemberId);
+      const normalizedPhone = normalizePhone(editingMemberForm.phone);
       const payload = {
         firstName: editingMemberForm.firstName.trim(),
         lastName: editingMemberForm.lastName.trim(),
-        phone: editingMemberForm.phone.trim(),
+        phone: normalizedPhone || editingMemberForm.phone.trim(),
         email: editingMemberForm.email.trim(),
         photoDataUrl: editingMemberForm.photoDataUrl,
         status: editingMemberForm.status,
