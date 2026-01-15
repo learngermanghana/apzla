@@ -32,6 +32,7 @@ function FollowupPage({
   const [sendMode, setSendMode] = useState("FREE"); // FREE | BULK
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [sendingChannel, setSendingChannel] = useState(null);
+  const [isConfirmingBulkSend, setIsConfirmingBulkSend] = useState(false);
   const [bundleId, setBundleId] = useState("");
   const [bundles, setBundles] = useState([]);
   const [isPaying, setIsPaying] = useState(false);
@@ -107,20 +108,20 @@ function FollowupPage({
 
   // --- Bulk send -------------------------------------------------------------
 
-  const handleBulkSend = async () => {
+  const validateBulkSend = () => {
     if (!churchId) {
       showToast("Church ID missing. Please reload and try again.", "error");
-      return;
+      return false;
     }
 
     if (!user) {
       showToast("Please sign in again to send bulk messages.", "error");
-      return;
+      return false;
     }
 
     if (selectedPhones.length === 0) {
       showToast("Select at least one recipient.", "error");
-      return;
+      return false;
     }
 
     if (selectedPhones.length > bulkLimit) {
@@ -128,7 +129,7 @@ function FollowupPage({
         `Bulk send is limited to ${bulkLimit} recipients per request.`,
         "error"
       );
-      return;
+      return false;
     }
 
     if (smsCredits < creditsRequired) {
@@ -136,8 +137,14 @@ function FollowupPage({
         "Not enough SMS credits for all selected recipients.",
         "error"
       );
-      return;
+      return false;
     }
+
+    return true;
+  };
+
+  const handleBulkSend = async () => {
+    if (!validateBulkSend()) return;
 
     try {
       setBulkFailures([]);
@@ -184,7 +191,19 @@ function FollowupPage({
       showToast(error.message || "Unable to send bulk message.", "error");
     } finally {
       setSendingChannel(null);
+      setIsConfirmingBulkSend(false);
     }
+  };
+
+  const handleBulkSendClick = () => {
+    if (!validateBulkSend()) return;
+
+    if (!isConfirmingBulkSend) {
+      setIsConfirmingBulkSend(true);
+      return;
+    }
+
+    handleBulkSend();
   };
 
   // --- Load bundles when switching to BULK ----------------------------------
@@ -321,6 +340,10 @@ function FollowupPage({
       clearTimeout(timer);
     };
   }, [pendingTopupRef, user, churchId]);
+
+  useEffect(() => {
+    setIsConfirmingBulkSend(false);
+  }, [sendMode, selectedPhones.length, smsCreditsPerMessage]);
 
   // --- Render ---------------------------------------------------------------
 
@@ -614,7 +637,7 @@ function FollowupPage({
                 }}
               >
                 <button
-                  onClick={handleBulkSend}
+                  onClick={handleBulkSendClick}
                   disabled={
                     sendingChannel !== null ||
                     selectedPhones.length === 0 ||
@@ -649,8 +672,21 @@ function FollowupPage({
                 >
                   {sendingChannel === "sms"
                     ? "Sending SMS…"
+                    : isConfirmingBulkSend
+                    ? "Confirm send"
                     : "Send SMS to selected"}
                 </button>
+                {sendingChannel === "sms" && (
+                  <progress
+                    aria-label="Sending SMS"
+                    style={{
+                      width: 120,
+                      height: 8,
+                      alignSelf: "center",
+                      accentColor: "#111827",
+                    }}
+                  />
+                )}
                 <span
                   style={{
                     fontSize: 12,
@@ -671,6 +707,75 @@ function FollowupPage({
                   {smsCreditsPerMessage} per message) · Available:{" "}
                   {smsCredits}
                 </span>
+              </div>
+            )}
+
+            {isBulkMode && isConfirmingBulkSend && sendingChannel !== "sms" && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  borderRadius: 10,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                  padding: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#111827",
+                  }}
+                >
+                  Confirm bulk SMS
+                </div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                  You are about to send to{" "}
+                  <strong>{selectedPhones.length}</strong> recipient
+                  {selectedPhones.length === 1 ? "" : "s"} using{" "}
+                  <strong>{creditsRequired}</strong> credits.
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    onClick={handleBulkSend}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #111827",
+                      background: "#111827",
+                      color: "white",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Send now
+                  </button>
+                  <button
+                    onClick={() => setIsConfirmingBulkSend(false)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      color: "#111827",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
 
