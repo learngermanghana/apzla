@@ -802,6 +802,10 @@ function FollowupPage({
                           <span style={{ fontSize: 12, color: "#9ca3af" }}>
                             Use bulk send above
                           </span>
+                        ) : !hasValidPhone ? (
+                          <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                            Add a valid phone number to message
+                          </span>
                         ) : (
                           <div
                             style={{
