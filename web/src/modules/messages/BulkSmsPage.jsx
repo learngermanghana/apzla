@@ -92,6 +92,7 @@ export default function BulkSmsPage({
   const [hubtelRates, setHubtelRates] = useState(null);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesError, setRatesError] = useState("");
+  const [selectedPhones, setSelectedPhones] = useState(new Set());
 
   useEffect(() => {
     let isActive = true;
@@ -152,18 +153,47 @@ export default function BulkSmsPage({
   }, [members]);
 
   const recipients = recipientStats.recipients;
-  const sampleRecipients = recipients.slice(0, 6);
   const totalRecipients = recipients.length;
+  const totalSelected = selectedPhones.size;
   const segmentCount = message
     ? Math.max(1, Math.ceil(message.length / CHAR_LIMIT))
     : 0;
-  const creditsRequired = totalRecipients * segmentCount * smsCreditsPerMessage;
+  const creditsRequired = totalSelected * segmentCount * smsCreditsPerMessage;
   const availableCredits = Number(churchPlan?.smsCredits ?? 0);
   const creditsShortfall =
     availableCredits && creditsRequired
       ? creditsRequired - availableCredits
       : 0;
   const insufficientCredits = creditsRequired > 0 && creditsShortfall > 0;
+
+  useEffect(() => {
+    setSelectedPhones(new Set(recipients.map((recipient) => recipient.phone)));
+  }, [recipients]);
+
+  const selectedRecipients = useMemo(
+    () => recipients.filter((recipient) => selectedPhones.has(recipient.phone)),
+    [recipients, selectedPhones]
+  );
+
+  const togglePhone = (phone) => {
+    setSelectedPhones((prev) => {
+      const next = new Set(prev);
+      if (next.has(phone)) {
+        next.delete(phone);
+      } else {
+        next.add(phone);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedPhones(new Set(recipients.map((recipient) => recipient.phone)));
+  };
+
+  const handleClearAll = () => {
+    setSelectedPhones(new Set());
+  };
 
   const ratesList = useMemo(() => buildRatesList(hubtelRates), [hubtelRates]);
   const ratesUpdatedAt =
@@ -190,6 +220,14 @@ export default function BulkSmsPage({
       return;
     }
 
+    if (totalSelected === 0) {
+      setStatus({
+        tone: "error",
+        message: "Select at least one recipient before sending.",
+      });
+      return;
+    }
+
     if (insufficientCredits) {
       setStatus({
         tone: "error",
@@ -200,7 +238,7 @@ export default function BulkSmsPage({
     }
 
     const confirmed = window.confirm(
-      `Send this message to ${totalRecipients} recipients?`
+      `Send this message to ${totalSelected} recipients?`
     );
 
     if (!confirmed) return;
@@ -213,7 +251,7 @@ export default function BulkSmsPage({
       await sendBulkSms({
         churchId: userProfile.churchId,
         message: message.trim(),
-        recipients: recipients.map((recipient) => recipient.phone),
+        recipients: selectedRecipients.map((recipient) => recipient.phone),
         token: idToken,
       });
 
@@ -289,11 +327,16 @@ export default function BulkSmsPage({
           <Button
             variant="primary"
             onClick={handleSend}
-            disabled={sending || !message.trim() || insufficientCredits}
+            disabled={
+              sending ||
+              !message.trim() ||
+              insufficientCredits ||
+              totalSelected === 0
+            }
           >
             {sending
               ? "Sending..."
-              : `Send to ${totalRecipients || 0} members`}
+              : `Send to ${totalSelected || 0} selected`}
           </Button>
         </Card>
 
@@ -303,21 +346,53 @@ export default function BulkSmsPage({
             <p className="bulk-sms__helper">
               {totalRecipients} members with phone numbers, {recipientStats.missingPhone} missing.
             </p>
-            {sampleRecipients.length > 0 ? (
-              <ul className="bulk-sms__list">
-                {sampleRecipients.map((recipient) => (
-                  <li key={recipient.id || recipient.phone}>
-                    <span>{recipient.name || "Unnamed member"}</span>
-                    <span className="bulk-sms__phone">{recipient.phone}</span>
-                  </li>
-                ))}
-              </ul>
+            {recipients.length > 0 ? (
+              <>
+                <div className="bulk-sms__recipient-actions">
+                  <button
+                    type="button"
+                    className="bulk-sms__action"
+                    onClick={handleSelectAll}
+                    disabled={totalSelected === totalRecipients}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    className="bulk-sms__action"
+                    onClick={handleClearAll}
+                    disabled={totalSelected === 0}
+                  >
+                    Clear all
+                  </button>
+                  <span className="bulk-sms__selected-count">
+                    {totalSelected} selected
+                  </span>
+                </div>
+                <ul className="bulk-sms__list bulk-sms__list--selectable">
+                  {recipients.map((recipient) => (
+                    <li key={recipient.id || recipient.phone}>
+                      <label className="bulk-sms__recipient">
+                        <input
+                          type="checkbox"
+                          checked={selectedPhones.has(recipient.phone)}
+                          onChange={() => togglePhone(recipient.phone)}
+                        />
+                        <span className="bulk-sms__recipient-info">
+                          <span>{recipient.name || "Unnamed member"}</span>
+                          <span className="bulk-sms__phone">{recipient.phone}</span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
               <p className="bulk-sms__empty">No phone numbers on file yet.</p>
             )}
-            {totalRecipients > sampleRecipients.length && (
+            {totalRecipients > 0 && totalSelected === 0 && (
               <p className="bulk-sms__helper">
-                Showing {sampleRecipients.length} of {totalRecipients} recipients.
+                Select recipients to enable sending.
               </p>
             )}
           </Card>
