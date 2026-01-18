@@ -181,7 +181,9 @@ async function handler(request, response) {
     })
   }
 
-  const recipients = [...new Set(recipientsInput.map(normalizePhone).filter(Boolean))]
+  const recipients = [
+    ...new Set(recipientsInput.map((recipient) => normalizePhone(recipient)).filter(Boolean)),
+  ]
 
   if (recipients.length === 0) {
     return response.status(400).json({
