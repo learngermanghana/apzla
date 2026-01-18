@@ -14,7 +14,7 @@ const sendBulkMessage = async ({ endpoint, churchId, message, recipients, token 
 
   const data = await response.json().catch(() => ({}))
 
-  if (!response.ok) {
+  if (!response.ok || (data?.status && data.status !== 'success')) {
     throw new Error(data?.message || 'Unable to send bulk message.')
   }
 
