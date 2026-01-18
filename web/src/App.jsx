@@ -30,6 +30,7 @@ import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsPage from "./modules/sermons/SermonsPage";
 import DataTransferPage from "./modules/data/DataTransferPage";
+import BulkSmsPage from "./modules/messages/BulkSmsPage";
 import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
 import ToastContainer from "./components/common/ToastContainer";
@@ -129,7 +130,7 @@ function AppContent() {
   const [planLoading, setPlanLoading] = useState(false);
   const [paystackLoading, setPaystackLoading] = useState(false);
 
-  // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons"
+  // Dashboard tabs: "overview" | "members" | "bulk-sms" | "attendance" | "giving" | "sermons"
   const [activeTab, setActiveTab] = useState("overview");
 
   const MEMBERS_PAGE_SIZE = 25;
@@ -1239,6 +1240,7 @@ function AppContent() {
     if (
       (activeTab === "members" ||
         activeTab === "overview" ||
+        activeTab === "bulk-sms" ||
         activeTab === "checkin" ||
         activeTab === "giving" ||
         activeTab === "data") &&
@@ -5174,6 +5176,16 @@ function AppContent() {
               )}
             </div>
           </>
+        )}
+
+        {activeTab === "bulk-sms" && (
+          <BulkSmsPage
+            members={members}
+            userProfile={userProfile}
+            churchPlan={churchPlan}
+            smsCreditsPerMessage={smsCreditsPerMessage}
+            showToast={showToast}
+          />
         )}
 
         {activeTab === "data" && <DataTransferPage members={members} />}

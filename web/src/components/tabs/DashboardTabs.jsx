@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 export const DASHBOARD_TABS = [
   { id: "overview", label: "Overview" },
   { id: "members", label: "Members (CRM)" },
+  { id: "bulk-sms", label: "Bulk SMS" },
   { id: "data", label: "Data transfer" },
   { id: "attendance", label: "Attendance" },
   { id: "checkin", label: "Check-in (Per Member)" },

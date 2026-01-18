@@ -1,0 +1,187 @@
+.bulk-sms {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bulk-sms__hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.bulk-sms__subtitle {
+  color: #475569;
+  margin-top: 8px;
+  max-width: 560px;
+}
+
+.bulk-sms__hero-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bulk-sms__stat {
+  min-width: 160px;
+}
+
+.bulk-sms__stat-label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.bulk-sms__stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.bulk-sms__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.bulk-sms__compose h3 {
+  margin-top: 0;
+}
+
+.bulk-sms__label {
+  display: block;
+  margin: 12px 0 8px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.bulk-sms__textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 140px;
+}
+
+.bulk-sms__textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.bulk-sms__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+  margin: 6px 0 12px;
+}
+
+.bulk-sms__alert {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #7c2d12;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.bulk-sms__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bulk-sms__card h4 {
+  margin: 0 0 8px;
+}
+
+.bulk-sms__helper {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.bulk-sms__list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.bulk-sms__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.bulk-sms__phone {
+  color: #475569;
+  font-family: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+.bulk-sms__empty {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 8px;
+}
+
+.bulk-sms__credit-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.bulk-sms__rates {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.bulk-sms__rates li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.bulk-sms__rate-label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.bulk-sms__rate-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.bulk-sms__rate-price {
+  font-weight: 700;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+
+.bulk-sms__error {
+  font-size: 12px;
+  color: #b91c1c;
+}
+
+@media (max-width: 960px) {
+  .bulk-sms__layout {
+    grid-template-columns: 1fr;
+  }
+}
