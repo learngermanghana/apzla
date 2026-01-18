@@ -8,7 +8,6 @@ export const DASHBOARD_TABS = [
   { id: "attendance", label: "Attendance" },
   { id: "checkin", label: "Check-in (Per Member)" },
   { id: "giving", label: "Giving (Tithes & Offerings)" },
-  { id: "followup", label: "Follow-up" },
   { id: "sermons", label: "Sermons" },
 ];
 

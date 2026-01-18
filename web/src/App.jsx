@@ -29,7 +29,6 @@ import ChurchSetupPanel from "./components/church/ChurchSetupPanel";
 import "./App.css";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import SermonsPage from "./modules/sermons/SermonsPage";
-import FollowupPage from "./modules/followup/FollowupPage";
 import DataTransferPage from "./modules/data/DataTransferPage";
 import DashboardTabs from "./components/tabs/DashboardTabs";
 import AccountSettingsModal from "./components/account/AccountSettingsModal";
@@ -130,7 +129,7 @@ function AppContent() {
   const [planLoading, setPlanLoading] = useState(false);
   const [paystackLoading, setPaystackLoading] = useState(false);
 
-  // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons" | "followup"
+  // Dashboard tabs: "overview" | "members" | "attendance" | "giving" | "sermons"
   const [activeTab, setActiveTab] = useState("overview");
 
   const MEMBERS_PAGE_SIZE = 25;
@@ -364,33 +363,6 @@ function AppContent() {
     const baseUrl = normalizeBaseUrlMemo(sermonsPublicBaseUrl || defaultBaseUrl);
     return `${baseUrl.replace(/\/$/, "")}/sermons/${userProfile.churchId}`;
   }, [defaultBaseUrl, normalizeBaseUrlMemo, sermonsPublicBaseUrl, userProfile?.churchId]);
-
-  // Follow-up
-  const [followupAudience, setFollowupAudience] = useState("VISITOR");
-  const [followupPastorName, setFollowupPastorName] = useState("");
-  const [followupMessage, setFollowupMessage] = useState("");
-  const [isFollowupMessageCustom, setIsFollowupMessageCustom] = useState(false);
-
-  const visitorTemplate = `Hi, thank you for worshipping with us at ${
-    userProfile?.churchName || "our church"
-  } today. We’re glad you came. God bless you!${
-    followupPastorName ? ` – ${followupPastorName}` : ""
-  }`;
-
-  const memberTemplate = `Hi from ${
-    userProfile?.churchName || "our church"
-  }. We appreciate you as part of our church family and are praying you’re well.${
-    followupPastorName ? ` – ${followupPastorName}` : ""
-  }`;
-
-  const followupTemplate =
-    followupAudience === "VISITOR" ? visitorTemplate : memberTemplate;
-
-  useEffect(() => {
-    if (!isFollowupMessageCustom) {
-      setFollowupMessage(followupTemplate);
-    }
-  }, [followupTemplate, isFollowupMessageCustom]);
 
   const showToast = (message, variant = "info") => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now();
@@ -1267,7 +1239,6 @@ function AppContent() {
     if (
       (activeTab === "members" ||
         activeTab === "overview" ||
-        activeTab === "followup" ||
         activeTab === "checkin" ||
         activeTab === "giving" ||
         activeTab === "data") &&
@@ -3048,32 +3019,6 @@ function AppContent() {
       (value || "").toLowerCase().includes(normalizedSermonSearch)
     );
   });
-
-  const followupMessageEncoded = encodeURIComponent(followupMessage);
-  const visitorEmailSubject = encodeURIComponent("Thank you for worshipping with us");
-  const memberEmailSubject = encodeURIComponent(
-    `Hello from ${userProfile.churchName || "our church"}`
-  );
-  const followupEmailSubject =
-    followupAudience === "VISITOR"
-      ? visitorEmailSubject
-      : memberEmailSubject;
-  const followupWhatsappLink = `https://wa.me/?text=${followupMessageEncoded}`;
-  const followupTelegramLink = `https://t.me/share/url?text=${followupMessageEncoded}`;
-  const followupEmailLink = `mailto:?subject=${followupEmailSubject}&body=${followupMessageEncoded}`;
-
-  const handleFollowupMessageChange = (value) => {
-    setFollowupMessage(value);
-    setIsFollowupMessageCustom(true);
-  };
-
-  const visitorMembers = members.filter(
-    (m) => (m.status || "").toUpperCase() === "VISITOR"
-  );
-
-  const followupTargets =
-    followupAudience === "VISITOR" ? visitorMembers : members;
-  const isVisitorAudience = followupAudience === "VISITOR";
 
   return (
     <div
@@ -6948,29 +6893,6 @@ function AppContent() {
               )}
             </div>
           </>
-        )}
-
-        {activeTab === "followup" && (
-          <FollowupPage
-            followupPastorName={followupPastorName}
-            setFollowupPastorName={setFollowupPastorName}
-            followupAudience={followupAudience}
-            setFollowupAudience={setFollowupAudience}
-            isVisitorAudience={isVisitorAudience}
-            membersLoading={membersLoading}
-            followupTargets={followupTargets}
-            followupMessage={followupMessage}
-            followupMessageEncoded={followupMessageEncoded}
-            onFollowupMessageChange={handleFollowupMessageChange}
-            followupWhatsappLink={followupWhatsappLink}
-            followupTelegramLink={followupTelegramLink}
-            followupEmailLink={followupEmailLink}
-            showToast={showToast}
-            churchId={userProfile.churchId}
-            smsCredits={churchPlan?.smsCredits ?? 0}
-            smsCreditsPerMessage={smsCreditsPerMessage}
-            user={user}
-          />
         )}
 
         {activeTab === "sermons" && (

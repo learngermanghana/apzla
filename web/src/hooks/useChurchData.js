@@ -13,7 +13,7 @@ import {
 import { db } from "../firebase";
 import { normalizePhone } from "../utils/phone";
 
-const overviewTabs = ["overview", "members", "attendance", "giving", "sermons", "followup"];
+const overviewTabs = ["overview", "members", "attendance", "giving", "sermons"];
 const MEMBERS_PAGE_SIZE = 25;
 const GIVING_PAGE_SIZE = 25;
 
@@ -68,7 +68,6 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     link: "",
   });
 
-  const [followupPastorName, setFollowupPastorName] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -445,22 +444,11 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     [members]
   );
 
-  const visitorTemplate = useMemo(
-    () =>
-      `Hi, thank you for worshipping with us at ${
-        userProfile?.churchName || "our church"
-      } today. We’re glad you came. God bless you!${
-        followupPastorName ? ` – ${followupPastorName}` : ""
-      }`,
-    [userProfile?.churchName, followupPastorName]
-  );
-
   return {
     actionLoading,
     attendance,
     attendanceForm,
     attendanceLoading,
-    followupPastorName,
     giving,
     givingHasMore,
     givingForm,
@@ -485,11 +473,9 @@ export function useChurchData(userProfile, activeTab, todayStr) {
     sermons,
     sermonsLoading,
     setAttendanceForm,
-    setFollowupPastorName,
     setGivingForm,
     setMemberForm,
     setSermonForm,
     visitorMembers,
-    visitorTemplate,
   };
 }
