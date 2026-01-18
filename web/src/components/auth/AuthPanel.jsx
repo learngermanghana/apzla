@@ -34,7 +34,7 @@ export function AuthPanel({
   const inlineError = errorMessage || validationMessage;
 
   return (
-    <div className="app-shell auth-gradient" style={{ color: "#0f172a" }}>
+    <div className="app-shell auth-gradient auth-shell" style={{ color: "#0f172a" }}>
       <div aria-hidden className="auth-overlay" />
 
       <div className="auth-grid">
