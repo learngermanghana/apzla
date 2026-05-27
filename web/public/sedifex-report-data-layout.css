@@ -1,0 +1,140 @@
+/* Sedifex reports should stay simple: data history + downloads, not another metrics dashboard. */
+
+body.sedifex-reports-simple main,
+body.sedifex-reports-simple .dashboard-page,
+body.sedifex-reports-simple .app-main {
+  color: #0f172a;
+}
+
+body.sedifex-reports-simple .sedifex-report-intro {
+  max-width: 1040px;
+  margin: 0 0 18px;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+body.sedifex-reports-simple .sedifex-report-intro h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+body.sedifex-reports-simple .sedifex-report-intro p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.55;
+}
+
+body.sedifex-reports-simple .sedifex-report-hidden,
+body.sedifex-reports-simple [class*="metric" i],
+body.sedifex-reports-simple [class*="kpi" i],
+body.sedifex-reports-simple [class*="summary" i],
+body.sedifex-reports-simple [class*="stat" i] {
+  display: none !important;
+}
+
+body.sedifex-reports-simple [class*="report" i][class*="grid" i],
+body.sedifex-reports-simple [class*="report" i][class*="list" i],
+body.sedifex-reports-simple [class*="reports" i][class*="grid" i],
+body.sedifex-reports-simple [class*="reports" i][class*="list" i] {
+  display: grid !important;
+  grid-template-columns: 1fr;
+  gap: 10px !important;
+  max-width: 1040px;
+}
+
+body.sedifex-reports-simple [class*="report" i][class*="card" i],
+body.sedifex-reports-simple [class*="report" i][class*="item" i],
+body.sedifex-reports-simple [class*="reports" i][class*="card" i],
+body.sedifex-reports-simple [class*="reports" i][class*="item" i] {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+body.sedifex-reports-simple [class*="report" i][class*="card" i] p,
+body.sedifex-reports-simple [class*="report" i][class*="item" i] p {
+  margin: 2px 0 0 !important;
+  color: #475569 !important;
+  line-height: 1.45;
+}
+
+body.sedifex-reports-simple [class*="report" i][class*="card" i] h3,
+body.sedifex-reports-simple [class*="report" i][class*="item" i] h3,
+body.sedifex-reports-simple [class*="report" i][class*="card" i] h4,
+body.sedifex-reports-simple [class*="report" i][class*="item" i] h4 {
+  margin: 0 !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+
+body.sedifex-reports-simple [class*="report" i] a,
+body.sedifex-reports-simple [class*="report" i] button,
+body.sedifex-reports-simple a[href*="report" i],
+body.sedifex-reports-simple a[href*="orders" i],
+body.sedifex-reports-simple a[href*="booking" i] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a !important;
+  text-decoration: none !important;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+body.sedifex-reports-simple [class*="report" i] a:hover,
+body.sedifex-reports-simple [class*="report" i] button:hover,
+body.sedifex-reports-simple a[href*="report" i]:hover,
+body.sedifex-reports-simple a[href*="orders" i]:hover,
+body.sedifex-reports-simple a[href*="booking" i]:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+body.sedifex-reports-simple table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+body.sedifex-reports-simple th,
+body.sedifex-reports-simple td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+}
+
+body.sedifex-reports-simple th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 720px) {
+  body.sedifex-reports-simple [class*="report" i][class*="card" i],
+  body.sedifex-reports-simple [class*="report" i][class*="item" i],
+  body.sedifex-reports-simple [class*="reports" i][class*="card" i],
+  body.sedifex-reports-simple [class*="reports" i][class*="item" i] {
+    grid-template-columns: 1fr;
+  }
+}
