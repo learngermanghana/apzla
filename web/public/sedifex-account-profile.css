@@ -1,0 +1,156 @@
+/* Sedifex Account page polish
+   Makes workspace/store profile details readable as cards instead of a plain label list. */
+
+.account-profile-card,
+.workspace-profile-card,
+.store-profile-card,
+.sedifex-account-profile-card,
+[class*="account" i] [class*="profile" i],
+[class*="workspace" i] [class*="profile" i],
+[class*="store" i] [class*="profile" i] {
+  max-width: 720px;
+}
+
+.account-profile-details,
+.workspace-profile-details,
+.store-profile-details,
+.sedifex-account-profile-details,
+[class*="account" i] [class*="details" i],
+[class*="workspace" i] [class*="details" i],
+[class*="store" i] [class*="details" i] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.account-detail-item,
+.workspace-detail-item,
+.store-detail-item,
+.sedifex-account-detail-item,
+[class*="detail" i][class*="item" i] {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+.account-detail-label,
+.workspace-detail-label,
+.store-detail-label,
+.sedifex-account-detail-label,
+[class*="detail" i][class*="label" i] {
+  display: block;
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.account-detail-value,
+.workspace-detail-value,
+.store-detail-value,
+.sedifex-account-detail-value,
+[class*="detail" i][class*="value" i] {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.account-detail-item.is-wide,
+.workspace-detail-item.is-wide,
+.store-detail-item.is-wide,
+.sedifex-account-detail-item.is-wide,
+[class*="detail" i][class*="item" i].is-wide {
+  grid-column: 1 / -1;
+}
+
+.account-status-badge,
+.workspace-status-badge,
+.store-status-badge,
+.sedifex-account-status-badge,
+[class*="status" i][class*="badge" i] {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+/* Fallback for current Account screen when labels/values are plain text inside one block. */
+.dashboard-page section:has(button),
+.dashboard-page article:has(button) {
+  box-sizing: border-box;
+}
+
+.dashboard-page :is(section, article, div):has(> h2):has(button) :is(dl, .profile-list, .details-list) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-page dl {
+  max-width: 720px;
+}
+
+.dashboard-page dl:has(dt) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-page dt,
+.dashboard-page dd {
+  margin: 0;
+}
+
+.dashboard-page dl:has(dt) > div,
+.dashboard-page dl:has(dt) > span {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.dashboard-page dt {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-page dd {
+  margin-top: 5px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .account-profile-details,
+  .workspace-profile-details,
+  .store-profile-details,
+  .sedifex-account-profile-details,
+  [class*="account" i] [class*="details" i],
+  [class*="workspace" i] [class*="details" i],
+  [class*="store" i] [class*="details" i],
+  .dashboard-page dl:has(dt) {
+    grid-template-columns: 1fr;
+  }
+}
