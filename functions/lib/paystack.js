@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const { calculatePaystackCustomerCharge, buildPaystackMetadata } = require('./paystackFees')
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
 
@@ -10,14 +11,18 @@ const requirePaystackKey = () => {
   }
 }
 
-const initializeTransaction = async ({ email, amount, metadata }) => {
+const initializeTransaction = async ({ email, amount, metadata, coverPaystackFee }) => {
   requirePaystackKey()
+
+  const amountBreakdown = calculatePaystackCustomerCharge(amount, {
+    coverPaystackFee,
+  })
 
   const payload = {
     email,
-    amount,
-    currency: 'GHS',
-    metadata,
+    amount: amountBreakdown.chargeAmountMinor,
+    currency: amountBreakdown.currency,
+    metadata: buildPaystackMetadata(metadata, amountBreakdown),
   }
 
   const response = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -36,7 +41,10 @@ const initializeTransaction = async ({ email, amount, metadata }) => {
     throw error
   }
 
-  return body.data
+  return {
+    ...body.data,
+    amountBreakdown,
+  }
 }
 
 const verifyTransaction = async (reference) => {
