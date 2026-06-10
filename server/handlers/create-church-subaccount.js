@@ -1,5 +1,6 @@
 const { db, initError } = require('../lib/firestoreAdmin')
 const verifyUser = require('../lib/verifyUser')
+const { encryptSensitiveValue } = require('../lib/sensitiveFields')
 const {
   buildSubaccountMetadata,
   createPaystackSubaccount,
@@ -112,6 +113,7 @@ async function handler(request, response) {
     })
 
     const nowIso = new Date().toISOString()
+    const encryptedAccountNumber = encryptSensitiveValue(payoutAccountNumber)
 
     await churchRef.update({
       paystackSubaccountCode: subaccount.subaccountCode,
@@ -120,10 +122,12 @@ async function handler(request, response) {
       paystackSubaccountLastSyncedAt: nowIso,
       payoutStatus: 'ACTIVE',
       payoutAccountName: subaccount.accountName || payoutAccountName,
+      payoutAccountNumberEncrypted: encryptedAccountNumber,
       payoutAccountNumberLast4: subaccount.accountNumberLast4,
       payoutBankCode: bankCode,
       payoutBankType,
       payoutNetwork: payoutNetwork || null,
+      payoutSensitiveFieldVersion: 'v1',
       payoutVerified: true,
       platformCommissionPercent: platformCommission,
       onlineGivingEnabled: true,
