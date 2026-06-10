@@ -1,4 +1,5 @@
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
+const { calculatePaystackCustomerCharge, buildPaystackMetadata } = require('../../lib/paystackFees')
 
 async function handler(request, response) {
   if (request.method !== 'POST') {
@@ -8,7 +9,9 @@ async function handler(request, response) {
     })
   }
 
-  const { email, amount, callback_url: callbackUrl, metadata } = request.body || {}
+  const body = request.body || {}
+  const { email, amount, callback_url: callbackUrl, metadata } = body
+  const coverPaystackFee = body.cover_paystack_fee ?? body.coverPaystackFee
 
   if (!email || typeof email !== 'string') {
     return response.status(400).json({
@@ -31,18 +34,19 @@ async function handler(request, response) {
     })
   }
 
+  const amountBreakdown = calculatePaystackCustomerCharge(Number(amount), {
+    coverPaystackFee,
+  })
+
   const payload = {
     email: email.trim(),
-    amount: Number(amount),
-    currency: 'GHS'
+    amount: amountBreakdown.chargeAmountMinor,
+    currency: amountBreakdown.currency,
+    metadata: buildPaystackMetadata(metadata, amountBreakdown),
   }
 
   if (callbackUrl) {
     payload.callback_url = callbackUrl
-  }
-
-  if (metadata) {
-    payload.metadata = metadata
   }
 
   try {
@@ -55,10 +59,10 @@ async function handler(request, response) {
       body: JSON.stringify(payload)
     })
 
-    const body = await paystackResponse.json().catch(() => ({}))
+    const responseBody = await paystackResponse.json().catch(() => ({}))
 
     if (!paystackResponse.ok) {
-      const message = body?.message || paystackResponse.statusText || 'Initialization failed'
+      const message = responseBody?.message || paystackResponse.statusText || 'Initialization failed'
       return response.status(paystackResponse.status || 500).json({
         status: 'error',
         message
@@ -67,8 +71,11 @@ async function handler(request, response) {
 
     return response.status(200).json({
       status: 'success',
-      data: body?.data || null,
-      message: body?.message || 'Transaction initialized successfully.'
+      data: {
+        ...(responseBody?.data || {}),
+        amountBreakdown,
+      },
+      message: responseBody?.message || 'Transaction initialized successfully.'
     })
   } catch (error) {
     return response.status(500).json({
