@@ -1,12 +1,7 @@
 const { db, initError } = require('../lib/firestoreAdmin')
 const verifyUser = require('../lib/verifyUser')
-const { encryptSensitiveValue } = require('../lib/sensitiveFields')
-const {
-  buildSubaccountMetadata,
-  createPaystackSubaccount,
-} = require('../lib/paystackSubaccount')
 
-const DEFAULT_PLATFORM_COMMISSION = 3
+const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY
 
 async function handler(request, response) {
   if (request.method !== 'POST') {
@@ -20,6 +15,13 @@ async function handler(request, response) {
     return response.status(500).json({
       status: 'error',
       message: initError.message || 'Unable to initialize Firebase.',
+    })
+  }
+
+  if (!PAYSTACK_SECRET) {
+    return response.status(500).json({
+      status: 'error',
+      message: 'PAYSTACK_SECRET_KEY environment variable is not configured.',
     })
   }
 
@@ -84,73 +86,56 @@ async function handler(request, response) {
       })
     }
 
-    const platformCommission = Number.isFinite(Number(church.platformCommissionPercent))
-      ? Number(church.platformCommissionPercent)
-      : DEFAULT_PLATFORM_COMMISSION
+    if (!bankCode) {
+      return response.status(400).json({
+        status: 'error',
+        message: 'Bank code or network is required to create a Paystack subaccount.',
+      })
+    }
 
-    const metadata = buildSubaccountMetadata({
-      entityType: 'church',
-      entityId: churchId,
-      ownerUserId: authResult.uid,
-      source: 'sedifex-online-giving',
-      metadata: {
-        payoutBankType,
-        payoutNetwork,
-        app: 'sedifex',
+    const body = {
+      business_name: church.name || `Apzla Church ${churchId}`,
+      account_number: payoutAccountNumber,
+      bank_code: bankCode,
+      percentage_charge: 0,
+    }
+
+    const paystackResponse = await fetch('https://api.paystack.co/subaccount', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(body),
     })
 
-    const subaccount = await createPaystackSubaccount({
-      businessName: church.name || payoutAccountName || `Sedifex Church ${churchId}`,
-      accountNumber: payoutAccountNumber,
-      bankCode,
-      percentageCharge: platformCommission,
-      description: `Sedifex payout account for ${church.name || churchId}`,
-      primaryContactEmail: userData?.email,
-      primaryContactName: payoutAccountName,
-      primaryContactPhone: church.phone,
-      metadata,
-    })
+    const result = await paystackResponse.json().catch(() => ({}))
 
-    const nowIso = new Date().toISOString()
-    const encryptedAccountNumber = encryptSensitiveValue(payoutAccountNumber)
+    if (!paystackResponse.ok || !result.status) {
+      const message = result?.message || paystackResponse.statusText || 'Paystack failed'
+      return response.status(paystackResponse.status || 500).json({
+        status: 'error',
+        message,
+      })
+    }
+
+    const subaccountCode = result?.data?.subaccount_code || null
 
     await churchRef.update({
-      paystackSubaccountCode: subaccount.subaccountCode,
-      paystackSubaccountId: subaccount.subaccountId,
-      paystackSubaccountCreatedAt: nowIso,
-      paystackSubaccountLastSyncedAt: nowIso,
+      paystackSubaccountCode: subaccountCode,
       payoutStatus: 'ACTIVE',
-      payoutAccountName: subaccount.accountName || payoutAccountName,
-      payoutAccountNumberEncrypted: encryptedAccountNumber,
-      payoutAccountNumberLast4: subaccount.accountNumberLast4,
-      payoutBankCode: bankCode,
-      payoutBankType,
-      payoutNetwork: payoutNetwork || null,
-      payoutSensitiveFieldVersion: 'v1',
-      payoutVerified: true,
-      platformCommissionPercent: platformCommission,
       onlineGivingEnabled: true,
-      updatedAt: nowIso,
     })
 
     return response.status(200).json({
       status: 'success',
-      data: {
-        subaccountCode: subaccount.subaccountCode,
-        subaccountId: subaccount.subaccountId,
-        accountName: subaccount.accountName,
-        accountNumberLast4: subaccount.accountNumberLast4,
-        settlementBank: subaccount.settlementBank,
-        percentageCharge: subaccount.percentageCharge,
-      },
-      message: 'Paystack subaccount created and saved.',
+      data: { subaccountCode },
+      message: 'Paystack subaccount created.',
     })
   } catch (error) {
-    return response.status(error.statusCode || 500).json({
+    return response.status(500).json({
       status: 'error',
       message: error.message || 'Unable to create Paystack subaccount.',
-      details: error.paystackResponse || undefined,
     })
   }
 }
